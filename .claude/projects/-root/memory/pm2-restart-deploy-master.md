@@ -34,11 +34,14 @@ pm2 save --force
 - `pm2 restart --update-env` — injects shell secrets into PM2 stored state
 - `pm2 restart <name>` after config change — reuses stale pm2_env.env
 - `pm2 kill` — destroys process table, daemon auto-resurrects old state from dump.pm2
+- `env:{}` blocks for secrets — they override .env files (wrapper respects existing vars). After rotating a DB password, an old password in env:{} causes auth failure crashloop
 
 ### ecosystem.config.js Rules
 - **NEVER** use `process.env.VAR || ""` in `env: {}` blocks — captures shell secrets into PM2
+- **NEVER** put secret values (passwords, API keys) in `env: {}` blocks — they OVERRIDE wrapper-loaded `.env` values. The pm2-env-wrapper.sh checks `[ -z "${!key+x}" ]` and skips vars already set, so an old password in `env:{}` silently wins over a rotated password in `.env`
 - Only hardcoded non-sensitive values: PORT, URIs, booleans
 - Secrets loaded via .env files at app runtime, not PM2 env
+- **`args` with `interpreter:'none'` collapses to single token** — `args: 'uvicorn main:app --host 127.0.0.1 --port 8103'` becomes one arg to `exec`, causing "not found". Use a `run.sh` wrapper script with hardcoded command instead
 
 ### Verification
 ```bash
@@ -105,4 +108,4 @@ Always `pm2 save --force` after deletions to persist.
 ### How to apply
 When deploying or restarting any PM2 process, follow the canonical pattern. Always verify with the secret scan after. If any process shows secret values, the ecosystem config has `process.env.VAR` references that must be removed.
 
-**Related:** [[pm2-env-i-pattern]] [[pm2-process-env-leak]] [[pm2-restart-canonical]] [[pm2-deploy-state]]
+**Related:** [[pm2-env-i-pattern]] [[pm2-process-env-leak]] [[pm2-env-override-pattern]] [[pm2-restart-canonical]] [[pm2-deploy-state]]
