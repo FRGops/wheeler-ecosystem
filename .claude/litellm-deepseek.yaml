@@ -1,0 +1,45 @@
+model_list:
+- model_name: deepseek-chat
+  litellm_params:
+    model: openai/deepseek-chat
+    api_key: os.environ/DEEPSEEK_API_KEY
+    api_base: https://api.deepseek.com
+    rpm: 1000
+- model_name: deepseek-reasoner
+  litellm_params:
+    model: openai/deepseek-reasoner
+    api_key: os.environ/DEEPSEEK_API_KEY
+    api_base: https://api.deepseek.com
+    rpm: 500
+- model_name: premium_review
+  litellm_params:
+    model: anthropic/claude-sonnet-4-20250514
+    api_key: os.environ/ANTHROPIC_API_KEY
+    rpm: 100
+- model_name: claude-sonnet-4
+  litellm_params:
+    model: anthropic/claude-sonnet-4-20250514
+    api_key: os.environ/ANTHROPIC_API_KEY
+    rpm: 100
+- model_name: claude-opus-4
+  litellm_params:
+    model: anthropic/claude-opus-4-20250514
+    api_key: os.environ/ANTHROPIC_API_KEY
+    rpm: 50
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: os.environ/DATABASE_URL
+  redis_host: os.environ/REDIS_HOST
+  redis_port: os.environ/REDIS_PORT
+
+litellm_settings:
+  cache: true
+  cache_params:
+    type: redis
+    host: os.environ/REDIS_HOST
+    port: os.environ/REDIS_PORT
+    password: os.environ/REDIS_PASSWORD
+    db: os.environ/REDIS_CACHE_DB
+  drop_params: true
+  set_verbose: false
