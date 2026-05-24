@@ -13,6 +13,7 @@
 - [cap_drop ALL Patterns](cap-drop-patterns.md) — s6-overlay needs SETGID/SETUID, nginx needs CHOWN, postgres needs DAC_OVERRIDE
 - [PM2 env -i Delete+Start Pattern](pm2-env-i-pattern.md) — restart reuses stored pm2_env.env; only delete+start with env -i creates clean processes. Daemon auto-restart preserves state.
 - [PM2 process.env Leak Pattern](pm2-process-env-leak.md) — ecosystem.config.js `process.env.VAR || ""` captures shell secrets into PM2 stored env. Never reference process.env in env:{} blocks.
+- [PM2 Env Override Pattern](pm2-env-override-pattern.md) — env:{} block overrides .env files; hardcoded passwords in env:{} cause auth failures after secret rotation. Use env -i delete+start to clear.
 - [PM2 Restart/Deploy Master](pm2-restart-deploy-master.md) — Canonical playbook: delete+start pattern, danger commands, auto-resurrect guard, 24-process config map, verification script
 - [QA Scorecard 100/100](qa-scorecard-100.md) — Wheeler ecosystem Stage 2 QA achieved A+ (100/100) on 2026-05-24. Scorecard at /root/STAGE2_QA_SCORECARD_FINAL.md.
 - [/slay](.claude/skills/slay/SKILL.md) — Full ecosystem health audit + auto-remediation. 20-endpoint check, PM2 jlist secret scan, Docker :latest audit, network bind verification. Fixes broken processes with env -i delete+start.
