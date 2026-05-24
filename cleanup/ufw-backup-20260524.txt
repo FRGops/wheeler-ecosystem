@@ -1,0 +1,100 @@
+Status: active
+
+     To                         Action      From
+     --                         ------      ----
+[ 1] OpenSSH                    ALLOW IN    Anywhere                  
+[ 2] 80/tcp                     ALLOW IN    Anywhere                  
+[ 3] 443/tcp                    ALLOW IN    Anywhere                  
+[ 4] 19999/tcp on tailscale0    ALLOW IN    Anywhere                  
+[ 5] 3001/tcp on tailscale0     ALLOW IN    Anywhere                  
+[ 6] 3002/tcp on tailscale0     ALLOW IN    Anywhere                  
+[ 7] 5000/tcp on tailscale0     ALLOW IN    Anywhere                  
+[ 8] 8088/tcp on tailscale0     ALLOW IN    Anywhere                  
+[ 9] 8098/tcp on tailscale0     ALLOW IN    Anywhere                  
+[10] 8007/tcp on tailscale0     ALLOW IN    Anywhere                  
+[11] 8123/tcp on tailscale0     ALLOW IN    Anywhere                  
+[12] 9000/tcp on tailscale0     ALLOW IN    Anywhere                  
+[13] 5001/tcp on tailscale0     ALLOW IN    Anywhere                  
+[14] 8090/tcp on tailscale0     ALLOW IN    Anywhere                  
+[15] 9090/tcp on tailscale0     ALLOW IN    Anywhere                  
+[16] 3130/tcp on tailscale0     ALLOW IN    Anywhere                  
+[17] 5434/tcp on tailscale0     ALLOW IN    Anywhere                  
+[18] 8098/tcp                   ALLOW IN    100.64.0.0/10             
+[19] 8007/tcp                   ALLOW IN    100.64.0.0/10             
+[20] 8088/tcp                   ALLOW IN    100.64.0.0/10             
+[21] 3002/tcp                   ALLOW IN    100.64.0.0/10             
+[22] 5000/tcp                   ALLOW IN    100.64.0.0/10             
+[23] 3130/tcp                   ALLOW IN    100.64.0.0/10             
+[24] 9000/tcp                   ALLOW IN    100.64.0.0/10             
+[25] 5001/tcp                   ALLOW IN    100.64.0.0/10             
+[26] 3001/tcp                   ALLOW IN    100.64.0.0/10             
+[27] 19999/tcp                  ALLOW IN    100.64.0.0/10             
+[28] 9090/tcp                   ALLOW IN    100.64.0.0/10             
+[29] 8123/tcp                   ALLOW IN    100.64.0.0/10             
+[30] 8098/tcp                   ALLOW IN    Anywhere                  
+[31] 8007/tcp                   ALLOW IN    Anywhere                  
+[32] 8088/tcp                   ALLOW IN    Anywhere                  
+[33] 3002/tcp                   ALLOW IN    Anywhere                  
+[34] 5000/tcp                   ALLOW IN    Anywhere                  
+[35] 3130/tcp                   ALLOW IN    Anywhere                  
+[36] 9000/tcp                   DENY IN     Anywhere                  
+[37] 5001/tcp                   ALLOW IN    Anywhere                  
+[38] 3001/tcp                   ALLOW IN    Anywhere                  
+[39] 19999/tcp                  ALLOW IN    Anywhere                  
+[40] 9090/tcp                   DENY IN     Anywhere                  
+[41] 8090/tcp                   ALLOW IN    Anywhere                  
+[42] 9091/tcp on docker0        ALLOW IN    Anywhere                  
+[43] 9091/tcp                   ALLOW IN    172.17.0.0/16             
+[44] 5432/tcp                   ALLOW IN    100.64.0.0/10             
+[45] 5433/tcp                   ALLOW IN    100.64.0.0/10             
+[46] 5434/tcp                   ALLOW IN    100.64.0.0/10             
+[47] 6379/tcp                   ALLOW IN    100.64.0.0/10             
+[48] 22/tcp                     LIMIT IN    Anywhere                  
+[49] 22/tcp                     ALLOW IN    100.64.0.0/10             
+[50] 3000/tcp                   ALLOW IN    100.64.0.0/10             
+[51] 4000/tcp                   ALLOW IN    100.64.0.0/10             
+[52] Anywhere                   ALLOW IN    172.16.0.0/12             
+[53] Anywhere                   ALLOW IN    10.0.0.0/8                
+[54] 5433/tcp                   DENY IN     Anywhere                  
+[55] 5433/tcp on tailscale0     ALLOW IN    Anywhere                  
+[56] 8103/tcp on tailscale0     ALLOW IN    Anywhere                  
+[57] 3003/tcp on tailscale0     ALLOW IN    Anywhere                  
+[58] 3007/tcp on tailscale0     ALLOW IN    Anywhere                  
+[59] 5433/tcp                   ALLOW IN    10.0.0.0/16               
+[60] OpenSSH (v6)               ALLOW IN    Anywhere (v6)             
+[61] 80/tcp (v6)                ALLOW IN    Anywhere (v6)             
+[62] 443/tcp (v6)               ALLOW IN    Anywhere (v6)             
+[63] 19999/tcp (v6) on tailscale0 ALLOW IN    Anywhere (v6)             
+[64] 3001/tcp (v6) on tailscale0 ALLOW IN    Anywhere (v6)             
+[65] 3002/tcp (v6) on tailscale0 ALLOW IN    Anywhere (v6)             
+[66] 5000/tcp (v6) on tailscale0 ALLOW IN    Anywhere (v6)             
+[67] 8088/tcp (v6) on tailscale0 ALLOW IN    Anywhere (v6)             
+[68] 8098/tcp (v6) on tailscale0 ALLOW IN    Anywhere (v6)             
+[69] 8007/tcp (v6) on tailscale0 ALLOW IN    Anywhere (v6)             
+[70] 8123/tcp (v6) on tailscale0 ALLOW IN    Anywhere (v6)             
+[71] 9000/tcp (v6) on tailscale0 ALLOW IN    Anywhere (v6)             
+[72] 5001/tcp (v6) on tailscale0 ALLOW IN    Anywhere (v6)             
+[73] 8090/tcp (v6) on tailscale0 ALLOW IN    Anywhere (v6)             
+[74] 9090/tcp (v6) on tailscale0 ALLOW IN    Anywhere (v6)             
+[75] 3130/tcp (v6) on tailscale0 ALLOW IN    Anywhere (v6)             
+[76] 5434/tcp (v6) on tailscale0 ALLOW IN    Anywhere (v6)             
+[77] 8098/tcp (v6)              ALLOW IN    Anywhere (v6)             
+[78] 8007/tcp (v6)              ALLOW IN    Anywhere (v6)             
+[79] 8088/tcp (v6)              ALLOW IN    Anywhere (v6)             
+[80] 3002/tcp (v6)              ALLOW IN    Anywhere (v6)             
+[81] 5000/tcp (v6)              ALLOW IN    Anywhere (v6)             
+[82] 3130/tcp (v6)              ALLOW IN    Anywhere (v6)             
+[83] 9000/tcp (v6)              DENY IN     Anywhere (v6)             
+[84] 5001/tcp (v6)              ALLOW IN    Anywhere (v6)             
+[85] 3001/tcp (v6)              ALLOW IN    Anywhere (v6)             
+[86] 19999/tcp (v6)             ALLOW IN    Anywhere (v6)             
+[87] 9090/tcp (v6)              DENY IN     Anywhere (v6)             
+[88] 8090/tcp (v6)              ALLOW IN    Anywhere (v6)             
+[89] 9091/tcp (v6) on docker0   ALLOW IN    Anywhere (v6)             
+[90] 22/tcp (v6)                LIMIT IN    Anywhere (v6)             
+[91] 5433/tcp (v6)              DENY IN     Anywhere (v6)             
+[92] 5433/tcp (v6) on tailscale0 ALLOW IN    Anywhere (v6)             
+[93] 8103/tcp (v6) on tailscale0 ALLOW IN    Anywhere (v6)             
+[94] 3003/tcp (v6) on tailscale0 ALLOW IN    Anywhere (v6)             
+[95] 3007/tcp (v6) on tailscale0 ALLOW IN    Anywhere (v6)             
+

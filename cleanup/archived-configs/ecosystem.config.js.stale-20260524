@@ -1,0 +1,344 @@
+/**
+ * =============================================================================
+ * Wheeler AIOPS — PM2 Ecosystem Configuration
+ * =============================================================================
+ * Node:      Hetzner CPX51 (AIOPS)
+ * Hostname:  wheeler-aiops-01
+ * Tailscale: 100.121.230.28
+ *
+ * All services connect to COREDB (100.118.166.117) for PostgreSQL and Redis.
+ * No local database instances — all state centralized on COREDB.
+ *
+ * Port assignments (resolved conflicts):
+ *   surplusai-scraper-agent-svc: 8007 -> 8009 (ravynai Docker has 8007)
+ *   voice-agent-svc:             8008 -> 8018 (was conflicting on AIOPS)
+ *   frgcrm-api:                  8082 (was errored; clean port assignment)
+ *   litellm:                     4049 (consistent with EDGE deployment)
+ *   wheeler-brain-os:            8100
+ *   openclaw-gateway:            8110
+ *   browser-agent-svc:           8120
+ *   prediction-radar-workers:    internal only (no HTTP port)
+ *
+ * Requirements:
+ *   - PM2 v7.x  (npm install -g pm2@latest)
+ *   - Node.js 22 LTS
+ *   - Python 3.12+ (for AI agent services)
+ * =============================================================================
+ */
+
+// ─── Core Database URLs (COREDB via Tailscale) ──────────────────────────────
+const COREDB_TAILSCALE = process.env.COREDB_TAILSCALE || "100.118.166.117";
+const DATABASE_URL  = process.env.DATABASE_URL  || `postgresql://wheeler:${process.env.DB_PASSWORD}@${COREDB_TAILSCALE}:5432/wheeler_core`;
+const REDIS_URL     = process.env.REDIS_URL     || `redis://:FRGpassword1!@${COREDB_TAILSCALE}:6379`;
+
+// ─── Common PM2 settings ────────────────────────────────────────────────────
+const NODE_ARGS = "--max-old-space-size=2048 --expose-gc";
+const LOG_DATE_FORMAT = "YYYY-MM-DD HH:mm:ss Z";
+
+// ─── Common environment variables injected into all services ─────────────────
+const COMMON_ENV = {
+  NODE_ENV: "production",
+  DATABASE_URL,
+  REDIS_URL,
+  COREDB_HOST: COREDB_TAILSCALE,
+};
+
+module.exports = {
+  apps: [
+    // ═══════════════════════════════════════════════════════════════════════
+    //  1. LiteLLM — LLM API Proxy (port 4049)
+    // ═══════════════════════════════════════════════════════════════════════
+    {
+      name: "litellm",
+      script: "litellm",
+      args: "--port 4049 --host 0.0.0.0",
+      cwd: "/opt/wheeler/services/litellm",
+      interpreter: "python3",
+      interpreter_args: "-m",
+      max_restarts: 10,
+      restart_delay: 5000,
+      max_memory_restart: "1G",
+      kill_timeout: 10000,
+      wait_ready: true,
+      listen_timeout: 15000,
+      autorestart: true,
+      log_date_format: LOG_DATE_FORMAT,
+      error_file: "/opt/logs/litellm-error.log",
+      out_file: "/opt/logs/litellm-out.log",
+      merge_logs: true,
+      node_args: NODE_ARGS,
+      env: {
+        ...COMMON_ENV,
+        LITELLM_PORT: "4049",
+        LITELLM_HOST: "0.0.0.0",
+        LITELLM_MASTER_KEY: process.env.LITELLM_MASTER_KEY || "",
+        LITELLM_TELEMETRY: "false",
+        LITELLM_CACHE_TYPE: "redis",
+        LITELLM_CACHE_REDIS_URL: REDIS_URL,
+        LITELLM_CACHE_TTL: "3600",
+        LITELLM_LOG_LEVEL: "info",
+        OPENAI_API_KEY: process.env.OPENAI_API_KEY || "",
+        ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || "",
+        DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY || "",
+        GEMINI_API_KEY: process.env.GEMINI_API_KEY || "",
+        LITELLM_DATABASE_URL: DATABASE_URL,
+      },
+      // Health endpoint
+      instance_var: "INSTANCE_ID",
+    },
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  2. FRGCRM API — Customer Relationship Management API (port 8082)
+    // ═══════════════════════════════════════════════════════════════════════
+    {
+      name: "frgcrm-api",
+      script: "dist/server.js",      // compiled TypeScript entry
+      cwd: "/opt/wheeler/apps/frgcrm/api",
+      max_restarts: 5,
+      restart_delay: 3000,
+      max_memory_restart: "512M",
+      kill_timeout: 8000,
+      wait_ready: true,
+      listen_timeout: 20000,
+      autorestart: true,
+      log_date_format: LOG_DATE_FORMAT,
+      error_file: "/opt/logs/frgcrm-api-error.log",
+      out_file: "/opt/logs/frgcrm-api-out.log",
+      merge_logs: true,
+      node_args: NODE_ARGS,
+      env: {
+        ...COMMON_ENV,
+        PORT: "8082",
+        HOST: "0.0.0.0",
+        FRGCRM_DATABASE_URL: `postgresql://wheeler:${process.env.DB_PASSWORD}@${COREDB_TAILSCALE}:5432/frgcrm`,
+        FRGCRM_REDIS_URL: `redis://:FRGpassword1!@${COREDB_TAILSCALE}:6379/1`,
+        SECRET_KEY_BASE: process.env.FRGCRM_SECRET_KEY_BASE || "",
+        CORS_ORIGIN: "https://frgcrm.wheeler.ai",
+        LOG_LEVEL: "info",
+      },
+    },
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  3. SurplusAI Scraper Agent — Asset lifecycle agent (port 8009)
+    //     Resolved: was 8007, conflicted with ravynai Docker container
+    // ═══════════════════════════════════════════════════════════════════════
+    {
+      name: "surplusai-scraper-agent-svc",
+      script: "dist/index.js",
+      cwd: "/opt/wheeler/services/surplusai-scraper-agent",
+      max_restarts: 10,
+      restart_delay: 5000,
+      max_memory_restart: "512M",
+      kill_timeout: 15000,
+      wait_ready: true,
+      listen_timeout: 30000,
+      autorestart: true,
+      log_date_format: LOG_DATE_FORMAT,
+      error_file: "/opt/logs/surplusai-scraper-agent-error.log",
+      out_file: "/opt/logs/surplusai-scraper-agent-out.log",
+      merge_logs: true,
+      node_args: NODE_ARGS,
+      env: {
+        ...COMMON_ENV,
+        PORT: "8009",
+        HOST: "0.0.0.0",
+        SURPLUSAI_REDIS_URL: `redis://:FRGpassword1!@${COREDB_TAILSCALE}:6379/2`,
+        SURPLUSAI_SCRAPER_INTERVAL: "300000",
+        SURPLUSAI_ALERT_WEBHOOK: process.env.SURPLUSAI_ALERT_WEBHOOK || "",
+        LOG_LEVEL: "info",
+      },
+    },
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  4. Prediction Radar Workers — Ensemble prediction workers (no HTTP port)
+    // ═══════════════════════════════════════════════════════════════════════
+    {
+      name: "prediction-radar-worker-1",
+      script: "dist/worker.js",
+      cwd: "/opt/wheeler/services/prediction-radar",
+      instances: 2,
+      exec_mode: "fork",
+      max_restarts: 5,
+      restart_delay: 10000,
+      max_memory_restart: "1G",
+      kill_timeout: 30000,
+      wait_ready: false,
+      listen_timeout: 30000,
+      autorestart: true,
+      log_date_format: LOG_DATE_FORMAT,
+      error_file: "/opt/logs/prediction-radar-worker-error.log",
+      out_file: "/opt/logs/prediction-radar-worker-out.log",
+      merge_logs: true,
+      node_args: NODE_ARGS,
+      env: {
+        ...COMMON_ENV,
+        PR_DATABASE_URL: `postgresql://prediction_radar:${process.env.PR_DB_PASSWORD}@${COREDB_TAILSCALE}:5432/prediction_radar`,
+        PR_REDIS_URL: `redis://:FRGpassword1!@${COREDB_TAILSCALE}:6379/3`,
+        PR_WORKER_CONCURRENCY: "4",
+        PR_BATCH_SIZE: "100",
+        LOG_LEVEL: "info",
+      },
+    },
+    {
+      name: "prediction-radar-scheduler",
+      script: "dist/scheduler.js",
+      cwd: "/opt/wheeler/services/prediction-radar",
+      max_restarts: 5,
+      restart_delay: 10000,
+      max_memory_restart: "512M",
+      kill_timeout: 10000,
+      wait_ready: false,
+      autorestart: true,
+      log_date_format: LOG_DATE_FORMAT,
+      error_file: "/opt/logs/prediction-radar-scheduler-error.log",
+      out_file: "/opt/logs/prediction-radar-scheduler-out.log",
+      merge_logs: true,
+      node_args: NODE_ARGS,
+      env: {
+        ...COMMON_ENV,
+        PR_DATABASE_URL: `postgresql://prediction_radar:${process.env.PR_DB_PASSWORD}@${COREDB_TAILSCALE}:5432/prediction_radar`,
+        PR_REDIS_URL: `redis://:FRGpassword1!@${COREDB_TAILSCALE}:6379/3`,
+        PR_CRON_SCHEDULE: "*/5 * * * *",
+        LOG_LEVEL: "info",
+      },
+    },
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  5. Wheeler Brain OS — Central AI orchestration (port 8100)
+    // ═══════════════════════════════════════════════════════════════════════
+    {
+      name: "wheeler-brain-os",
+      script: "dist/server.js",
+      cwd: "/opt/wheeler/services/wheeler-brain-os",
+      max_restarts: 10,
+      restart_delay: 5000,
+      max_memory_restart: "2G",
+      kill_timeout: 15000,
+      wait_ready: true,
+      listen_timeout: 30000,
+      autorestart: true,
+      log_date_format: LOG_DATE_FORMAT,
+      error_file: "/opt/logs/wheeler-brain-os-error.log",
+      out_file: "/opt/logs/wheeler-brain-os-out.log",
+      merge_logs: true,
+      node_args: "--max-old-space-size=4096 --expose-gc",
+      env: {
+        ...COMMON_ENV,
+        PORT: "8100",
+        HOST: "0.0.0.0",
+        BRAIN_DATABASE_URL: DATABASE_URL,
+        BRAIN_REDIS_URL: `redis://:FRGpassword1!@${COREDB_TAILSCALE}:6379/4`,
+        BRAIN_LITELLM_URL: "http://127.0.0.1:4049",
+        BRAIN_OPENCLAW_URL: "http://127.0.0.1:8110",
+        BRAIN_MAX_CONCURRENT_TASKS: "10",
+        BRAIN_TASK_TIMEOUT: "300000",
+        SECRET_KEY_BASE: process.env.BRAIN_SECRET_KEY_BASE || "",
+        LOG_LEVEL: "info",
+      },
+    },
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  6. OpenClaw Gateway — OpenClaw multi-agent gateway (port 8110)
+    // ═══════════════════════════════════════════════════════════════════════
+    {
+      name: "openclaw-gateway",
+      script: "dist/gateway.js",
+      cwd: "/opt/wheeler/services/openclaw",
+      max_restarts: 10,
+      restart_delay: 5000,
+      max_memory_restart: "1G",
+      kill_timeout: 10000,
+      wait_ready: true,
+      listen_timeout: 20000,
+      autorestart: true,
+      log_date_format: LOG_DATE_FORMAT,
+      error_file: "/opt/logs/openclaw-gateway-error.log",
+      out_file: "/opt/logs/openclaw-gateway-out.log",
+      merge_logs: true,
+      node_args: NODE_ARGS,
+      env: {
+        ...COMMON_ENV,
+        PORT: "8110",
+        HOST: "0.0.0.0",
+        OPENCLAW_DATABASE_URL: DATABASE_URL,
+        OPENCLAW_REDIS_URL: `redis://:FRGpassword1!@${COREDB_TAILSCALE}:6379/5`,
+        OPENCLAW_LITELLM_URL: "http://127.0.0.1:4049",
+        OPENCLAW_MAX_WORKERS: "8",
+        OPENCLAW_TASK_TIMEOUT: "120000",
+        LOG_LEVEL: "info",
+      },
+    },
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  7. Voice Agent Service — Voice outreach and call handling (port 8018)
+    //     Resolved: was 8008, conflicted on AIOPS
+    // ═══════════════════════════════════════════════════════════════════════
+    {
+      name: "voice-agent-svc",
+      script: "dist/server.js",
+      cwd: "/opt/wheeler/services/voice-agent",
+      max_restarts: 10,
+      restart_delay: 5000,
+      max_memory_restart: "512M",
+      kill_timeout: 10000,
+      wait_ready: true,
+      listen_timeout: 20000,
+      autorestart: true,
+      log_date_format: LOG_DATE_FORMAT,
+      error_file: "/opt/logs/voice-agent-svc-error.log",
+      out_file: "/opt/logs/voice-agent-svc-out.log",
+      merge_logs: true,
+      node_args: NODE_ARGS,
+      env: {
+        ...COMMON_ENV,
+        PORT: "8018",
+        HOST: "0.0.0.0",
+        VOICE_DATABASE_URL: DATABASE_URL,
+        VOICE_REDIS_URL: `redis://:FRGpassword1!@${COREDB_TAILSCALE}:6379/6`,
+        VOICE_LITELLM_URL: "http://127.0.0.1:4049",
+        ELEVENLABS_API_KEY: process.env.ELEVENLABS_API_KEY || "",
+        TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID || "",
+        TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN || "",
+        TWILIO_PHONE_NUMBER: process.env.TWILIO_PHONE_NUMBER || "",
+        VOICE_MAX_CONCURRENT_CALLS: "5",
+        VOICE_CALL_TIMEOUT: "900000",
+        LOG_LEVEL: "info",
+      },
+    },
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  8. Browser Agent Service — Puppeteer/Playwright browser automation
+    //     (port 8120)
+    // ═══════════════════════════════════════════════════════════════════════
+    {
+      name: "browser-agent-svc",
+      script: "dist/server.js",
+      cwd: "/opt/wheeler/services/browser-agent",
+      max_restarts: 10,
+      restart_delay: 5000,
+      max_memory_restart: "1G",
+      kill_timeout: 15000,
+      wait_ready: true,
+      listen_timeout: 20000,
+      autorestart: true,
+      log_date_format: LOG_DATE_FORMAT,
+      error_file: "/opt/logs/browser-agent-svc-error.log",
+      out_file: "/opt/logs/browser-agent-svc-out.log",
+      merge_logs: true,
+      node_args: "--max-old-space-size=2048 --expose-gc",
+      env: {
+        ...COMMON_ENV,
+        PORT: "8120",
+        HOST: "0.0.0.0",
+        BROWSER_DATABASE_URL: DATABASE_URL,
+        BROWSER_REDIS_URL: `redis://:FRGpassword1!@${COREDB_TAILSCALE}:6379/7`,
+        BROWSER_POOL_SIZE: "3",
+        BROWSER_HEADLESS: "true",
+        BROWSER_TIMEOUT: "60000",
+        BROWSER_SANDBOX: "true",
+        PUPPETEER_EXECUTABLE_PATH: "/usr/bin/chromium",
+        LOG_LEVEL: "info",
+      },
+    },
+  ],
+};

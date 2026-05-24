@@ -1,0 +1,29 @@
+NAMES                            PORTS
+langflow                         127.0.0.1:7860->7860/tcp
+docuseal                         127.0.0.1:3010->3000/tcp
+aiops-healthchecks               127.0.0.1:3130->8000/tcp
+aiops-changedetection            127.0.0.1:5000->5000/tcp
+aiops-superset                   127.0.0.1:8088->8088/tcp
+aiops-clickhouse                 9000/tcp, 127.0.0.1:8123->8123/tcp, 9009/tcp
+aiops-prometheus                 127.0.0.1:9090->9090/tcp
+hostinger-health-exporter        127.0.0.1:9091->9091/tcp
+aiops-grafana                    127.0.0.1:3002->3000/tcp
+frgops-standby                   127.0.0.1:5433->5432/tcp
+prediction-radar-app-web         0.0.0.0:8098->80/tcp
+loki                             0.0.0.0:3100->3100/tcp
+prediction-radar-app-scheduler   
+prediction-radar-app-worker      
+temporal-temporal-1              
+usesend                          
+promtail                         0.0.0.0:9080->9080/tcp
+docuseal-redis                   6379/tcp
+temporal-temporal-ui-1           
+aiops-ravynai-postgres           127.0.0.1:5434->5432/tcp
+open-webui                       127.0.0.1:3000->8080/tcp
+prediction-radar-dashboard-v2    3000/tcp
+prediction-radar-app-api         
+prediction-radar-app-db          5432/tcp
+prediction-radar-app-redis       6379/tcp
+aiops-ravynai-app                
+netdata                          0.0.0.0:19999->19999/tcp
+uptime-kuma                      0.0.0.0:3001->3001/tcp
