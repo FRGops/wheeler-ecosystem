@@ -1,7 +1,7 @@
 {
   "ecosystem_health": {
     "script": "ecosystem-health",
-    "timestamp": "2026-05-24T21:30:22Z",
+    "timestamp": "2026-05-24T21:42:01Z",
     "version": "1.0.0",
     "platform": "Wheeler Autonomous AI Ops"
   },
@@ -22,8 +22,8 @@
     {
       "name": "pm2-watchdog",
       "weight": 25,
-      "total": 20,
-      "pass": 20,
+      "total": 24,
+      "pass": 24,
       "fail": 0,
       "score": 100
     },
