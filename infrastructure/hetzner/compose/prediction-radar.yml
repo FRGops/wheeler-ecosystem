@@ -1,0 +1,383 @@
+# =============================================================================
+# Prediction Radar — Full Stack Docker Compose
+# =============================================================================
+# Deploys the Prediction Radar platform: a machine learning prediction
+# marketplace with web UI, REST API, background workers, and task scheduler.
+#
+# Architecture:
+#   web/nginx  →  api (FastAPI)  →  postgres  (relational data)
+#                                 →  redis     (queues + caching)
+#   worker (Celery)  →  redis (broker)  →  postgres (results)
+#   scheduler (Celery Beat)  →  redis (schedule)
+#
+# Network: All services on prediction-radar internal network.
+#   Web and API attach to traefik-public for reverse proxy routing.
+#
+# Scaling:
+#   Worker can be scaled horizontally: docker compose up -d --scale worker=3
+#   Postgres is single-instance (vertical scale for now).
+#
+# Service ports (internal, not exposed to host):
+#   - Web:      8098
+#   - API:      8000
+#   - Postgres: 5433  (mapped to host for Tailscale DB access)
+#   - Redis:    6379  (internal only)
+# =============================================================================
+
+services:
+  # ===========================================================================
+  # POSTGRES — Primary database
+  # ===========================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: prediction-radar-db
+    restart: unless-stopped
+
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    environment:
+      POSTGRES_DB: "${PREDICTION_RADAR_DB_NAME:-prediction_radar}"
+      POSTGRES_USER: "${PREDICTION_RADAR_DB_USER:-prediction_radar}"
+      POSTGRES_PASSWORD: "${PREDICTION_RADAR_DB_PASSWORD:?Must set PREDICTION_RADAR_DB_PASSWORD}"
+      # Timezone for scheduled tasks
+      TZ: "${TZ:-UTC}"
+
+    volumes:
+      # Persist data — DO NOT use tmpfs here (data must survive restarts)
+      - prediction-radar-postgres:/var/lib/postgresql/data
+      # tmpfs for stats temp — improves performance, no durability needed
+      - type: tmpfs
+        target: /var/lib/postgresql/data/pg_stat_tmp
+        tmpfs:
+          size: 64M
+
+    # Health check: pg_isready ensures the DB is accepting connections
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PREDICTION_RADAR_DB_USER:-prediction_radar} -d ${PREDICTION_RADAR_DB_NAME:-prediction_radar}"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s  # Postgres needs time to initialize on first run
+
+    networks:
+      - prediction-radar
+
+    # Port exposed only for Tailscale admin access (not for public)
+    ports:
+      - "127.0.0.1:5433:5432"
+
+  # ===========================================================================
+  # REDIS — Message broker + cache + rate limiter backend
+  # ===========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: prediction-radar-redis
+    restart: unless-stopped
+
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+
+    # WHY these policies:
+    #   - appendonly yes: Durability for Celery task results
+    #   - maxmemory 256mb: Prevent Redis from eating all RAM on OOM scenarios
+    #   - maxmemory-policy allkeys-lru: Evict least-recently-used keys when full
+    #     (Celery results are transient, safe to evict)
+    #   - save: RDB snapshots for recovery (3 schedule tiers for different
+    #     write intensities)
+
+    volumes:
+      - prediction-radar-redis:/data
+
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+    networks:
+      - prediction-radar
+
+  # ===========================================================================
+  # API — FastAPI backend
+  # ===========================================================================
+  api:
+    image: "${PREDICTION_RADAR_API_IMAGE:-ghcr.io/wheelerai/prediction-radar-api:latest}"
+    container_name: prediction-radar-api
+    restart: unless-stopped
+
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1G
+        reservations:
+          cpus: "0.5"
+          memory: 256M
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    environment:
+      # Database
+      DATABASE_URL: "postgresql+asyncpg://${PREDICTION_RADAR_DB_USER:-prediction_radar}:${PREDICTION_RADAR_DB_PASSWORD}@postgres:5432/${PREDICTION_RADAR_DB_NAME:-prediction_radar}"
+      # Redis
+      REDIS_URL: "redis://redis:6379/0"
+      CELERY_BROKER_URL: "redis://redis:6379/1"
+      CELERY_RESULT_BACKEND: "redis://redis:6379/2"
+      # App config
+      SECRET_KEY: "${PREDICTION_RADAR_SECRET_KEY:?Must set PREDICTION_RADAR_SECRET_KEY}"
+      ENVIRONMENT: "${ENVIRONMENT:-production}"
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+      CORS_ORIGINS: "${CORS_ORIGINS:-https://predictionradar.wheeler.ai}"
+      TZ: "${TZ:-UTC}"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s  # API needs DB migrations on first start
+
+    networks:
+      - prediction-radar
+      - traefik-public
+
+    labels:
+      # Enable Traefik routing
+      - "traefik.enable=true"
+
+      # API Router
+      - "traefik.http.routers.prediction-radar-api.rule=Host(`predictionradar.wheeler.ai`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.prediction-radar-api.entrypoints=websecure"
+      - "traefik.http.routers.prediction-radar-api.tls=true"
+      - "traefik.http.routers.prediction-radar-api.tls.certresolver=letsencrypt-staging"
+      - "traefik.http.routers.prediction-radar-api.middlewares=chain-api@file"
+      - "traefik.http.services.prediction-radar-api.loadbalancer.server.port=8000"
+      - "traefik.http.services.prediction-radar-api.loadbalancer.healthCheck.path=/health"
+      - "traefik.http.services.prediction-radar-api.loadbalancer.healthCheck.interval=30s"
+
+  # ===========================================================================
+  # WEB — Nginx (static files + reverse proxy to API)
+  # ===========================================================================
+  web:
+    image: "${PREDICTION_RADAR_WEB_IMAGE:-ghcr.io/wheelerai/prediction-radar-web:latest}"
+    container_name: prediction-radar-web
+    restart: unless-stopped
+
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    environment:
+      API_URL: "https://predictionradar.wheeler.ai/api"
+      TZ: "${TZ:-UTC}"
+
+    depends_on:
+      api:
+        condition: service_started
+
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+    networks:
+      - prediction-radar
+      - traefik-public
+
+    labels:
+      # Enable Traefik routing
+      - "traefik.enable=true"
+
+      # Web Router
+      - "traefik.http.routers.prediction-radar-web.rule=Host(`predictionradar.wheeler.ai`)"
+      - "traefik.http.routers.prediction-radar-web.entrypoints=websecure"
+      - "traefik.http.routers.prediction-radar-web.tls=true"
+      - "traefik.http.routers.prediction-radar-web.tls.certresolver=letsencrypt-staging"
+      - "traefik.http.routers.prediction-radar-web.middlewares=chain-public@file"
+      - "traefik.http.services.prediction-radar-web.loadbalancer.server.port=80"
+
+  # ===========================================================================
+  # WORKER — Celery worker (background task processing)
+  # ===========================================================================
+  worker:
+    image: "${PREDICTION_RADAR_WORKER_IMAGE:-ghcr.io/wheelerai/prediction-radar-worker:latest}"
+    container_name: prediction-radar-worker
+    restart: unless-stopped
+
+    deploy:
+      resources:
+        limits:
+          cpus: "4.0"
+          memory: 4G
+        reservations:
+          cpus: "1.0"
+          memory: 1G
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    environment:
+      DATABASE_URL: "postgresql+asyncpg://${PREDICTION_RADAR_DB_USER:-prediction_radar}:${PREDICTION_RADAR_DB_PASSWORD}@postgres:5432/${PREDICTION_RADAR_DB_NAME:-prediction_radar}"
+      REDIS_URL: "redis://redis:6379/0"
+      CELERY_BROKER_URL: "redis://redis:6379/1"
+      CELERY_RESULT_BACKEND: "redis://redis:6379/2"
+      SECRET_KEY: "${PREDICTION_RADAR_SECRET_KEY}"
+      ENVIRONMENT: "${ENVIRONMENT:-production}"
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+      TZ: "${TZ:-UTC}"
+      # Worker-specific: number of concurrent tasks
+      CELERY_CONCURRENCY: "${CELERY_CONCURRENCY:-4}"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+    # Workers don't need health checks in the same way — they're either
+    # connected to the broker or not. The Celery worker will restart if
+    # connection is lost.
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A tasks inspect ping -d celery@$$HOSTNAME || exit 1"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    networks:
+      - prediction-radar
+
+  # ===========================================================================
+  # SCHEDULER — Celery Beat (periodic task scheduler)
+  # ===========================================================================
+  scheduler:
+    image: "${PREDICTION_RADAR_WORKER_IMAGE:-ghcr.io/wheelerai/prediction-radar-worker:latest}"
+    container_name: prediction-radar-scheduler
+    restart: unless-stopped
+
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # Celery Beat runs the scheduler. The entrypoint override starts beat
+    # instead of a worker.
+    entrypoint: ["celery", "-A", "tasks", "beat", "--loglevel=info", "--pidfile=/tmp/celerybeat.pid", "--schedule=/tmp/celerybeat-schedule"]
+
+    environment:
+      DATABASE_URL: "postgresql+asyncpg://${PREDICTION_RADAR_DB_USER:-prediction_radar}:${PREDICTION_RADAR_DB_PASSWORD}@postgres:5432/${PREDICTION_RADAR_DB_NAME:-prediction_radar}"
+      REDIS_URL: "redis://redis:6379/0"
+      CELERY_BROKER_URL: "redis://redis:6379/1"
+      CELERY_RESULT_BACKEND: "redis://redis:6379/2"
+      SECRET_KEY: "${PREDICTION_RADAR_SECRET_KEY}"
+      ENVIRONMENT: "${ENVIRONMENT:-production}"
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+      TZ: "${TZ:-UTC}"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+    healthcheck:
+      # Check if beat process is running and schedule file is being updated
+      test: ["CMD-SHELL", "test -f /tmp/celerybeat-schedule && test $$(( $$(date +%s) - $$(stat -c %Y /tmp/celerybeat-schedule) )) -lt 300 || exit 1"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    networks:
+      - prediction-radar
+
+# =============================================================================
+# VOLUMES
+# =============================================================================
+volumes:
+  prediction-radar-postgres:
+    name: prediction-radar-postgres
+  prediction-radar-redis:
+    name: prediction-radar-redis
+
+# =============================================================================
+# NETWORKS
+# =============================================================================
+networks:
+  prediction-radar:
+    external: true
+    name: prediction-radar
+  traefik-public:
+    external: true
+    name: traefik-public

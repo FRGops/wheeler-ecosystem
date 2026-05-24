@@ -1,0 +1,193 @@
+###############################################################################
+# AI EDGE — LiteLLM Proxy + MinIO Object Store
+# ================================================
+# Lightweight AI infrastructure for the Hostinger edge VPS.
+#
+# SERVICES:
+#   LiteLLM — Lightweight LLM API proxy (routes to OpenAI, Anthropic, etc.)
+#   MinIO   — S3-compatible object store (for app uploads, assets)
+#
+# RESOURCE RATIONALE:
+#   LiteLLM: 256MB — it's a proxy, not an LLM itself.  Most memory is for
+#            connection pooling and caching API responses.
+#   MinIO:   512MB — MinIO is RAM-hungry (uses mmap for files).  512MB is
+#            the minimum for reasonable performance with <100GB storage.
+#
+# WHY NOT ON HETZNER?
+#   These are edge-facing services needed by local apps (FRGops, n8n).
+#   LiteLLM is a proxy — it should be close to the apps using it.
+#   MinIO stores app uploads — should be low-latency to the apps.
+###############################################################################
+
+version: "3.8"
+
+# =============================================================================
+# NETWORKS
+# =============================================================================
+networks:
+  traefik-public:
+    external: true
+    name: traefik-public
+  ai-proxy-internal:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: "172.20.3.0/24"
+
+# =============================================================================
+# VOLUMES
+# =============================================================================
+volumes:
+  litellm-data:
+    name: litellm-data
+  minio-data:
+    name: minio-data
+
+# =============================================================================
+# SERVICES
+# =============================================================================
+services:
+
+  # ---------------------------------------------------------------------------
+  # LITELLM PROXY
+  # Unified API gateway for LLM providers (OpenAI, Anthropic, Google, etc.)
+  #
+  # Configuration is via config.yaml (mounted as a config file).
+  # The proxy caches responses and handles rate limiting, retries, and
+  # failover between providers.
+  #
+  # NOTE: LiteLLM uses PostgreSQL for usage tracking by default.
+  # On this resource-constrained VPS, we use SQLite instead to avoid
+  # adding load to the shared Postgres instance.
+  # ---------------------------------------------------------------------------
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: litellm-edge
+    restart: unless-stopped
+    networks:
+      - traefik-public
+      - ai-proxy-internal
+    ports:
+      # Expose port 4000 internally for the Docker network (Traefik routes here)
+      # No host port binding — Traefik handles external access
+      - "4000"
+    volumes:
+      - litellm-data:/app/data
+      # Optional: mount a LiteLLM config.yaml for advanced model routing.
+      # If you need it, create litellm-config.yaml in the compose/ directory
+      # and uncomment the line below:
+      # - ./litellm-config.yaml:/app/config.yaml:ro
+    environment:
+      # --- Database ---
+      # Use SQLite for lightweight local storage instead of PostgreSQL
+      DATABASE_URL: "sqlite:///app/data/litellm.db"
+      # --- API Keys ---
+      # Provider API keys — set these in your .env file
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      # --- Proxy Configuration ---
+      LITELLM_PORT: 4000
+      LITELLM_HOST: "0.0.0.0"
+      # --- Resource Conservation ---
+      # Disable telemetry and optional features
+      LITELLM_TELEMETRY: "false"
+      # --- Cache ---
+      # Enable response caching (in-memory) — reduces API costs and latency
+      LITELLM_CACHE_TYPE: "local"  # In-memory cache (no Redis needed)
+      LITELLM_CACHE_TTL: "3600"    # Cache LLM responses for 1 hour
+      # --- Rate Limiting ---
+      # Per-model rate limiting (requests per minute)
+      # Overridden by LiteLLM config.yaml
+      LITELLM_RATE_LIMIT: "100"
+      # --- Proxy Key ---
+      # Key required to call the proxy (acts as an auth gate)
+      LITELLM_PROXY_KEY: ${LITELLM_PROXY_KEY:?required}
+      # --- Logging ---
+      LITELLM_LOG_LEVEL: "warning"  # Reduce log verbosity on constrained VPS
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+        reservations:
+          cpus: "0.10"
+          memory: 64M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health/readiness"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    labels:
+      - "traefik.enable=false"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # MINIO OBJECT STORE
+  # S3-compatible storage for app uploads, assets, and backups.
+  #
+  # NOTE: MinIO is configured for a single-node, standalone deployment.
+  # No erasure coding, no distributed mode — those are for production
+  # multi-node setups and would waste resources here.
+  #
+  # UI: MinIO Console is available at minio.wheeler.ai (port 9001)
+  # API: S3 API at port 9000 (internal only — access through Traefik)
+  # ---------------------------------------------------------------------------
+  minio:
+    image: minio/minio:latest
+    container_name: minio-edge
+    restart: unless-stopped
+    networks:
+      - traefik-public
+      - ai-proxy-internal
+    ports:
+      # API port (internal — Traefik exposes via routers.yml)
+      - "9000"
+      # Console port (internal — Traefik exposes via routers.yml)
+      - "9001"
+    volumes:
+      - minio-data:/data
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?required}
+      MINIO_BROWSER: "on"  # Enable web UI
+      MINIO_DOMAIN: "minio.wheeler.ai"
+      # Disable MinIO's built-in update checker (saves bandwidth)
+      MINIO_UPDATE: "off"
+      # Conservative memory allocation for MinIO
+      # MinIO uses /dev/shm for its fan-out writes
+      MINIO_CACHE_SIZE: "256"  # MB — small cache for edge use
+    command:
+      - "server"
+      - "/data"
+      - "--console-address"
+      - ":9001"
+      - "--address"
+      - ":9000"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M  # MinIO needs more RAM for I/O caching
+        reservations:
+          cpus: "0.10"
+          memory: 128M
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - "traefik.enable=false"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

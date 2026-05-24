@@ -1,0 +1,77 @@
+# =============================================================================
+# Grafana Provisioned Datasources — Wheeler AIOps Stack
+# =============================================================================
+# These are auto-loaded at Grafana startup and are NOT deletable from UI
+# (set editable: true to allow UI changes)
+# =============================================================================
+
+apiVersion: 1
+
+datasources:
+  # ---------------------------------------------------------------------------
+  # 1. PROMETHEUS — Primary metrics datasource
+  # ---------------------------------------------------------------------------
+  - name: 'Prometheus'
+    type: prometheus
+    access: proxy
+    url: 'http://prometheus:9090'
+    isDefault: true
+    editable: false
+    version: 1
+    uid: 'prometheus'
+    jsonData:
+      httpMethod: 'POST'
+      timeInterval: '15s'  # Align with Prometheus scrape interval
+      queryTimeout: '30s'
+      manageAlerts: true
+      prometheusType: 'Prometheus'
+      cacheLevel: 'High'
+      incrementalQuerying: true
+      incrementalQueryOverlapWindow: '10m'
+      exemplarTraceIdDestinations:
+        - name: 'traceID'
+          url:
+            url: 'http://tempo:3200'
+            displayName: 'Tempo (placeholder)'
+
+  # ---------------------------------------------------------------------------
+  # 2. LOKI — Log aggregation (placeholder — not yet deployed)
+  # ---------------------------------------------------------------------------
+  # WHY: Listed for future use. Currently using docker logs + grep.
+  #      Deploy Loki + Promtail when log volume justifies it (>10GB/day).
+  - name: 'Loki'
+    type: loki
+    access: proxy
+    url: 'http://loki:3100'
+    isDefault: false
+    editable: true
+    version: 1
+    uid: 'loki'
+    jsonData:
+      timeout: 60
+      maxLines: 1000
+      derivedFields:
+        - name: 'traceID'
+          matcherRegex: 'traceID=(\w+)'
+          url: 'http://tempo:3200/explore?traceId=$&'
+    # Only enable when Loki is deployed:
+    # secureJsonData:
+    #   basicAuthPassword: 'your-password'
+
+  # ---------------------------------------------------------------------------
+  # 3. CLICKHOUSE — Analytics datasource (placeholder)
+  # ---------------------------------------------------------------------------
+  - name: 'ClickHouse'
+    type: grafana-clickhouse-datasource
+    access: proxy
+    url: 'http://clickhouse:8123'
+    isDefault: false
+    editable: true
+    uid: 'clickhouse'
+    jsonData:
+      port: 8123
+      protocol: 'http'
+      defaultDatabase: 'default'
+      tlsSkipVerify: true
+    # Requires grafana-clickhouse-datasource plugin:
+    # grafana-cli plugins install grafana-clickhouse-datasource

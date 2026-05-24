@@ -1,0 +1,429 @@
+###############################################################################
+# TRAEFIK V3 — SERVICE ROUTING TABLE
+# ======================================
+# All routers, services, and load balancer configurations.
+#
+# This file defines EVERY route that the Hostinger edge Traefik handles:
+#   - Hetzner-proxied services (via Tailscale IP 100.121.230.28)
+#   - Local services (via Docker service names on traefik-public network)
+#
+# ROUTING DOMAIN: *.wheeler.ai
+#
+# RESOURCE NOTE: Each router + service pair adds ~1-2MB of Traefik memory
+# usage (TLS context, connection pools, metrics).  With ~15 routes, this
+# is ~20-30MB total — acceptable for a 256MB Traefik container.
+###############################################################################
+
+http:
+  routers:
+    # =========================================================================
+    # HETZNER-PROXIED SERVICES
+    # These services run on the Hetzner CPX51 and are reached via Tailscale.
+    # Tailscale IP: 100.121.230.28 (stable, assigned via Tailscale admin console)
+    #
+    # Each Hetzner route uses:
+    #   - chain-full middleware: security headers + rate limiting + CrowdSec
+    #   - circuit-breaker-hetzner: protects edge from backend failures
+    #   - retry-hetzner: one retry for transient blips
+    #   - error-handler-hetzner: friendly 5XX pages when backend is down
+    # =========================================================================
+
+    # --- Prediction Radar Web (Hetzner) ---
+    predictionradar:
+      rule: "Host(`predictionradar.wheeler.ai`)"
+      entryPoints:
+        - websecure
+      service: predictionradar-svc
+      tls:
+        certResolver: cloudflare
+      middlewares:
+        - chain-full
+        - circuit-breaker-hetzner
+        - retry-hetzner
+
+    # --- RavynAI API (Hetzner) ---
+    ravynai:
+      rule: "Host(`ravynai.wheeler.ai`)"
+      entryPoints:
+        - websecure
+      service: ravynai-svc
+      tls:
+        certResolver: cloudflare
+      middlewares:
+        - chain-full
+        - circuit-breaker-hetzner
+        - retry-hetzner
+
+    # --- Superset (Hetzner) ---
+    superset:
+      rule: "Host(`superset.wheeler.ai`)"
+      entryPoints:
+        - websecure
+      service: superset-svc
+      tls:
+        certResolver: cloudflare
+      middlewares:
+        - chain-full
+        - circuit-breaker-hetzner
+        - retry-hetzner
+
+    # --- Healthchecks (Hetzner) ---
+    healthchecks:
+      rule: "Host(`healthchecks.wheeler.ai`)"
+      entryPoints:
+        - websecure
+      service: healthchecks-svc
+      tls:
+        certResolver: cloudflare
+      middlewares:
+        - chain-full
+        - circuit-breaker-hetzner
+        - retry-hetzner
+
+    # --- ChangeDetection (Hetzner) ---
+    changedetect:
+      rule: "Host(`changedetect.wheeler.ai`)"
+      entryPoints:
+        - websecure
+      service: changedetect-svc
+      tls:
+        certResolver: cloudflare
+      middlewares:
+        - chain-full
+        - circuit-breaker-hetzner
+        - retry-hetzner
+
+    # --- Grafana (Hetzner) ---
+    grafana:
+      rule: "Host(`grafana.wheeler.ai`)"
+      entryPoints:
+        - websecure
+      service: grafana-svc
+      tls:
+        certResolver: cloudflare
+      middlewares:
+        - chain-full
+        - circuit-breaker-hetzner
+        - retry-hetzner
+
+    # --- Uptime Kuma (Hetzner) ---
+    uptimekuma:
+      rule: "Host(`uptime.wheeler.ai`)"
+      entryPoints:
+        - websecure
+      service: uptimekuma-svc
+      tls:
+        certResolver: cloudflare
+      middlewares:
+        - chain-full
+        - circuit-breaker-hetzner
+        - retry-hetzner
+
+    # =========================================================================
+    # LOCAL SERVICES (Hostinger VPS)
+    # These services run in Docker containers on this same VPS.
+    # They are reached via Docker service names on the traefik-public network.
+    #
+    # Each local route uses:
+    #   - chain-security middleware: rate limiting + security headers (no CrowdSec)
+    #     (CrowdSec adds latency; local services are lower-risk)
+    # =========================================================================
+
+    # --- FRGops (Local Docker: frgops:3000) ---
+    frgops:
+      rule: "Host(`frgops.wheeler.ai`)"
+      entryPoints:
+        - websecure
+      service: frgops-svc
+      tls:
+        certResolver: cloudflare
+      middlewares:
+        - chain-security
+
+    # --- FRGCRM (Local Docker: frgcrm:3000) ---
+    frgcrm:
+      rule: "Host(`frgcrm.wheeler.ai`)"
+      entryPoints:
+        - websecure
+      service: frgcrm-svc
+      tls:
+        certResolver: cloudflare
+      middlewares:
+        - chain-security
+
+    # --- Chatwoot (Local Docker: chatwoot:3000) ---
+    chatwoot:
+      rule: "Host(`chatwoot.wheeler.ai`)"
+      entryPoints:
+        - websecure
+      service: chatwoot-svc
+      tls:
+        certResolver: cloudflare
+      middlewares:
+        - chain-security
+
+    # --- n8n (Local Docker: n8n:5678) ---
+    n8n:
+      rule: "Host(`n8n.wheeler.ai`)"
+      entryPoints:
+        - websecure
+      service: n8n-svc
+      tls:
+        certResolver: cloudflare
+      middlewares:
+        - chain-security
+
+    # --- Docuseal (Local Docker: docuseal:3000) ---
+    docuseal:
+      rule: "Host(`docuseal.wheeler.ai`)"
+      entryPoints:
+        - websecure
+      service: docuseal-svc
+      tls:
+        certResolver: cloudflare
+      middlewares:
+        - chain-security
+
+    # --- LiteLLM (Local Docker: litellm:4000) ---
+    litellm:
+      rule: "Host(`litellm.wheeler.ai`)"
+      entryPoints:
+        - websecure
+      service: litellm-svc
+      tls:
+        certResolver: cloudflare
+      middlewares:
+        - chain-security
+
+    # --- MinIO Console (Local Docker: minio:9001) ---
+    minio:
+      rule: "Host(`minio.wheeler.ai`)"
+      entryPoints:
+        - websecure
+      service: minio-svc
+      tls:
+        certResolver: cloudflare
+      middlewares:
+        - chain-security
+
+    # --- Webhook Receiver (Local Docker: webhook-receiver:9000) ---
+    webhooks:
+      rule: "Host(`webhooks.wheeler.ai`)"
+      entryPoints:
+        - websecure
+      service: webhooks-svc
+      tls:
+        certResolver: cloudflare
+      middlewares:
+        # Webhooks get rate-limit-strict instead of chain-security to prevent
+        # abuse (webhooks are common attack vectors)
+        - rate-limit-strict
+        - security-headers
+
+    # NOTE: Traefik dashboard is configured in docker-compose.yml labels
+    # (router: traefik-dashboard, service: api@internal) to avoid provider
+    # conflicts.  Dashboard is internal-only with IP whitelist + basic auth.
+
+  # =============================================================================
+  # SERVICES
+  # =============================================================================
+  services:
+
+    # -------------------------------------------------------------------------
+    # HETZNER BACKEND SERVICES
+    # Reached via direct HTTP connection to Hetzner's Tailscale IP.
+    # Each has a passive health check + circuit breaker.
+    # -------------------------------------------------------------------------
+
+    predictionradar-svc:
+      loadBalancer:
+        servers:
+          - url: "http://100.121.230.28:8098"
+        serversTransport: hetzner-transport
+        healthCheck:
+          path: /health
+          interval: 30s
+          timeout: 5s
+          # Mark as healthy after 2 successful checks (prevents flapping)
+          healthyStatusCount: 2
+          # Mark as unhealthy after 3 failed checks
+          unhealthyStatusCount: 3
+        passHostHeader: true
+
+    ravynai-svc:
+      loadBalancer:
+        servers:
+          - url: "http://100.121.230.28:8007"
+        serversTransport: hetzner-transport
+        healthCheck:
+          path: /api/v1/health
+          interval: 30s
+          timeout: 5s
+          healthyStatusCount: 2
+          unhealthyStatusCount: 3
+        passHostHeader: true
+
+    superset-svc:
+      loadBalancer:
+        servers:
+          - url: "http://100.121.230.28:8088"
+        serversTransport: hetzner-transport
+        healthCheck:
+          path: /health
+          interval: 30s
+          timeout: 5s
+          healthyStatusCount: 2
+          unhealthyStatusCount: 3
+        passHostHeader: true
+
+    healthchecks-svc:
+      loadBalancer:
+        servers:
+          - url: "http://100.121.230.28:3130"
+        serversTransport: hetzner-transport
+        healthCheck:
+          path: /ping
+          interval: 30s
+          timeout: 5s
+          healthyStatusCount: 2
+          unhealthyStatusCount: 3
+        passHostHeader: true
+
+    changedetect-svc:
+      loadBalancer:
+        servers:
+          - url: "http://100.121.230.28:5000"
+        serversTransport: hetzner-transport
+        healthCheck:
+          path: /
+          interval: 30s
+          timeout: 5s
+          healthyStatusCount: 2
+          unhealthyStatusCount: 3
+        passHostHeader: true
+
+    grafana-svc:
+      loadBalancer:
+        servers:
+          - url: "http://100.121.230.28:3002"
+        serversTransport: hetzner-transport
+        healthCheck:
+          path: /api/health
+          interval: 30s
+          timeout: 5s
+          healthyStatusCount: 2
+          unhealthyStatusCount: 3
+        passHostHeader: true
+
+    uptimekuma-svc:
+      loadBalancer:
+        servers:
+          - url: "http://100.121.230.28:3001"
+        serversTransport: hetzner-transport
+        healthCheck:
+          path: /
+          interval: 30s
+          timeout: 5s
+          healthyStatusCount: 2
+          unhealthyStatusCount: 3
+        passHostHeader: true
+
+    # -------------------------------------------------------------------------
+    # LOCAL DOCKER SERVICES
+    # Reached via Docker service names on the traefik-public network.
+    # No health checks needed — Docker restart policy + Traefik's Docker
+    # provider handles container lifecycle automatically.
+    # -------------------------------------------------------------------------
+
+    frgops-svc:
+      loadBalancer:
+        servers:
+          - url: "http://frgops:3000"
+        serversTransport: local-transport
+        passHostHeader: true
+
+    frgcrm-svc:
+      loadBalancer:
+        servers:
+          - url: "http://frgcrm:3000"
+        serversTransport: local-transport
+        passHostHeader: true
+
+    chatwoot-svc:
+      loadBalancer:
+        servers:
+          - url: "http://chatwoot:3000"
+        serversTransport: local-transport
+        passHostHeader: true
+
+    n8n-svc:
+      loadBalancer:
+        servers:
+          - url: "http://n8n:5678"
+        serversTransport: local-transport
+        passHostHeader: true
+
+    docuseal-svc:
+      loadBalancer:
+        servers:
+          - url: "http://docuseal:3000"
+        serversTransport: local-transport
+        passHostHeader: true
+
+    litellm-svc:
+      loadBalancer:
+        servers:
+          - url: "http://litellm:4000"
+        serversTransport: local-transport
+        passHostHeader: true
+
+    minio-svc:
+      loadBalancer:
+        servers:
+          - url: "http://minio:9001"
+        serversTransport: local-transport
+        passHostHeader: true
+
+    webhooks-svc:
+      loadBalancer:
+        servers:
+          - url: "http://webhook-receiver:9000"
+        serversTransport: local-transport
+        passHostHeader: true
+
+    # -------------------------------------------------------------------------
+    # ERROR SERVICE (for friendly 5XX pages)
+    # Serves static error pages when Hetzner backends are unreachable.
+    # This is a lightweight service that returns simple HTML error pages.
+    # -------------------------------------------------------------------------
+    error-service:
+      loadBalancer:
+        servers:
+          - url: "http://error-pages:8080"
+        passHostHeader: false
+
+  # =============================================================================
+  # SERVERS TRANSPORTS (per-backend timeouts)
+  # =============================================================================
+  serversTransports:
+    # Transport for Hetzner-backend connections (via Tailscale)
+    hetzner-transport:
+      # Tailscale typically adds <5ms latency;  10s timeout is more than enough.
+      # If a request to Hetzner takes >10s, something is wrong — fail fast.
+      respondTimeouts:
+        readTimeout: "10s"
+        writeTimeout: "10s"
+        idleTimeout: "30s"
+      # Keep connections warm — Tailscale NAT traversal benefits from persistent
+      # connections (avoids DERP relay renegotiation).
+      forwardTimeouts:
+        dialTimeout: "5s"
+
+    # Transport for local Docker service connections (sub-millisecond)
+    local-transport:
+      respondTimeouts:
+        readTimeout: "30s"
+        writeTimeout: "30s"
+        idleTimeout: "120s"
+      forwardTimeouts:
+        dialTimeout: "2s"

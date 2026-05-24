@@ -1,0 +1,621 @@
+###############################################################################
+# Wheeler — Docker Compose Template (Standardized)
+# =============================================================================
+# Version:      3.8 (compatible with Docker Engine 20.10+ and 1.13.0+)
+# Usage:        Copy this template and replace all {{PLACEHOLDER}} values.
+# Maintainer:   Platform Engineering <platform@wheeler.ai>
+#
+# =============================================================================
+# TABLE OF CONTENTS
+# =============================================================================
+#   Section 1 — Version & Top-Level Declarations
+#   Section 2 — Networks (frontend, backend, database)
+#   Section 3 — Volumes (named volumes, bind mounts)
+#   Section 4 — Secrets (commented examples)
+#   Section 5 — Service Template (full annotated example)
+#   Section 6 — Traefik Label Patterns (for edge services)
+#   Section 7 — Backup Hook Labels
+# =============================================================================
+#
+# =============================================================================
+# Section 1 — Version & Top-Level Declarations
+# =============================================================================
+version: "3.8"
+
+# ── Services ─────────────────────────────────────────────────────────────────
+services:
+  # Each service is defined below.  See Section 5 for the annotated template.
+
+# ── Networks ─────────────────────────────────────────────────────────────────
+# See Section 2 for detailed network definitions.
+
+# ── Volumes ───────────────────────────────────────────────────────────────────
+# See Section 3 for detailed volume definitions.
+
+# ── Secrets ───────────────────────────────────────────────────────────────────
+# See Section 4 for secrets handling patterns.
+
+# =============================================================================
+# Section 2 — Networks
+# =============================================================================
+# Wheeler uses three standard networks to isolate traffic by security domain.
+#
+#   NETWORK              PURPOSE                           CONNECTED SERVICES
+#   ──────────────────── ───────────────────────────────── ──────────────────
+#   traefik-public       Edge routing (internet-facing)     Traefik, web UIs
+#   backend              Internal API/service comms         APIs, workers, AI
+#   database             Database-only network              PostgreSQL, Redis
+#
+# Network policies:
+#   - traefik-public:  Can receive traffic from Traefik only.
+#   - backend:         Internal only.  APIs talk to each other and to DB.
+#   - database:        Strict database access.  Only services with DB access.
+#
+# A service CAN be on multiple networks, e.g., a web UI service may be on
+# both traefik-public (for Traefik routing) and backend (for API calls).
+# A database service should ONLY be on the database network.
+
+networks:
+  # ── Frontend network (internet-facing via Traefik) ───────────────────────
+  traefik-public:
+    # External: true means the network already exists (created by Traefik's
+    # own docker-compose).  Do NOT use 'driver: bridge' with external: true.
+    external: true
+    name: traefik-public
+      # Explicit name ensures consistent naming across all compose files.
+
+  # ── Backend network (internal service-to-service communication) ──────────
+  backend:
+    # Driver: bridge is the default.  Specify for clarity.
+    driver: bridge
+    # internal: true prevents containers on this network from accessing the
+    # internet.  Use false for services that need outbound access (APIs,
+    # workers that call external services).
+    internal: false
+    # IPAM configuration ensures a consistent subnet across stacks.
+    ipam:
+      config:
+        - subnet: "{{BACKEND_SUBNET}}"
+          # Example: 172.21.0.0/20 for AIOPS, 172.31.0.0/20 for EDGE.
+          # Each physical host should use a distinct subnet to avoid conflicts
+          # even though services are isolated per host.
+
+  # ── Database network (strict, database-only) ─────────────────────────────
+  database:
+    driver: bridge
+    # internal: true — database containers should not reach the internet.
+    internal: true
+    ipam:
+      config:
+        - subnet: "{{DATABASE_SUBNET}}"
+          # Example: 172.22.0.0/20
+
+  # ── Monitoring network (observability stack only) ────────────────────────
+  monitoring:
+    external: true
+    name: monitoring
+    # Prometheus, Grafana, Loki, Promtail, node-exporter, cadvisor.
+
+# =============================================================================
+# Section 3 — Volumes
+# =============================================================================
+# Wheeler distinguishes between two volume types:
+#
+#   NAMED VOLUMES:  Managed by Docker.  Data persists across container
+#                   recreation.  Use for application data, databases, caches.
+#                   Format: <server>-<service>-<purpose>
+#
+#   BIND MOUNTS:    Direct host filesystem path mapping.  Use for config
+#                   files, source code (development), log directories.
+#                   These appear in the service's volumes: list, not here.
+#
+# Best practices:
+#   - Always use named volumes for persistent data (databases, uploads).
+#   - Use bind mounts (read-only) for configuration files.
+#   - Never use bind mounts for production data — backup is manual.
+#   - Volume names include the server prefix to avoid cross-server confusion.
+#   - Use external: true for volumes shared across compose files.
+
+volumes:
+  # ── Application Data Volumes ─────────────────────────────────────────────
+  {{SERVICE_NAME}}-data:
+    name: {{SERVER_PREFIX}}-{{SERVICE_NAME}}-data
+      # Standard naming: {server}-{service}-data
+      # Examples: aiops-langflow-data, edge-frgops-dashboard-data
+
+  # ── Database Volumes (if service has a sidecar database) ─────────────────
+  {{SERVICE_NAME}}-postgres-data:
+    name: {{SERVER_PREFIX}}-{{SERVICE_NAME}}-postgres-data
+
+  {{SERVICE_NAME}}-redis-data:
+    name: {{SERVER_PREFIX}}-{{SERVICE_NAME}}-redis-data
+
+  # ── Cache / Temp Volumes ─────────────────────────────────────────────────
+  {{SERVICE_NAME}}-cache:
+    name: {{SERVER_PREFIX}}-{{SERVICE_NAME}}-cache
+
+# =============================================================================
+# Section 4 — Secrets
+# =============================================================================
+# Docker Swarm secrets are preferred for production, but for docker-compose
+# (standalone, non-Swarm), secrets are managed via:
+#
+#   1. Environment files with restricted permissions (chmod 600).
+#   2. Docker secrets (Swarm mode only — see commented example below).
+#   3. External secret manager (HashiCorp Vault, Doppler, Infisical).
+#
+# For Wheeler's current 3-server topology (no Swarm), use:
+#   - .env files with restricted permissions.
+#   - process.env references in the compose file.
+#
+# Example Swarm-mode secrets (not active — for future reference):
+#
+# secrets:
+#   db_password:
+#     external: true
+#     name: wheeler_db_password
+#   litellm_master_key:
+#     external: true
+#     name: wheeler_litellm_master_key
+#
+# secrets:
+#   db_password:
+#     file: ./secrets/db_password.txt
+#       # File containing only the secret value (no newline).
+#       # This file MUST be in .gitignore.
+#       # Permissions: chmod 600 ./secrets/db_password.txt
+#
+# Usage in service:
+#   secrets:
+#     - db_password
+#   environment:
+#     DB_PASSWORD_FILE: /run/secrets/db_password
+
+# =============================================================================
+# Section 5 — Service Template (Annotated)
+# =============================================================================
+#
+# Copy this block for each service in your compose file.  Replace all
+# {{PLACEHOLDER}} markers with service-specific values.  Remove any
+# sections that don't apply.
+
+services:
+  # ═══════════════════════════════════════════════════════════════════════════
+  # {{SERVICE_DISPLAY_NAME}} — {{SERVICE_DESCRIPTION}}
+  # ═══════════════════════════════════════════════════════════════════════════
+  {{SERVICE_NAME}}:
+    # ── Image ───────────────────────────────────────────────────────────────
+    image: {{DOCKER_IMAGE}}:{{IMAGE_TAG}}
+      # Use explicit tags in production (never `:latest`).
+      #   - Semantic version: ghcr.io/wheeler-ai/my-service:v2.3.1
+      #   - Git SHA:          ghcr.io/wheeler-ai/my-service:sha-a1b2c3d
+      #   - Build date:       ghcr.io/wheeler-ai/my-service:2026-05-23
+      #
+      # For environment-specific builds, use env vars:
+      #   image: "${MY_SERVICE_IMAGE:-ghcr.io/wheeler-ai/my-service:latest}"
+      # This way you can override via .env file without modifying compose.
+
+    # ── Container Name ───────────────────────────────────────────────────────
+    container_name: {{SERVER_PREFIX}}-{{SERVICE_NAME}}
+      # Standard naming: {server}-{service}
+      # Examples: aiops-langflow, edge-frgops-dashboard, coredb-minio
+      # This ensures unique container names across all servers.
+
+    # ── Restart Policy ───────────────────────────────────────────────────────
+    restart: unless-stopped
+      # Options:
+      #   "no"              — Never restart (one-shot tasks, init containers).
+      #   "always"          — Always restart, even after Docker daemon restart.
+      #   "on-failure"      — Restart only on non-zero exit code.
+      #   "unless-stopped"  — Restart unless explicitly stopped (RECOMMENDED).
+      #
+      # NEVER use "no" for persistent services in production.
+
+    # ── Networks ─────────────────────────────────────────────────────────────
+    networks:
+      # Connect to the appropriate standard networks.
+      # Web-facing service:
+      - traefik-public
+      - backend
+      # Internal API (no public access):
+      # - backend
+      # - database
+      # Database service (strict):
+      # - database
+      #
+      # IMPORTANT: List networks in order of trust (most restricted last).
+      # This is a convention, not a security mechanism — Docker network
+      # isolation is at the network level, not ordering.
+
+    # ── Ports ────────────────────────────────────────────────────────────────
+    ports:
+      # Two port publishing strategies:
+      #
+      # STRATEGY 1 — Internal only (access via Traefik/Tailscale only):
+      - "127.0.0.1:{{SERVICE_PORT}}:{{CONTAINER_PORT}}"
+      #   Bind to loopback (127.0.0.1) so Traefik can reach it, but the
+      #   port is not exposed to the public internet.  Use when the service
+      #   has Traefik labels for public routing.
+      #
+      # STRATEGY 2 — Public port (use with extreme caution):
+      # - "{{SERVICE_PORT}}:{{CONTAINER_PORT}}"
+      #   Binds to 0.0.0.0 (all interfaces).  ONLY use if the service must
+      #   be directly accessible (not recommended for most services).
+      #
+      # STRATEGY 3 — No ports (internal Docker network only):
+      #   Omit the ports: section entirely.  The service is only reachable
+      #   by other containers on the same Docker network via service name.
+      #
+      # For Wheeler, use STRATEGY 1 for web services and STRATEGY 3 for
+      # databases, Redis, and internal-only services.
+
+    # ── Volumes ──────────────────────────────────────────────────────────────
+    volumes:
+      # Named volumes (persistent application data):
+      - {{SERVICE_NAME}}-data:/app/data
+
+      # Bind mounts (configuration files, read-only):
+      - /opt/wheeler/configs/{{SERVICE_NAME}}/config.yml:/app/config/config.yml:ro
+        # The :ro flag makes the mount read-only (container cannot modify).
+        # Use for config files to prevent accidental changes.
+
+      # Bind mounts (logs, read-write):
+      - /opt/logs/{{SERVICE_NAME}}:/app/logs
+        # Mount a host directory for centralized log collection (Promtail).
+
+      # Temporary filesystems (no persistence needed):
+      # - type: tmpfs
+      #   target: /tmp
+      #   tmpfs:
+      #     size: 100M
+        # tmpfs for /tmp avoids disk I/O for temporary files.
+
+    # ── Environment ──────────────────────────────────────────────────────────
+    # Three environment management strategies:
+    #
+    # STRATEGY 1 — env_file (RECOMMENDED for production):
+    env_file:
+      - /opt/wheeler/configs/env/{{SERVICE_NAME}}.env
+        # Single env file per service.  File permissions: chmod 600.
+        # File is in .gitignore — NEVER commit env files.
+
+    # STRATEGY 2 — Inline environment (for non-sensitive, documented defaults):
+    environment:
+      # Application
+      SERVICE_NAME: "{{SERVICE_NAME}}"
+      PORT: "{{CONTAINER_PORT}}"
+      HOST: "0.0.0.0"
+      NODE_ENV: "production"
+      LOG_LEVEL: "info"
+
+      # Database (COREDB via Tailscale)
+      DATABASE_URL: "postgresql://${DB_USER:-wheeler}:${DB_PASSWORD}@${COREDB_TAILSCALE:-100.118.166.117}:5432/{{DATABASE_NAME}}"
+        # ${VAR:-default} syntax: use environment variable, or default if not set.
+        # ${VAR:?required} syntax: error if environment variable is not set.
+
+      # Redis (COREDB via Tailscale)
+      REDIS_URL: "redis://${COREDB_TAILSCALE:-100.118.166.117}:6379/{{REDIS_DB_NUMBER}}"
+
+      # Secrets (referenced from host environment, never hardcoded)
+      SECRET_KEY_BASE: "${SECRET_KEY_BASE:?required}"
+        # The :?required variant causes docker-compose to fail immediately
+        # if the variable is not set, preventing silent misconfiguration.
+
+    # STRATEGY 3 — Docker secrets (Swarm mode, reference only):
+    # secrets:
+    #   - db_password
+    #   - api_key
+    # environment:
+    #   DB_PASSWORD_FILE: /run/secrets/db_password
+
+    # ── Dependencies ─────────────────────────────────────────────────────────
+    depends_on:
+      # For startup ordering (NOT for health checking).
+      # Docker does not wait for the dependency to be "ready" — only for
+      # the container to be "started".  Use healthcheck conditions for
+      # services that must be ready before this service starts.
+      #
+      # Simple dependency (just start order):
+      # {{DEPENDENCY_SERVICE}}
+      #
+      # Health-aware dependency (wait for healthy):
+      {{DEPENDENCY_SERVICE}}:
+        condition: service_healthy
+          # Only proceed when the dependency's healthcheck passes.
+          # Requires the dependency to have a `healthcheck:` block.
+      #
+      # Completed dependency (wait for one-shot init to finish):
+      # {{INIT_SERVICE}}:
+      #   condition: service_completed_successfully
+          # Use for init containers (migrations, seed data, config generation).
+          # The init container must exit with code 0.
+
+    # ── Health Check ─────────────────────────────────────────────────────────
+    healthcheck:
+      # See docker-healthcheck.template for comprehensive health check patterns.
+      test: ["CMD", "curl", "-f", "http://localhost:{{CONTAINER_PORT}}/health"]
+        # The health check command.  Must return exit code 0 for healthy,
+        # exit code 1 for unhealthy.
+        #
+        # Common patterns:
+        #   Web service:  ["CMD", "curl", "-f", "http://localhost:PORT/health"]
+        #   PostgreSQL:   ["CMD-SHELL", "pg_isready -U postgres"]
+        #   Redis:        ["CMD", "redis-cli", "ping"]
+        #   Custom:       ["CMD", "/usr/local/bin/health-check.sh"]
+      interval: 30s
+        # How often to run the health check.  Balance between:
+        #   - Too frequent: unnecessary load, log noise.
+        #   - Too infrequent: slow detection of dead containers.
+        #   Recommended: 30s for most services, 10s for critical services,
+        #   60s for low-priority or expensive checks.
+      timeout: 10s
+        # Maximum time for the health check command to complete.
+        # Must be less than interval.  If exceeded, the check is considered
+        # failed.  Recommended: 5-10s for HTTP, 3s for Redis/PG, 15s for
+        # complex checks (AI workers, ML inference).
+      retries: 3
+        # Number of consecutive failures before marking as unhealthy.
+        #   Normal: 3 (gives transient issues a chance to self-heal).
+        #   Critical: 2 (fast detection).
+        #   Important: the actual detection time is:
+        #     (interval) * (retries) = worst-case detection
+        #     Example: 30s * 3 = 90 seconds before unhealthy.
+      start_period: 30s
+        # Grace period after container start before health checks begin.
+        # Use this for services with slow startup (model loading, DB migration).
+        #   Fast services:       5-15s
+        #   Normal services:    20-30s
+        #   ML/AI services:     60-120s
+        #   Database bootstrap: 60-120s (first-time init + migration)
+
+    # ── Resource Limits ──────────────────────────────────────────────────────
+    deploy:
+      resources:
+        limits:
+          cpus: "{{CPU_LIMIT}}"
+            # Maximum CPU allocation.  Uses Completely Fair Scheduler (CFS).
+            #   "0.50"  = 0.5 cores (burst up to 50% of one core)
+            #   "1.0"   = 1 core
+            #   "2.0"   = 2 cores
+            #   "0.5-1.0" = min 0.5, max 1.0
+            #
+            # Guidelines per service type:
+            #   Web UI (static):          0.25-0.50
+            #   REST API (light):         0.50-1.0
+            #   REST API (heavy):         1.0-2.0
+            #   AI worker (inference):    2.0-4.0
+            #   Database (PostgreSQL):    1.0-4.0
+            #   Redis (cache):            0.25-0.50
+            #   Observability (Grafana):  0.50-1.0
+          memory: "{{MEMORY_LIMIT}}"
+            # Maximum RAM allocation.
+            #   "128M", "256M", "512M", "1G", "2G", "4G", "8G"
+            #
+            # IMPORTANT: When memory limit is exceeded, Docker kills the
+            # container (OOM).  Set this HIGHER than the service's peak usage.
+            # Apply the 80% rule: limit >= peak * 1.25.
+        reservations:
+          cpus: "{{CPU_RESERVATION}}"
+            # Minimum CPU guarantee.  Use to ensure critical services always
+            # get CPU time under contention.
+            # Typically: 25-50% of the limit value.
+          memory: "{{MEMORY_RESERVATION}}"
+            # Minimum memory guarantee.  Docker will not start a container
+            # that cannot get this much memory.
+            # Typically: 25-50% of the limit value.
+
+    # ── Logging ──────────────────────────────────────────────────────────────
+    logging:
+      driver: "json-file"
+        # The json-file driver writes logs to the host filesystem as JSON.
+        # Other options: loki, syslog, journald, fluentd.
+        #
+        # For Wheeler: use json-file everywhere.  Promtail collects these
+        # files and ships them to Loki.  This is the simplest, most
+        # widely supported configuration.
+      options:
+        max-size: "20m"
+          # Maximum size of a single log file before rotation.
+          #   Light logging (errors only):   10m
+          #   Normal logging (requests):     20m
+          #   Heavy logging (debug, AI):     50m
+          #   Database (query logging):      50m
+        max-file: "3"
+          # Number of rotated log files to keep.
+          #   Default: 3 (keeps 3 * max-size of logs, e.g., 60MB)
+          #   Increase for services needing longer log history in the file.
+          #
+          # Total local log storage per service = max-size * max-file.
+          # Example: 20m * 3 = 60MB per service.
+          #
+          # Logs are also shipped to Loki, so local retention can be short.
+          # The files are primarily a buffer for Promtail.
+
+    # ── User / Security Context ──────────────────────────────────────────────
+    # user: "1000:1000"
+      # Run container as a non-root user for security.
+      # Uncomment and set the appropriate UID:GID.
+      #   wheel is available (UID 1000) on all Wheeler servers.
+      #   Services should NOT run as root in production.
+
+    # ── Labels ────────────────────────────────────────────────────────────────
+    labels:
+      # Traefik routing labels (see Section 6 for full pattern):
+      - "traefik.enable=true"
+      - "traefik.http.routers.{{SERVICE_NAME}}.rule=Host(`{{PUBLIC_HOSTNAME}}`)"
+      - "traefik.http.routers.{{SERVICE_NAME}}.entrypoints=websecure"
+      - "traefik.http.routers.{{SERVICE_NAME}}.tls=true"
+      - "traefik.http.routers.{{SERVICE_NAME}}.tls.certresolver=cloudflare"
+      - "traefik.http.routers.{{SERVICE_NAME}}.middlewares={{MIDDLEWARE_CHAIN}}@file"
+      - "traefik.http.services.{{SERVICE_NAME}}.loadbalancer.server.port={{CONTAINER_PORT}}"
+
+      # Backup hook labels (see Section 7):
+      - "wheeler.backup.enable=true"
+      - "wheeler.backup.pre-hook=/opt/wheeler/scripts/docker-backup-hooks.sh {{SERVICE_NAME}}"
+      - "wheeler.backup.volumes={{SERVICE_NAME}}-data,{{SERVICE_NAME}}-postgres-data"
+
+      # Metadata labels:
+      - "wheeler.service={{SERVICE_NAME}}"
+      - "wheeler.server={{SERVER_PREFIX}}"
+      - "wheeler.team={{TEAM_NAME}}"
+      - "wheeler.version={{VERSION}}"
+
+# =============================================================================
+# Section 6 — Traefik Label Patterns (for edge services)
+# =============================================================================
+#
+# Every service that receives traffic FROM Traefik (web UIs, APIs served
+# through the EDGE node) needs Traefik labels.
+#
+# =============================================================================
+# PATTERN 1: Standard Public Service
+# =============================================================================
+#
+# - "traefik.enable=true"
+# - "traefik.http.routers.<service>.rule=Host(`<subdomain>.wheeler.ai`)"
+# - "traefik.http.routers.<service>.entrypoints=websecure"
+# - "traefik.http.routers.<service>.tls=true"
+# - "traefik.http.routers.<service>.tls.certresolver=cloudflare"
+#     # Cert resolver: cloudflare (DNS challenge), letsencrypt (HTTP challenge).
+#     # Wheeler uses cloudflare for wildcard cert support.
+# - "traefik.http.routers.<service>.middlewares=<chain>@file"
+#     # Middleware chain from Traefik dynamic config:
+#     #   chain-public@file   — public-facing services (no auth).
+#     #   chain-admin@file    — admin dashboards (basic auth or SSO).
+#     #   chain-internal@file — internal-only services (IP whitelist).
+#     #   chain-api@file      — API services (rate-limited, CORS).
+# - "traefik.http.services.<service>.loadbalancer.server.port=<port>"
+#
+# =============================================================================
+# PATTERN 2: Internal-Only Service (Tailscale/VPN only)
+# =============================================================================
+#
+# - "traefik.enable=true"
+# - "traefik.http.routers.<service>.rule=Host(`<subdomain>.wheeler.ai`) && ClientIP(`100.0.0.0/8`)"
+#     # Only allow Tailscale IP range (100.x.x.x).
+#     # Traefik evaluates rules with AND operators for multiple conditions.
+# - "traefik.http.routers.<service>.entrypoints=websecure"
+# - "traefik.http.routers.<service>.tls=true"
+# - "traefik.http.routers.<service>.tls.certresolver=cloudflare"
+# - "traefik.http.services.<service>.loadbalancer.server.port=<port>"
+#
+# =============================================================================
+# PATTERN 3: Service on Different Host (via Tailscale)
+# =============================================================================
+#
+# When Traefik routes to a service NOT running on the same Docker host,
+# the service must be defined in Traefik's dynamic configuration file
+# (dynamic.yml), NOT in Docker labels.  Docker labels only work for
+# services on the same Docker daemon.
+#
+# See /opt/wheeler/configs/traefik-dynamic-template.yml for cross-host
+# service routing.
+#
+# =============================================================================
+# PATTERN 4: Weighted Canary (Two Versions of Same Service)
+# =============================================================================
+#
+# - "traefik.enable=true"
+# - "traefik.http.services.<service>-stable.loadbalancer.server.port=<port>"
+# - "traefik.http.services.<service>-canary.loadbalancer.server.port=<canary_port>"
+# - "traefik.http.services.<service>-stable.loadbalancer.server.weight=95"
+# - "traefik.http.services.<service>-canary.loadbalancer.server.weight=5"
+#   # Adjust weights for canary stages (5/95, 25/75, 50/50, 100/0).
+#   # See docs/CANARY_DEPLOYMENT_PLAN.md for the full canary procedure.
+
+# =============================================================================
+# Section 7 — Backup Hook Labels
+# =============================================================================
+#
+# Wheeler backup system uses Docker labels to discover which containers
+# need backing up and what pre-backup hooks to run.
+#
+# ── Label Reference ──────────────────────────────────────────────────────────
+#
+# wheeler.backup.enable=true
+#   Enables backup for this container.  Only containers with this label
+#   are included in backup operations.
+#
+# wheeler.backup.pre-hook=/path/to/hook-script.sh <args>
+#   Script to run BEFORE backup.  Used to:
+#     - Dump databases: pg_dump, redis-cli save
+#     - Flush caches to disk
+#     - Pause write operations
+#   The hook script must exit with code 0 for the backup to proceed.
+#   See templates/docker/docker-backup-hooks.sh for hook implementation.
+#
+# wheeler.backup.post-hook=/path/to/hook-script.sh <args>
+#   Script to run AFTER backup.  Used to:
+#     - Resume write operations
+#     - Verify backup integrity
+#     - Clean up temporary files
+#
+# wheeler.backup.volumes=vol1,vol2,vol3
+#   Comma-separated list of named volumes to back up.
+#
+# wheeler.backup.retention.days=30
+#   Number of days to retain backups for this service.
+#
+# wheeler.backup.schedule=0 2 * * *
+#   Cron expression for backup schedule (optional; defaults to daily at 2am).
+#
+# ── Example ──────────────────────────────────────────────────────────────────
+#
+# labels:
+#   - "wheeler.backup.enable=true"
+#   - "wheeler.backup.pre-hook=/opt/wheeler/scripts/docker-backup-hooks.sh my-service"
+#   - "wheeler.backup.volumes=my-service-data,my-service-postgres-data"
+#   - "wheeler.backup.retention.days=30"
+#   - "wheeler.service=my-service"
+#   - "wheeler.server=aiops"
+
+# =============================================================================
+# ADDITIONAL NOTES
+# =============================================================================
+#
+# ── Environment File Location ───────────────────────────────────────────────
+# All .env files are stored in /opt/wheeler/configs/env/ and are NEVER
+# committed to version control.  They are deployed via secure channels
+# (Ansible Vault, sops, or manual scp with restricted permissions).
+#
+# ── Compose File Organization ───────────────────────────────────────────────
+# Wheeler compose files follow this directory structure:
+#   /opt/wheeler/infrastructure/<server>/compose/
+#     ├── docker-compose.yml          # Main compose file (uses this template)
+#     ├── docker-compose.override.yml # Local overrides (gitignored)
+#     ├── .env                        # Environment variables (gitignored)
+#     └── services/                   # Per-service compose fragments (optional)
+#
+# ── Deploy Commands ─────────────────────────────────────────────────────────
+#
+#   # Pull latest images and restart changed services
+#   docker compose -f docker-compose.yml pull
+#   docker compose -f docker-compose.yml up -d --remove-orphans
+#
+#   # Recreate a specific service (pulls latest, recreates container)
+#   docker compose -f docker-compose.yml up -d --force-recreate <service-name>
+#
+#   # Scale a service (must not have container_name set)
+#   docker compose -f docker-compose.yml up -d --scale <service-name>=3
+#
+#   # View logs for a service
+#   docker compose -f docker-compose.yml logs -f --tail 100 <service-name>
+#
+#   # Stop everything
+#   docker compose -f docker-compose.yml down
+#
+#   # Stop and remove volumes (DESTRUCTIVE — only for dev/staging)
+#   docker compose -f docker-compose.yml down -v
+#
+# ── Validation ───────────────────────────────────────────────────────────────
+#
+#   # Validate compose file syntax
+#   docker compose -f docker-compose.yml config --quiet
+#
+#   # Show full resolved config (with env vars substituted)
+#   docker compose -f docker-compose.yml config
+#
+#   # Check for common issues
+#   /opt/wheeler/scripts/docker-validation.sh
+#
+###############################################################################

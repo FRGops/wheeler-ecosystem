@@ -1,0 +1,171 @@
+# =============================================================================
+# Fail2ban Jail Configuration — Shared Base Configuration
+# =============================================================================
+#
+# This file serves as a REFERENCE jail.local that can be deployed as-is or
+# used as a template. Server-specific overrides are in:
+#   /etc/fail2ban/jail.d/hetzner.local
+#   /etc/fail2ban/jail.d/hostinger.local
+#
+# Deploy with:
+#   sudo cp fail2ban-jail.local /etc/fail2ban/jail.local
+#   sudo systemctl restart fail2ban
+#
+# Security Rationale:
+#   Fail2ban is a mandatory component of a defense-in-depth strategy.
+#   It provides dynamic, real-time blocking that complements static UFW rules.
+#   Each jail targets a specific attack vector with appropriate thresholds.
+#
+# Architecture:
+#   ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
+#   │  sshd jail   │───→│  recidive    │───→│  1 WEEK ban  │
+#   │  3 fails/10m │    │  jail        │    │  (escalated) │
+#   │  = 1h ban    │    │  3 bans/day  │    │              │
+#   └──────────────┘    └──────────────┘    └──────────────┘
+#   ┌──────────────┐          ↑
+#   │ traefik-auth │──────────┘
+#   │ 10 fails/10m │
+#   │ = 2h ban     │
+#   └──────────────┘
+# =============================================================================
+
+[DEFAULT]
+# ─── Ban Action ──────────────────────────────────────────────────────────
+# Use UFW for bans so they're visible in the firewall status.
+# Alternative: iptables-multiport (more traditional).
+banaction = ufw
+banaction_allports = ufw
+
+# ─── Ignore IPs ──────────────────────────────────────────────────────────
+# Never ban internal infrastructure.
+#   127.0.0.1/8, ::1        — localhost
+#   100.64.0.0/10          — Tailscale mesh (both servers)
+#   10.0.0.0/8             — Docker internal networks
+#   172.16.0.0/12          — Docker bridge networks
+#   192.168.0.0/16         — Local networks (if any)
+ignoreip = 127.0.0.1/8 ::1 100.64.0.0/10 10.0.0.0/8 172.16.0.0/12
+
+# ─── Time Windows (Defaults) ─────────────────────────────────────────────
+findtime  = 600    # 10 minutes — the window in which failures are counted
+maxretry  = 3      # Default max failures before ban
+bantime   = 3600   # 1 hour — default ban duration
+
+# ─── Logging ─────────────────────────────────────────────────────────────
+# Log all bans to syslog for SIEM/tool integration
+logencoding = auto
+
+# ─── Email Notifications ─────────────────────────────────────────────────
+# Set destemail to receive ban alerts.
+# If you don't want emails, change action to %(action_)s (no notification).
+destemail = root@localhost
+sendername = fail2ban
+action     = %(action_mwl)s   # Ban + email with whois and log lines
+
+# ─────────────────────────────────────────────────────────────────────────────
+# [sshd] — SSH Brute Force Protection
+# ─────────────────────────────────────────────────────────────────────────────
+# Enabled on BOTH servers.
+# Rationale: SSH is the #1 brute-force target on any internet-connected server.
+# 3 failed auth attempts in 10 minutes = 1 hour ban. Key-based auth will
+# never trip this (only password failures count).
+[sshd]
+enabled   = true
+port      = ssh
+filter    = sshd
+logpath   = /var/log/auth.log
+maxretry  = 3
+bantime   = 3600
+findtime  = 600
+
+# ─────────────────────────────────────────────────────────────────────────────
+# [sshd-ddos] — SSH Connection Flood Protection
+# ─────────────────────────────────────────────────────────────────────────────
+# Optional: Enable if you see connection floods on port 22.
+# Separate from [sshd] because connection floods and auth failures are
+# different attack patterns.
+[sshd-ddos]
+enabled   = false
+port      = ssh
+filter    = sshd-ddos
+logpath   = /var/log/auth.log
+maxretry  = 5
+bantime   = 3600
+findtime  = 60
+
+# ─────────────────────────────────────────────────────────────────────────────
+# [traefik-auth] — Traefik Application-Level Abuse Protection
+# ─────────────────────────────────────────────────────────────────────────────
+# Rationale: Traefik is the reverse proxy entry point for ALL web services.
+# Attackers probe for:
+#   - 401 Unauthorized: hitting admin panels with default creds
+#   - 403 Forbidden: path traversal, blocked IPs
+#   - 429 Too Many Requests: rate-limited clients that keep coming
+# This requires a custom filter and Traefik access logs.
+#
+# Prerequisites:
+#   1. Enable Traefik access logs: --access.log=true
+#   2. Custom filter at /etc/fail2ban/filter.d/traefik-auth.conf
+#   3. Log file at /var/log/traefik/access.log
+[traefik-auth]
+enabled   = true
+port      = http,https
+filter    = traefik-auth
+logpath   = /var/log/traefik/access.log
+maxretry  = 10     # Allow some 401s (bots probe a few paths)
+bantime   = 7200   # 2 hours
+findtime  = 600
+
+# ─────────────────────────────────────────────────────────────────────────────
+# [recidive] — Persistent Threat Escalation
+# ─────────────────────────────────────────────────────────────────────────────
+# Rationale: Some attackers keep coming back after their ban expires.
+# The recidive jail monitors /var/log/fail2ban.log for IPs that have been
+# banned multiple times and escalates to a much longer ban.
+#
+# This is the most important jail for dealing with dedicated attackers.
+# If someone gets banned 3 times in a day, they're not a random scanner —
+# they're targeting you specifically.
+[recidive]
+enabled   = true
+filter    = recidive
+logpath   = /var/log/fail2ban.log
+maxretry  = 3       # Banned 3 times across any jail
+bantime   = 604800  # 1 WEEK — persistent threats get long bans
+findtime  = 86400   # Look back 1 day
+
+# ─────────────────────────────────────────────────────────────────────────────
+# [docker-proxy] — Docker exposed port protection (OPTIONAL)
+# ─────────────────────────────────────────────────────────────────────────────
+# Rationale: If any Docker container ports are accidentally exposed to the
+# public, this jail provides a safety net by monitoring those logs.
+# Disabled by default — enable if you need it.
+# [docker-proxy]
+# enabled   = false
+# port      = http,https
+# filter    = nginx-http-auth  # Replace with appropriate filter
+# logpath   = /var/log/docker/*.log
+# maxretry  = 5
+# bantime   = 3600
+
+# ─────────────────────────────────────────────────────────────────────────────
+# [nginx-http-auth] — Nginx HTTP Auth (if applicable)
+# ─────────────────────────────────────────────────────────────────────────────
+# Uncomment if you have Nginx with HTTP Basic Auth alongside Traefik.
+# [nginx-http-auth]
+# enabled   = true
+# port      = http,https
+# filter    = nginx-http-auth
+# logpath   = /var/log/nginx/error.log
+# maxretry  = 5
+# bantime   = 3600
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Custom User Bans — Add specific IPs you want permanently blocked here:
+# [manual-bans]
+# enabled  = true
+# filter   = manual-bans
+# logpath  = /var/log/fail2ban-manual.log
+# maxretry = 0
+# bantime  = -1  # Permanent ban
+# =============================================================================
+# vim: ft=dosini

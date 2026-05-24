@@ -1,0 +1,83 @@
+# =============================================================================
+# COREDB (5.78.210.123) -- OPTIMIZED CORE STACK
+# Generated: 2026-05-23
+# Replaces: /opt/wheeler-core/docker-compose.yml
+# =============================================================================
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  # ── Postgres ───────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16
+    container_name: wheeler-postgres
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "127.0.0.1:5432:5432"       # BIND TO LOCALHOST -- was 0.0.0.0
+    mem_limit: 1g                    # ADDED
+    cpus: "2.0"                      # ADDED
+    logging: *default-logging        # ADDED (WAS NONE)
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  # ── Redis ──────────────────────────────────────────────────────────
+  redis:
+    image: redis:7
+    container_name: wheeler-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    ports:
+      - "127.0.0.1:6379:6379"       # BIND TO LOCALHOST -- was 0.0.0.0
+    mem_limit: 256m                  # ADDED
+    cpus: "0.5"                      # ADDED
+    logging: *default-logging        # ADDED (WAS NONE)
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # ── Minio ──────────────────────────────────────────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: wheeler-minio
+    restart: unless-stopped
+    env_file: .env
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports:
+      - "127.0.0.1:9000:9000"       # BIND TO LOCALHOST -- was 0.0.0.0
+      - "127.0.0.1:9001:9001"       # BIND TO LOCALHOST -- was 0.0.0.0
+    mem_limit: 512m                  # ADDED
+    cpus: "1.0"                      # ADDED
+    logging: *default-logging        # ADDED (WAS NONE)
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9000/minio/health/live"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:

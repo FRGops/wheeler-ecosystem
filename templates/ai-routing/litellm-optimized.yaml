@@ -1,0 +1,295 @@
+# =============================================================================
+# Wheeler AI Routing — Optimized LiteLLM Configuration
+# Target: AIOPS (5.78.140.118), LiteLLM on port 4049
+# Generated: 2026-05-23 by Phase 7 AI Routing Optimization
+# Replaces: /root/.claude/litellm-deepseek.yaml
+#
+# CHANGES FROM CURRENT RUNNING CONFIG:
+#   1. Fixed Redis auth (was: broken, no password in ecosystem URL)
+#   2. Added fallback chain (was: none)
+#   3. Added retry logic (was: none)
+#   4. Added model-specific timeouts (was: none)
+#   5. Added max_parallel_requests (was: none)
+#   6. Added streaming support (was: none)
+#   7. Added Langfuse callbacks (was: none)
+#   8. Added alerting webhooks (was: none)
+#   9. Added budget tracking (was: none)
+#  10. Added guardrails (was: none)
+#  11. Reduced rpm on deepseek-chat (was: 1000, now: 500 to match API tier)
+# =============================================================================
+
+# ─── Model List ───────────────────────────────────────────────────────────────
+
+model_list:
+  # ── Primary: DeepSeek Flash (cheap, fast) ──
+  - model_name: deepseek-chat
+    litellm_params:
+      model: openai/deepseek-chat
+      api_key: os.environ/DEEPSEEK_API_KEY
+      api_base: https://api.deepseek.com
+      rpm: 500                    # Reduced from 1000 to match API tier limits
+      tpm: 1000000
+      timeout: 30                 # Flash should respond in <30s
+      max_retries: 3
+      stream_timeout: 15          # Streaming timeout for first token
+
+  # ── Secondary: DeepSeek Reasoner (for complex reasoning) ──
+  - model_name: deepseek-reasoner
+    litellm_params:
+      model: openai/deepseek-reasoner
+      api_key: os.environ/DEEPSEEK_API_KEY
+      api_base: https://api.deepseek.com
+      rpm: 200                    # Reduced from 500 (reasoner is slower/more expensive)
+      tpm: 300000
+      timeout: 60                 # Reasoner may need more time
+      max_retries: 2
+      stream_timeout: 30
+
+  # ── Premium: Claude Sonnet 4 (fallback + premium tasks) ──
+  - model_name: claude-sonnet-4
+    litellm_params:
+      model: anthropic/claude-sonnet-4-20250514
+      api_key: os.environ/ANTHROPIC_API_KEY
+      rpm: 100
+      tpm: 100000
+      timeout: 90
+      max_retries: 1              # Claude is expensive, retry sparingly
+      stream_timeout: 30
+
+  # ── Premium: Claude Opus 4 (highest capability, highest cost) ──
+  - model_name: claude-opus-4
+    litellm_params:
+      model: anthropic/claude-opus-4-20250514
+      api_key: os.environ/ANTHROPIC_API_KEY
+      rpm: 50
+      tpm: 30000
+      timeout: 120
+      max_retries: 1
+      stream_timeout: 30
+
+  # ── Premium Review (alias for Claude Sonnet, used by review workflows) ──
+  - model_name: premium_review
+    litellm_params:
+      model: anthropic/claude-sonnet-4-20250514
+      api_key: os.environ/ANTHROPIC_API_KEY
+      rpm: 100
+      tpm: 100000
+      timeout: 90
+      max_retries: 1
+      stream_timeout: 30
+
+
+# ─── Router / Fallback Configuration ─────────────────────────────────────────
+
+router_settings:
+  # Maximum parallel requests across ALL models
+  max_parallel_requests: 10
+
+  # Allowed consecutive failures before circuit-breaking a model
+  allowed_fails: 3               # After 3 consecutive failures, remove from rotation
+  allowed_fails_policy:
+    bad_request_errors: false    # Don't count 400 errors (client mistakes)
+    authentication_errors: false # Don't count 401/403 (config issues, not model issues)
+
+  # Cooldown after circuit-breaker trips (seconds)
+  cooldown_time: 30
+
+  # Retry policy
+  num_retries: 3                 # Max retries for the entire routing attempt
+  retry_after: 2                 # Seconds to wait before first retry
+  retry_policy:
+    strategy: "exponential_backoff"
+    base_delay: 1                # Start at 1 second
+    max_delay: 30                # Cap at 30 seconds
+    jitter: true                 # Add random jitter to prevent thundering herd
+
+  # Fallback chain: Flash -> Reasoner -> Sonnet
+  # Opus is NEVER an automatic fallback (cost guard)
+  fallbacks:
+    - from: deepseek-chat
+      to: deepseek-reasoner
+      conditions:
+        - status_code: [500, 502, 503, 504]
+        - timeout_seconds: 30
+      max_fallbacks_per_hour: 50
+      alert_on_fallback: true
+
+    - from: deepseek-reasoner
+      to: claude-sonnet-4
+      conditions:
+        - status_code: [500, 502, 503, 504]
+        - timeout_seconds: 60
+      max_fallbacks_per_hour: 10
+      alert_on_fallback: true
+
+    - from: deepseek-chat
+      to: claude-sonnet-4
+      conditions:
+        - status_code: [500, 502, 503, 504]
+        - timeout_seconds: 30
+      max_fallbacks_per_hour: 5    # Very limited; Claude is expensive
+      alert_on_fallback: true      # Direct Flash->Claude fallback is an escalation
+
+  # Context window fallbacks (don't auto-upgrade)
+  context_window_fallbacks: []
+
+  # Routing strategy
+  routing_strategy: "usage-based-routing-v2"
+
+
+# ─── LiteLLM Core Settings ────────────────────────────────────────────────────
+
+litellm_settings:
+  # Parameter handling
+  drop_params: true              # Drop unsupported params silently
+  set_verbose: false             # Keep logs clean
+  request_timeout: 600           # Global max: 10 minutes (safety net)
+
+  # Retry
+  num_retries: 3                 # Global retry count
+  num_retries_per_request: 2     # Per-individual-request retries
+
+  # Streaming
+  stream: true                   # Enable streaming support
+  stream_timeout: 60             # Global stream timeout
+
+  # Concurrency
+  max_parallel_requests: 10      # Global cap
+
+  # Circuit breaker
+  allowed_fails: 3
+  allowed_fails_policy:
+    bad_request_errors: false
+    authentication_errors: false
+  cooldown_time: 30
+
+  # Fallbacks
+  fallbacks: []                  # Managed via router_settings above
+  context_window_fallbacks: []   # Don't auto-upgrade context windows
+
+
+# ─── Caching ──────────────────────────────────────────────────────────────────
+
+  cache: true
+  cache_params:
+    type: redis
+    host: 100.118.166.117
+    port: 6379
+    # IMPORTANT: Password must match the actual Redis server password.
+    # If Redis has no password, remove this line entirely.
+    # If Redis password differs, update it here AND in REDIS_URL env var.
+    password: os.environ/REDIS_PASSWORD
+    db: 6                        # Use DB 6 for LiteLLM cache (isolated)
+    socket_timeout: 5            # 5s Redis socket timeout
+    socket_connect_timeout: 5    # 5s Redis connect timeout
+    connection_pool_size: 20    # Connection pool for concurrent access
+    cache_ttl: 3600              # Cache TTL: 1 hour (was: default)
+    cache_prompts: true          # Cache identical prompts
+    cache_completions: false     # Don't cache completions (deterministic-optional)
+    cache_embeddings: false      # Not using embeddings through LiteLLM
+
+  # In-memory fallback when Redis is down (local cache only)
+  cache_fallback_to_in_memory: true
+  cache_in_memory_max_size: 100  # Max 100 entries in memory (per process)
+
+
+# ─── General Settings ─────────────────────────────────────────────────────────
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: os.environ/DATABASE_URL
+
+  # Redis for rate limiting and parallel request tracking
+  redis_host: 100.118.166.117
+  redis_port: 6379
+  redis_password: os.environ/REDIS_PASSWORD
+  redis_db: 6
+
+  # Store model call metadata in PostgreSQL
+  store_model_in_db: true
+
+  # Alerting
+  alerting: ["slack", "webhook"]
+  alerting_threshold: 5          # Alert after 5 consecutive failures
+
+
+# ─── Observability / Callbacks ────────────────────────────────────────────────
+
+litellm_settings:
+  # NOTE: This section is merged with the litellm_settings above
+  # at LiteLLM config parse time.
+
+  success_callback:
+    - langfuse:
+        public_key: os.environ/LANGFUSE_PUBLIC_KEY
+        secret_key: os.environ/LANGFUSE_SECRET_KEY
+        host: "http://localhost:3020"
+        flush_interval: 10       # Flush to Langfuse every 10 seconds
+
+  failure_callback:
+    - webhook:
+        url: os.environ/ALERTING_WEBHOOK_URL
+        headers:
+          Content-Type: "application/json"
+          X-Alert-Source: "litellm-failure"
+          X-Alert-Severity: "critical"
+
+    - langfuse:
+        public_key: os.environ/LANGFUSE_PUBLIC_KEY
+        secret_key: os.environ/LANGFUSE_SECRET_KEY
+        host: "http://localhost:3020"
+
+
+# ─── Guardrails ───────────────────────────────────────────────────────────────
+
+guardrails:
+  # Loop detection: block identical requests in a window
+  loop_detection:
+    enabled: true
+    max_identical_requests: 3      # Block after 3 identical requests
+    window_seconds: 60             # Within 60-second window
+    action: "reject"               # Reject the repeated request
+    alert: true
+
+  # Token limits (global defaults)
+  max_input_tokens:
+    deepseek-chat: 64000
+    deepseek-reasoner: 64000
+    claude-sonnet-4: 100000
+    claude-opus-4: 100000
+    premium_review: 100000
+
+  max_output_tokens:
+    deepseek-chat: 16000
+    deepseek-reasoner: 16000
+    claude-sonnet-4: 16000
+    claude-opus-4: 16000
+    premium_review: 16000
+
+  # Block abusive prompt patterns
+  blocked_user_patterns:
+    - "ignore all previous instructions"
+    - "system: ignore"
+    - "<|im_start|>system"
+
+  # Alert on suspicious patterns (log but don't block)
+  alerting_patterns:
+    - "read the entire (codebase|repository)"
+    - "audit every file"
+    - "spawn \\d+ agents"
+    - "bypass (budget|rate limit|guardrail)"
+
+
+# ─── Environment Validation ──────────────────────────────────────────────────
+
+environment_variables:
+  required:
+    - DEEPSEEK_API_KEY
+    - LITELLM_MASTER_KEY
+    - DATABASE_URL
+  optional:
+    - ANTHROPIC_API_KEY
+    - REDIS_PASSWORD
+    - LANGFUSE_PUBLIC_KEY
+    - LANGFUSE_SECRET_KEY
+    - ALERTING_WEBHOOK_URL

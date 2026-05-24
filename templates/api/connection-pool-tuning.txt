@@ -1,0 +1,365 @@
+# Connection Pool Tuning Guide
+# Generated: 2026-05-23
+# Target: PostgreSQL connections across Wheeler ecosystem
+
+# ============================================================================
+# CURRENT CONNECTION POOL LANDSCAPE
+# ============================================================================
+
+CURRENT_POOLS = """
+Service                  Pool_size  Max_overflow  Max_per_worker  Workers  Max_total
+─────────────────────────────────────────────────────────────────────────────────────
+frgcrm-api               30         50            80              2        160
+frgcrm-agent-svc         ~10 (pg default)        10              1        10
+horizon-agent-svc        ~10                    10              1        10
+design-agent-svc         ~10                    10              1        10
+paperless-agent-svc      ~10                    10              1        10
+prediction-radar-agent-svc ~10                  10              1        10
+ravyn-agent-svc          ~10                    10              1        10
+surplusai-scraper-agent-svc ~10                  10              1        10
+voice-agent-svc          ~10                    10              1        10
+insforge-agent-svc       N/A (HTTP/PostgREST)    0              1        0
+─────────────────────────────────────────────────────────────────────────────────────
+TOTAL POTENTIAL                                          260 connections
+PostgreSQL DEFAULT max_connections                       100 connections
+OVERRUN RISK                                            160 connections OVER limit
+"""
+
+# ============================================================================
+# POSTGRESQL SERVER-SIDE RECOMMENDATIONS
+# ============================================================================
+
+PG_SERVER_TUNING = """
+-- File: /etc/postgresql/16/main/postgresql.conf (or ALTER SYSTEM SET)
+
+-- Connections
+max_connections = 200                         # Up from default 100
+superuser_reserved_connections = 5            # Keep 5 for admin access
+idle_in_transaction_session_timeout = 30000   # 30s — kill idle transactions
+
+-- Statement timeouts (server-side safety net)
+statement_timeout = 15000                     # 15s — kill long queries
+idle_in_transaction_session_timeout = 30000   # 30s
+
+-- Keepalive (detect dead connections faster)
+tcp_keepalives_idle = 60                      # 60s idle before probing
+tcp_keepalives_interval = 10                  # 10s between probes
+tcp_keepalives_count = 3                      # 3 failed probes = dead
+
+-- Memory for connections
+work_mem = 16MB                               # Per-operation memory (up from 4MB)
+maintenance_work_mem = 128MB                  # For VACUUM, CREATE INDEX
+
+-- Connection pooling hints (if using pgbouncer in future)
+# If connection count becomes problematic, add pgbouncer:
+# pgbouncer transaction pooling:
+#   default_pool_size = 50
+#   max_client_conn = 300
+#   pool_mode = transaction
+
+-- Apply:
+-- ALTER SYSTEM SET max_connections = 200;
+-- ALTER SYSTEM SET statement_timeout = '15s';
+-- SELECT pg_reload_conf();
+-- Verify: SHOW max_connections;
+"""
+
+# ============================================================================
+# FRG CRM API (FASTAPI) POOL TUNING
+# ============================================================================
+
+FRGCRM_POOL_CURRENT = """
+# /opt/wheeler/apps/frgcrm/api/database.py
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,
+    pool_size=30,
+    max_overflow=50,
+    pool_recycle=600,
+)
+"""
+
+FRGCRM_POOL_RECOMMENDED = """
+# /opt/wheeler/apps/frgcrm/api/database.py
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,              # Verify connection is alive before using
+    pool_size=10,                    # Down from 30 (10 per worker * 6 workers = 60)
+    max_overflow=20,                 # Down from 50 (burst limit)
+    pool_recycle=3600,               # Up from 600 (recycle hourly instead of 10min)
+    pool_timeout=10,                 # ADD: max wait time for a connection (seconds)
+    echo_pool=False,                 # ADD: only enable for debugging
+    connect_args={
+        "connect_timeout": 5,        # ADD: fast failure on unreachable DB
+        "keepalives": 1,             # ADD: TCP keepalive
+        "keepalives_idle": 60,       # ADD: 60s idle before keepalive probe
+        "keepalives_interval": 10,   # ADD: 10s between probes
+        "keepalives_count": 3,       # ADD: 3 failed probes = dead
+        "options": "-c statement_timeout=10000",  # ADD: per-connection server timeout
+        "application_name": "frgcrm-api",         # ADD: identify in pg_stat_activity
+    },
+)
+
+# Session factory
+SessionLocal = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    bind=engine,
+    expire_on_commit=False,          # ADD: prevent detached instance errors
+)
+
+# Async engine (for Phase 2 async migration):
+async_engine = create_async_engine(
+    DATABASE_URL_ASYNC,
+    pool_size=10,
+    max_overflow=20,
+    pool_recycle=3600,
+    pool_pre_ping=True,
+    pool_timeout=10,
+    connect_args={
+        "timeout": 10,                              # asyncpg timeout syntax
+        "command_timeout": 10,
+        "server_settings": {
+            "statement_timeout": "10000",
+            "idle_in_transaction_session_timeout": "30000",
+            "application_name": "frgcrm-api-async",
+        },
+    },
+)
+
+# Connection pool rationale:
+# - pool_size=10: Enough for typical concurrency. Most API handlers are fast (<100ms).
+# - max_overflow=20: Allows temporary bursts without permanent overhead.
+# - pool_recycle=3600: Prevents memory bloat; hourly is sufficient.
+# - pool_timeout=10: Fail fast — don't make users wait for a connection.
+# - connect_timeout=5: If DB is unreachable, fail in 5s instead of OS TCP timeout (30s+).
+#
+# With 6 uvicorn workers:
+#   Regular pool:  6 * 10 = 60 connections
+#   Burst pool:    6 * (10+20) = 180 connections max
+#   PostgreSQL max: 200 connections
+#   Safe margin: 20 connections for maintenance / other services
+"""
+
+# ============================================================================
+# AGENT-SVC (NODE.JS / node-postgres) POOL TUNING
+# ============================================================================
+
+AGENTSVC_POOL_RECOMMENDED = """
+// Each agent-svc that connects to PostgreSQL should use explicit pool config.
+// Default node-postgres pool: max=10, idleTimeoutMillis=10000
+
+// Recommended pool config (TypeScript):
+import { Pool } from 'pg';
+
+const pool = new Pool({
+  host: process.env.PGHOST || '100.118.166.117',
+  port: parseInt(process.env.PGPORT || '5432'),
+  database: process.env.PGDATABASE || 'wheeler_core',
+  user: process.env.PGUSER || 'wheeler',
+  password: process.env.PGPASSWORD,
+
+  // Pool sizing
+  max: 5,                          // Down from default 10
+  min: 0,                          // Don't maintain idle connections
+  idleTimeoutMillis: 30_000,       // Up from default 10s
+  connectionTimeoutMillis: 5_000,  // Fail fast (default is 0 = no timeout)
+
+  // Keepalive
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 60_000,
+
+  // Statement timeout (server-side)
+  statement_timeout: 10_000,       // 10s max per query
+
+  // Application name for monitoring
+  application_name: process.env.SERVICE_NAME || 'agent-svc',
+});
+
+// Per-service totals (with 5 max connections each):
+//   8 agent-svc * 5 = 40 connections
+//   + frgcrm-api (60) = 100 connections
+//   + LiteLLM (if DB used) = 5 connections
+//   Total: ~105 connections (well within 200 limit)
+
+// Event listener for pool health:
+pool.on('error', (err) => {
+  console.error('[pg-pool] Unexpected pool error:', err.message);
+});
+
+pool.on('connect', () => {
+  // Connection acquired — log only in debug
+});
+
+pool.on('acquire', () => {
+  // Connection request — log only in debug
+});
+
+pool.on('remove', () => {
+  // Connection removed from pool — log in debug
+});
+"""
+
+# ============================================================================
+# CONNECTION POOL MONITORING QUERIES
+# ============================================================================
+
+POOL_MONITORING_SQL = """
+-- 1. Current connection count by application
+SELECT
+    application_name,
+    state,
+    COUNT(*) AS connections
+FROM pg_stat_activity
+WHERE application_name != ''
+GROUP BY application_name, state
+ORDER BY connections DESC;
+
+-- 2. Idle-in-transaction connections (LEAKS)
+SELECT
+    pid,
+    application_name,
+    state,
+    age(now(), state_change) AS state_duration,
+    query
+FROM pg_stat_activity
+WHERE state = 'idle in transaction'
+  AND age(now(), state_change) > interval '30 seconds'
+ORDER BY state_change;
+
+-- 3. Long-running queries
+SELECT
+    pid,
+    application_name,
+    age(now(), query_start) AS query_duration,
+    state,
+    left(query, 200) AS query_preview
+FROM pg_stat_activity
+WHERE state = 'active'
+  AND age(now(), query_start) > interval '5 seconds'
+ORDER BY query_start;
+
+-- 4. Connection utilization (requires pg_stat_statements extension)
+SELECT
+    count(*) AS total_connections,
+    (SELECT setting::int FROM pg_settings WHERE name = 'max_connections') AS max_connections,
+    round(100.0 * count(*) / (SELECT setting::int FROM pg_settings WHERE name = 'max_connections'), 1) AS utilization_pct
+FROM pg_stat_activity;
+
+-- 5. Waiting queries (locks)
+SELECT
+    blocked.pid AS blocked_pid,
+    blocked.query AS blocked_query,
+    blocking.pid AS blocking_pid,
+    blocking.query AS blocking_query,
+    age(now(), blocked.query_start) AS wait_duration
+FROM pg_stat_activity blocked
+JOIN pg_locks blocked_locks ON blocked.pid = blocked_locks.pid
+JOIN pg_locks blocking_locks ON blocked_locks.lock_type = blocking_locks.lock_type
+    AND blocked_locks.relation = blocking_locks.relation
+    AND blocked_locks.pid != blocking_locks.pid
+JOIN pg_stat_activity blocking ON blocking_locks.pid = blocking.pid
+WHERE NOT blocked_locks.granted;
+"""
+
+# ============================================================================
+# POOL HEALTH CHECKS (FOR ECOSYSTEM-GUARDIAN)
+# ============================================================================
+
+POOL_HEALTH_CHECKS = """
+// Add to ecosystem-guardian/src/validators/postgres.ts or equivalent:
+
+interface PoolHealth {
+  service: string;
+  poolSize: number;
+  activeConnections: number;
+  idleConnections: number;
+  waitingClients: number;
+  utilizationPct: number;
+  status: 'healthy' | 'warning' | 'critical';
+}
+
+async function checkPoolHealth(pool: Pool, serviceName: string): Promise<PoolHealth> {
+  const stats = {
+    total: pool.totalCount,
+    idle: pool.idleCount,
+    waiting: pool.waitingCount,
+  };
+
+  const utilizationPct = stats.total > 0
+    ? (stats.total - stats.idle) / stats.total * 100
+    : 0;
+
+  let status: 'healthy' | 'warning' | 'critical' = 'healthy';
+  if (utilizationPct > 90 || stats.waiting > 5) status = 'critical';
+  else if (utilizationPct > 70 || stats.waiting > 0) status = 'warning';
+
+  return {
+    service: serviceName,
+    poolSize: pool.options.max || 10,
+    activeConnections: stats.total - stats.idle,
+    idleConnections: stats.idle,
+    waitingClients: stats.waiting,
+    utilizationPct: Math.round(utilizationPct * 10) / 10,
+    status,
+  };
+}
+
+// Alert on critical pool utilization:
+// if (health.utilizationPct > 90) {
+//   sendAlert(`Pool saturation: ${serviceName} at ${utilizationPct}%`);
+// }
+"""
+
+# ============================================================================
+# CONNECTION POOL TUNING DECISION MATRIX
+# ============================================================================
+
+TUNING_MATRIX = """
+Symptom                          Cause                     Fix
+─────────────────────────────────────────────────────────────────────────────
+"FATAL: too many connections"    Max total exceeds PG max  Reduce pool sizes
+"FATAL: remaining connection      Pool starvation           Add max_overflow
+ slots reserved for superuser"
+"QueuePool limit reached,         Pool exhausted under load Increase pool_size
+ connection timed out"                                      or max_overflow
+"Server closed the connection     pool_recycle too short    Increase pool_recycle
+ unexpectedly"                                              or use pool_pre_ping
+"Idle in transaction" buildup    Missing commit/rollback    Fix transaction leaks
+"(timeout) connection not         Network/firewall timeout  Add keepalive config
+ available"
+"Slow query (>1s)" logs           No statement_timeout      Set server/client
+                                                           query timeout
+"Connection refused,              DB unavailable            Set connect_timeout
+ hangs for 30s+"                                            to 5s to fail fast
+"""
+
+# ============================================================================
+# PGBOUNCER (FUTURE — IF CONNECTION COUNT BECOMES PROBLEMATIC)
+# ============================================================================
+
+PGBOUNCER_CONFIG = """
+;; /etc/pgbouncer/pgbouncer.ini
+[databases]
+frgcrm = host=127.0.0.1 port=5432 dbname=frgcrm
+wheeler_core = host=100.118.166.117 port=5432 dbname=wheeler_core
+
+[pgbouncer]
+listen_addr = 127.0.0.1
+listen_port = 6432
+auth_type = md5
+auth_file = /etc/pgbouncer/userlist.txt
+pool_mode = transaction       # Best for web apps; returns connection after each tx
+default_pool_size = 50        # Per-database pool size
+max_client_conn = 300         # Max incoming client connections
+max_db_connections = 50       # Max outgoing DB connections per database
+server_idle_timeout = 600     # Close idle server connections after 10 min
+client_idle_timeout = 0       # Don't timeout client connections
+query_timeout = 15            # Kill queries > 15s
+query_wait_timeout = 10       # Max wait for a connection
+
+# App connection string changes from:
+#   postgresql://user:pass@host:5432/dbname
+# To:
+#   postgresql://user:pass@127.0.0.1:6432/dbname
+"""

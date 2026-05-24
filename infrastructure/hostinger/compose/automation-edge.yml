@@ -1,0 +1,194 @@
+###############################################################################
+# AUTOMATION EDGE — n8n + Webhook Receiver
+# ============================================
+# Lightweight automation stack for the Hostinger edge VPS.
+#
+# WHAT RUNS HERE:
+#   - n8n: Lightweight workflow automation (no browser automation, no
+#          heavy ETL; those stay on Hetzner with full resources)
+#   - webhook-receiver: Simple HTTP endpoint for receiving webhooks
+#                        and forwarding to n8n or other services
+#
+# WHAT DOES NOT RUN HERE:
+#   - ChangeDetection:         → Hetzner (too resource-intensive)
+#   - Browser Automation:      → Hetzner (Puppeteer/Playwright = 500MB+ per instance)
+#   - Heavy ETL/Data Pipeline: → Hetzner (ClickHouse, dbt, Airflow)
+#
+# RESOURCE RATIONALE:
+# n8n on its own is lightweight (~150MB idle).  Workflows that call LLMs
+# or external APIs use minimal RAM.  The risk is unconstrained workflow
+# loops — hence the aggressive CPU limit of 0.5 cores.
+###############################################################################
+
+version: "3.8"
+
+# =============================================================================
+# NETWORKS
+# =============================================================================
+networks:
+  traefik-public:
+    external: true
+    name: traefik-public
+  automation-internal:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: "172.20.2.0/24"
+
+# =============================================================================
+# VOLUMES
+# =============================================================================
+volumes:
+  n8n-data:
+    name: n8n-data
+
+# =============================================================================
+# SERVICES
+# =============================================================================
+services:
+
+  # ---------------------------------------------------------------------------
+  # n8n — Lightweight Workflow Automation
+  #
+  # Database: SQLite (embedded, no separate DB needed)
+  #   → Saves ~256MB that Postgres would use for n8n data
+  #   → Good enough for <50 workflows with light executions
+  #   → If you exceed 50 workflows or 1000 executions/day, migrate to Postgres
+  #
+  # Queue: Built-in (no Redis needed for single-node)
+  #   → Redis would add ~128MB overhead for minimal benefit at this scale
+  #
+  # IMPORTANT: Disable the n8n AI Agent node type to save ~200MB of Python
+  # dependency overhead.  AI agent execution stays on Hetzner.
+  # ---------------------------------------------------------------------------
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n-edge
+    restart: unless-stopped
+    networks:
+      - traefik-public
+      - automation-internal
+    environment:
+      # --- Core Configuration ---
+      N8N_PORT: 5678
+      N8N_HOST: n8n.wheeler.ai
+      N8N_PROTOCOL: https
+      N8N_EDITOR_BASE_URL: "https://n8n.wheeler.ai"
+      WEBHOOK_URL: "https://n8n.wheeler.ai"
+      EXECUTIONS_DATA_PRUNE: "true"
+      EXECUTIONS_DATA_MAX_AGE: 168  # Prune execution data > 7 days
+      EXECUTIONS_DATA_PRUNE_TIMEOUT: 60
+
+      # --- Resource Conservation ---
+      # Use SQLite (embedded) instead of Postgres to save resources
+      DB_TYPE: sqlite
+      DB_SQLITE_DATABASE: /home/node/.n8n/database.sqlite
+      # Disable AI Agent nodes (heavy Python dependencies)
+      N8N_NODES_INCLUDE: ""  # Include all default nodes except AI Agent
+      # Actually, we'll keep defaults and just avoid installing AI packages
+      N8N_DISABLE_AI_NODES: "true"
+
+      # --- Security ---
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?required}
+      N8N_METRICS: "false"
+      N8N_METRICS_INCLUDE_DEFAULT_METRICS: "false"
+
+      # --- Execution Settings ---
+      # Max 5 concurrent executions — prevents resource exhaustion
+      EXECUTIONS_TIMEOUT: 300  # 5 min max per workflow
+      EXECUTIONS_TIMEOUT_MAX: 600  # 10 min absolute max
+      N8N_MAX_EXECUTION_TIMEOUT: 600
+      # Single process mode — reduces memory by ~30% vs multi-process
+      N8N_MULTI_MAIN_INSTANCE: "false"
+
+    volumes:
+      - n8n-data:/home/node/.n8n
+
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 384M
+        reservations:
+          cpus: "0.10"
+          memory: 128M
+
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:5678/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+    labels:
+      - "traefik.enable=false"
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # WEBHOOK RECEIVER
+  # Lightweight HTTP endpoint for receiving external webhooks (GitHub,
+  # Stripe, Cloudflare, monitoring alerts, etc.) and forwarding to
+  # n8n workflows or other services.
+  #
+  # This is a simple Node.js or Python app.  Replace the image with your
+  # actual webhook receiver implementation.
+  #
+  # If you don't need a custom webhook receiver, n8n can serve as the
+  # webhook endpoint directly (n8n webhook nodes).
+  # This container exists for:
+  #   - Pre-processing webhooks before n8n (validation, rate limiting)
+  #   - Handling webhooks that don't need workflow orchestration
+  #   - Acting as a webhook proxy (retry, queue, transform)
+  #
+  # NOTE: Entrypoint is /health, /webhook/github, /webhook/stripe, etc.
+  # ---------------------------------------------------------------------------
+  webhook-receiver:
+    image: ${WEBHOOK_RECEIVER_IMAGE:-ghcr.io/wheeler-ai/webhook-receiver:latest}
+    container_name: webhook-receiver
+    restart: unless-stopped
+    networks:
+      - traefik-public
+      - automation-internal
+    depends_on:
+      # webhook-receiver can run independently of n8n
+      # but typically forwards to n8n webhooks
+      - n8n
+    environment:
+      PORT: 9000
+      N8N_WEBHOOK_URL: "http://n8n:5678/webhook/"
+      # Secret for validating incoming webhooks
+      WEBHOOK_SECRET: ${WEBHOOK_RECEIVER_SECRET:-}
+      # Rate limit: max 100 requests/min per source IP
+      RATE_LIMIT_RPM: 100
+      # Retry on failure: 3 attempts with exponential backoff
+      RETRY_MAX_ATTEMPTS: 3
+      RETRY_BASE_DELAY_MS: 1000
+      # Timeout for forwarding to n8n
+      FORWARD_TIMEOUT_MS: 10000
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+        reservations:
+          cpus: "0.05"
+          memory: 48M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    labels:
+      - "traefik.enable=false"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

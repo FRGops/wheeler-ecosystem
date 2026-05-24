@@ -1,0 +1,560 @@
+# =============================================================================
+# Prometheus Alert Rules — Wheeler AIOps Stack
+# =============================================================================
+# Tuned for: 2-server setup (Hetzner CPX51 + Hostinger VPS)
+# Philosophy: Alert on SRE golden signals, avoid noise
+#   - WARNING: Investigate within business hours
+#   - CRITICAL: Pager-worthy, respond immediately
+# =============================================================================
+
+groups:
+
+  # ---------------------------------------------------------------------------
+  # GROUP 1: INSTANCE AVAILABILITY — Core uptime monitoring
+  # ---------------------------------------------------------------------------
+  - name: availability
+    interval: 30s
+    rules:
+
+      # InstanceDown — CRITICAL
+      # WHY: A server or core service is unreachable. In a 2-server setup,
+      #      this means we've lost 50% of our capacity. Alert immediately.
+      - alert: InstanceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+          group: 'availability'
+        annotations:
+          summary: '{{ $labels.instance }} is DOWN'
+          description: >-
+            Instance {{ $labels.instance }} (job: {{ $labels.job }},
+            server: {{ $labels.server }}) has been unreachable for >1m.
+          runbook_url: 'https://internal.wheeler.ai/runbooks/instance-down'
+          grafana_url: 'https://grafana.wheeler.ai/d/aiops-overview'
+
+      # HostUnreachable — For node_exporter specifically
+      - alert: HostUnreachable
+        expr: up{job="node"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          group: 'availability'
+        annotations:
+          summary: 'Server {{ $labels.server }} is UNREACHABLE'
+          description: >-
+            The {{ $labels.server }} server with role {{ $labels.role }}
+            has no node metrics for 30s. Check Tailscale connectivity and SSH.
+          runbook_url: 'https://internal.wheeler.ai/runbooks/host-down'
+
+  # ---------------------------------------------------------------------------
+  # GROUP 2: CPU USAGE
+  # ---------------------------------------------------------------------------
+  # Hetzner: 16 vCPU — sustained >80% means 13+ cores busy. Normal for AI workloads.
+  #   WARNING at 80% for 5m (investigate), CRITICAL at 90% for 5m (throttling risk).
+  # Hostinger: 4-8 vCPU — tighter margins, needs lower thresholds.
+  # ---------------------------------------------------------------------------
+  - name: cpu
+    interval: 30s
+    rules:
+
+      # HighCPUUsage — WARNING at 80%, CRITICAL at 90%
+      # WHY: 80% sustained on 16 vCPU = 13 cores busy. Below throttling point.
+      #      90% sustained = near saturation. Users will see latency increases.
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance, server, job) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+          group: 'cpu'
+        annotations:
+          summary: 'High CPU usage on {{ $labels.server }} ({{ $labels.instance }})'
+          description: >-
+            CPU usage is {{ $value | humanizePercentage }} for 5+ minutes
+            on {{ $labels.server }}. Investigate runaway processes or
+            scale-constrained workers.
+
+      - alert: CriticalCPUUsage
+        expr: 100 - (avg by(instance, server, job) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 90
+        for: 5m
+        labels:
+          severity: critical
+          group: 'cpu'
+        annotations:
+          summary: 'CRITICAL CPU usage on {{ $labels.server }}'
+          description: >-
+            CPU usage is {{ $value | humanizePercentage }} for 5+ minutes
+            on {{ $labels.server }}. Immediate action required. Consider
+            stopping non-essential containers or scaling horizontally.
+
+  # ---------------------------------------------------------------------------
+  # GROUP 3: MEMORY USAGE
+  # ---------------------------------------------------------------------------
+  # Hetzner: 32GB. 85% = 27GB used, some headroom. 95% = OOM risk.
+  # Hostinger: 8-16GB. Same percentages but lower absolute buffer.
+  # ---------------------------------------------------------------------------
+  - name: memory
+    interval: 30s
+    rules:
+
+      - alert: HighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          group: 'memory'
+        annotations:
+          summary: 'High memory usage on {{ $labels.server }}'
+          description: >-
+            Memory usage is {{ $value | humanizePercentage }} for 5+ minutes
+            on {{ $labels.server }}. Total: {{ $labels.instance }}.
+            Check for memory leaks or consider increasing swap (disabled by design).
+
+      - alert: CriticalMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 95
+        for: 3m
+        labels:
+          severity: critical
+          group: 'memory'
+        annotations:
+          summary: 'CRITICAL memory usage on {{ $labels.server }}'
+          description: >-
+            Memory usage at {{ $value | humanizePercentage }} on
+            {{ $labels.server }}. OOM risk imminent. Check container resource
+            limits and consider emergency scaling.
+
+      - alert: SwapUsageDetected
+        expr: (node_memory_SwapTotal_bytes > 0 and (node_memory_SwapFree_bytes / node_memory_SwapTotal_bytes) < 0.9) or (node_memory_SwapCached_bytes > 0)
+        for: 5m
+        labels:
+          severity: warning
+          group: 'memory'
+        annotations:
+          summary: 'Swap is being used on {{ $labels.server }}'
+          description: >-
+            Swap usage detected on {{ $labels.server }}. Swap is disabled
+            by design (OOM preferred over swap thrash). Check if swap was
+            accidentally re-enabled or if kswapd is active.
+
+  # ---------------------------------------------------------------------------
+  # GROUP 4: DISK SPACE
+  # ---------------------------------------------------------------------------
+  # Hetzner: 360GB NVMe. Containers + DBs + backups.
+  #   <20% free = WARNING (72GB remaining), <10% = CRITICAL (36GB remaining).
+  #   Docker will start failing if disk fills.
+  # ---------------------------------------------------------------------------
+  - name: disk
+    interval: 30s
+    rules:
+
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes{mountpoint="/", fstype!="tmpfs"} / node_filesystem_size_bytes{mountpoint="/", fstype!="tmpfs"}) * 100 < 20
+        for: 5m
+        labels:
+          severity: warning
+          group: 'disk'
+        annotations:
+          summary: 'Disk space below 20% on {{ $labels.server }}'
+          description: >-
+            {{ $labels.mountpoint }} on {{ $labels.server }} has
+            {{ $value | humanizePercentage }} free. Clean up old backups
+            or prune Docker images/volumes.
+
+      - alert: DiskSpaceCritical
+        expr: (node_filesystem_avail_bytes{mountpoint="/", fstype!="tmpfs"} / node_filesystem_size_bytes{mountpoint="/", fstype!="tmpfs"}) * 100 < 10
+        for: 2m
+        labels:
+          severity: critical
+          group: 'disk'
+        annotations:
+          summary: 'CRITICAL disk space on {{ $labels.server }}'
+          description: >-
+            {{ $labels.mountpoint }} on {{ $labels.server }} has only
+            {{ $value | humanizePercentage }} free. Immediate cleanup
+            required. Database writes and Docker containers at risk.
+
+      - alert: DiskInodesLow
+        expr: (node_filesystem_files_free{mountpoint="/", fstype!="tmpfs"} / node_filesystem_files{mountpoint="/", fstype!="tmpfs"}) * 100 < 10
+        for: 5m
+        labels:
+          severity: warning
+          group: 'disk'
+        annotations:
+          summary: 'inodes running out on {{ $labels.server }}'
+          description: >-
+            Only {{ $value | humanizePercentage }} inodes remaining on
+            {{ $labels.instance }} root filesystem. Possible by log file
+            explosion or too many small temp files.
+
+  # ---------------------------------------------------------------------------
+  # GROUP 5: CONTAINER HEALTH
+  # ---------------------------------------------------------------------------
+  # WHY: Non-monitoring containers going down impacts users.
+  #      30s grace period (containers restart, probes may flap).
+  # ---------------------------------------------------------------------------
+  - name: containers
+    interval: 30s
+    rules:
+
+      - alert: ContainerDown
+        expr: |
+          time() - container_last_seen{
+            name!~".*prometheus.*|.*grafana.*|.*netdata.*|.*alertmanager.*|.*uptime-kuma.*"
+          } > 30
+        for: 30s
+        labels:
+          severity: warning
+          group: 'containers'
+        annotations:
+          summary: 'Container {{ $labels.name }} is DOWN'
+          description: >-
+            Container {{ $labels.name }} on {{ $labels.server }} has not
+            reported metrics for >30s. Check container status with:
+            docker ps -a --filter name={{ $labels.name }}
+
+      - alert: TooManyContainerRestarts
+        expr: rate(container_last_seen[15m]) > 5
+        for: 5m
+        labels:
+          severity: warning
+          group: 'containers'
+        annotations:
+          summary: 'Container {{ $labels.name }} restarting frequently'
+          description: >-
+            Container {{ $labels.name }} has restarted >5 times in 15m.
+            Possible OOMKill, health check failure, or configuration error.
+            Run: docker logs --tail 50 {{ $labels.name }}
+
+      - alert: ContainerOOMKilled
+        expr: container_oom_killed_total > 0
+        for: 0m
+        labels:
+          severity: critical
+          group: 'containers'
+        annotations:
+          summary: 'Container {{ $labels.name }} was OOMKilled'
+          description: >-
+            Container {{ $labels.name }} has been killed due to out-of-memory.
+            Increase memory limit or fix memory leak immediately.
+
+      - alert: ContainerCPUThrottling
+        expr: rate(container_cpu_cfs_throttled_seconds_total[5m]) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          group: 'containers'
+        annotations:
+          summary: 'Container {{ $labels.name }} CPU throttling'
+          description: >-
+            Container {{ $labels.name }} is experiencing CPU throttling.
+            Consider increasing CPU limit or optimizing workload.
+
+  # ---------------------------------------------------------------------------
+  # GROUP 6: POSTGRES DATABASE
+  # ---------------------------------------------------------------------------
+  - name: postgres
+    interval: 30s
+    rules:
+
+      - alert: PostgresDown
+        expr: pg_up == 0
+        for: 10s
+        labels:
+          severity: critical
+          group: 'database'
+        annotations:
+          summary: 'Postgres DOWN on {{ $labels.server }} ({{ $labels.db_name }})'
+          description: >-
+            Postgres instance {{ $labels.db_name }} on {{ $labels.server }}
+            is down. All dependent services will fail. Check:
+            docker logs {{ $labels.db_name }}-db
+
+      - alert: PostgresHighConnections
+        expr: pg_stat_activity_count > 80
+        for: 5m
+        labels:
+          severity: warning
+          group: 'database'
+        annotations:
+          summary: 'High Postgres connection count on {{ $labels.db_name }}'
+          description: >-
+            {{ $labels.db_name }} on {{ $labels.server }} has
+            {{ $value }} active connections near 100 limit.
+            Check for connection leaks or pool misconfiguration.
+
+      - alert: PostgresQueryLatency
+        expr: rate(pg_stat_database_blk_read_time_seconds[5m]) > 1
+        for: 10m
+        labels:
+          severity: warning
+          group: 'database'
+        annotations:
+          summary: 'High Postgres query latency on {{ $labels.db_name }}'
+          description: >-
+            Postgres on {{ $labels.server }} is experiencing >1s block read
+            latency. Check for missing indexes or slow queries.
+            Run: pg_stat_statements analysis.
+
+      - alert: PostgresReplicaLag
+        expr: pg_replication_lag > 10
+        for: 5m
+        labels:
+          severity: warning
+          group: 'database'
+        annotations:
+          summary: 'Postgres replication lag on {{ $labels.db_name }}'
+          description: >-
+            Replication lag is {{ $value }}s on {{ $labels.db_name }}.
+            If this persists, read replicas will serve stale data.
+
+      - alert: PostgresDeadTuplesHigh
+        expr: (pg_stat_user_tables_n_dead_tup / pg_stat_user_tables_n_live_tup) > 0.2
+        for: 15m
+        labels:
+          severity: warning
+          group: 'database'
+        annotations:
+          summary: 'High dead tuple ratio on {{ $labels.db_name }}'
+          description: >-
+            Dead tuple ratio >20% on {{ $labels.db_name }}.
+            Autovacuum may be behind schedule. Run VACUUM ANALYZE.
+
+  # ---------------------------------------------------------------------------
+  # GROUP 7: REDIS
+  # ---------------------------------------------------------------------------
+  - name: redis
+    interval: 30s
+    rules:
+
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 10s
+        labels:
+          severity: warning
+          group: 'cache'
+        annotations:
+          summary: 'Redis DOWN on {{ $labels.server }} ({{ $labels.redis_name }})'
+          description: >-
+            Redis instance {{ $labels.redis_name }} on {{ $labels.server }}
+            is down. Caching will fail, pub/sub will degrade.
+            Check: docker logs {{ $labels.redis_name }}-redis
+
+      - alert: RedisHighMemory
+        expr: (redis_memory_used_bytes / redis_memory_max_bytes) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          group: 'cache'
+        annotations:
+          summary: 'Redis memory >85% on {{ $labels.redis_name }}'
+          description: >-
+            Redis {{ $labels.redis_name }} at {{ $value | humanizePercentage }}
+            memory. Evictions may occur. Consider increasing maxmemory
+            or optimizing TTL.
+
+      - alert: RedisEvictionsHigh
+        expr: rate(redis_keyspace_evictions_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          group: 'cache'
+        annotations:
+          summary: 'High Redis eviction rate on {{ $labels.redis_name }}'
+          description: >-
+            {{ $value }} keys/s being evicted from {{ $labels.redis_name }}.
+            Cache hit ratio will degrade. Increase memory or fix TTL config.
+
+      - alert: RedisCacheHitRateLow
+        expr: rate(redis_keyspace_hits_total[5m]) / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m])) < 0.7
+        for: 10m
+        labels:
+          severity: warning
+          group: 'cache'
+        annotations:
+          summary: 'Low Redis cache hit rate on {{ $labels.redis_name }}'
+          description: >-
+            Cache hit rate is {{ $value | humanizePercentage }} on
+            {{ $labels.redis_name }}. Below 70% target. Check for
+            cache-busting issues or expired keys.
+
+  # ---------------------------------------------------------------------------
+  # GROUP 8: API LATENCY & TRAEFIK METRICS
+  # ---------------------------------------------------------------------------
+  - name: api
+    interval: 30s
+    rules:
+
+      - alert: HighAPILatency
+        expr: histogram_quantile(0.95, sum(rate(traefik_router_request_duration_seconds_bucket[5m])) by (le, router)) > 2
+        for: 5m
+        labels:
+          severity: warning
+          group: 'api'
+        annotations:
+          summary: 'P95 API latency >2s for {{ $labels.router }}'
+          description: >-
+            P95 latency for {{ $labels.router }} is {{ $value }}s.
+            Investigate backend performance, DB queries, or upstream timeouts.
+
+      - alert: HighAPIErrorRate
+        expr: sum(rate(traefik_router_requests_total{code=~"5.."}[5m])) / sum(rate(traefik_router_requests_total[5m])) * 100 > 5
+        for: 5m
+        labels:
+          severity: warning
+          group: 'api'
+        annotations:
+          summary: 'High 5xx error rate on {{ $labels.router }}'
+          description: >-
+            {{ $value | humanizePercentage }} of requests returning 5xx.
+            Check backend service health and upstream availability.
+
+      - alert: HighAPI4xxRate
+        expr: sum(rate(traefik_router_requests_total{code=~"4.."}[5m])) / sum(rate(traefik_router_requests_total[5m])) * 100 > 20
+        for: 10m
+        labels:
+          severity: warning
+          group: 'api'
+        annotations:
+          summary: 'High 4xx error rate on {{ $labels.router }}'
+          description: >-
+            {{ $value | humanizePercentage }} 4xx errors. May indicate
+            misconfigured clients or auth issues.
+
+  # ---------------------------------------------------------------------------
+  # GROUP 9: SSL CERTIFICATE EXPIRY
+  # ---------------------------------------------------------------------------
+  - name: ssl
+    interval: 6h  # Check every 6 hours (certificates don't expire fast)
+    rules:
+
+      - alert: CertificateExpiryWarning
+        expr: probe_ssl_earliest_cert_expiry - time() < 30 * 86400
+        for: 0m
+        labels:
+          severity: warning
+          group: 'ssl'
+        annotations:
+          summary: 'SSL cert expiring <30d for {{ $labels.instance }}'
+          description: >-
+            Certificate for {{ $labels.instance }} expires in
+            {{ $value | humanizeDuration }}. Renew via acme.sh or
+            check Traefik Let's Encrypt auto-renewal.
+
+      - alert: CertificateExpiryCritical
+        expr: probe_ssl_earliest_cert_expiry - time() < 7 * 86400
+        for: 0m
+        labels:
+          severity: critical
+          group: 'ssl'
+        annotations:
+          summary: 'SSL cert EXPIRING <7d for {{ $labels.instance }}'
+          description: >-
+            Certificate for {{ $labels.instance }} expires in
+            {{ $value | humanizeDuration }}. Immediate renewal required.
+            Users will see browser security warnings.
+
+      - alert: CertificateExpired
+        expr: probe_ssl_earliest_cert_expiry - time() < 0
+        for: 0m
+        labels:
+          severity: critical
+          group: 'ssl'
+        annotations:
+          summary: 'SSL cert EXPIRED for {{ $labels.instance }}'
+          description: >-
+            Certificate for {{ $labels.instance }} has already expired!
+            Site is inaccessible. Renew immediately.
+
+  # ---------------------------------------------------------------------------
+  # GROUP 10: DISK I/O & NETWORK
+  # ---------------------------------------------------------------------------
+  - name: system
+    interval: 30s
+    rules:
+
+      - alert: HighDiskIO
+        expr: rate(node_disk_io_time_seconds_total[5m]) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          group: 'system'
+        annotations:
+          summary: 'High disk I/O on {{ $labels.server }}'
+          description: >-
+            Disk I/O utilization >50% for 10m on {{ $labels.server }}
+            (device: {{ $labels.device }}). NVMe should handle this,
+            but check for I/O contention.
+
+      - alert: NetworkErrors
+        expr: rate(node_network_receive_errors_total[5m]) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+          group: 'system'
+        annotations:
+          summary: 'Network errors detected on {{ $labels.server }}'
+          description: >-
+            Network errors on {{ $labels.server }}/{{ $labels.device }}.
+            Check NIC health and cable/switch connectivity.
+
+  # ---------------------------------------------------------------------------
+  # GROUP 11: BACKUP & MAINTENANCE
+  # ---------------------------------------------------------------------------
+  - name: maintenance
+    interval: 30m
+    rules:
+
+      - alert: BackupStale
+        expr: time() - node_textfile_mtime_seconds{file="backup_timestamp"} > 86400 * 2
+        for: 0m
+        labels:
+          severity: warning
+          group: 'maintenance'
+        annotations:
+          summary: 'Backup is stale (>48h old)'
+          description: >-
+            Last backup was {{ $value | humanizeDuration }} ago.
+            Backup may have failed. Check /opt/backups/ and cron logs.
+
+      # Prometheus rule evaluation failures — alert if rules break
+      - alert: RuleEvaluationFailed
+        expr: increase(prometheus_rule_evaluation_failures_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          group: 'maintenance'
+        annotations:
+          summary: 'Prometheus rule evaluation failed'
+          description: >-
+            Some alert rules failed to evaluate. Check Prometheus
+            logs and rule syntax in alert-rules.yml.
+
+  # ---------------------------------------------------------------------------
+  # GROUP 12: CONTAINER QUEUE DEPTH (Application-specific)
+  # ---------------------------------------------------------------------------
+  # NOTE: These require custom metrics to be exposed by your applications.
+  # They serve as templates — uncomment when apps expose these metrics.
+  # ---------------------------------------------------------------------------
+  # - alert: QueueDepthHigh
+  #   expr: prediction_radar_queue_depth > 100
+  #   for: 5m
+  #   labels:
+  #     severity: warning
+  #     group: 'application'
+  #   annotations:
+  #     summary: 'Prediction Radar queue depth >100'
+  #     description: >
+  #       Queue depth is {{ $value }}. Workers may be falling behind.
+  #       Consider scaling worker count or optimizing task processing.
+  #
+  # - alert: TradingWorkerLag
+  #   expr: trading_worker_lag_seconds > 30
+  #   for: 2m
+  #   labels:
+  #     severity: critical
+  #     group: 'trading'
+  #   annotations:
+  #     summary: 'Trading worker lag >30s'
+  #     description: >
+  #       Trading worker {{ $labels.worker }} is {{ $value }}s behind.
+  #       Market data may be stale. Immediate investigation required.

@@ -1,0 +1,225 @@
+# =============================================================================
+# EDGE (187.77.148.88) -- OPTIMIZED DOCKER COMPOSE MASTER TEMPLATE
+# Generated: 2026-05-23
+# This covers the 11 running containers. Merge into existing per-app compose files
+# at /docker/* and /opt/apps/*.
+# =============================================================================
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-logging-temporal: &temporal-logging
+  driver: json-file
+  options:
+    max-size: "25m"
+    max-file: "3"
+
+services:
+  # ══════════════════════════════════════════════════════════════════
+  # TEMPORAL STACK -- CRITICAL FIXES REQUIRED
+  # Current issues:
+  #   - temporal-server at 83% CPU with NO limit and NO restart policy
+  #   - temporal-temporal-1 has 15 restarts (crash loop)
+  # ══════════════════════════════════════════════════════════════════
+
+  # ── Temporal Server ────────────────────────────────────────────────
+  temporal-server:
+    image: temporalio/server:latest
+    container_name: temporal-server
+    restart: on-failure:5           # WAS: no restart policy at all -- CRITICAL FIX
+    mem_limit: 1g                    # ADDED (no limit before)
+    cpus: "2.0"                      # ADDED (83% CPU before with no cap)
+    logging: *temporal-logging
+    # Note: temporal-server typically needs DB config. Verify existing configuration.
+    healthcheck:
+      test: ["CMD", "tctl", "--address", "127.0.0.1:7233", "cluster", "health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # ── Temporal Worker (auto-setup) ───────────────────────────────────
+  temporal-temporal-1:
+    image: temporalio/auto-setup:latest
+    container_name: temporal-temporal-1
+    restart: on-failure:10          # WAS: unless-stopped (15 restarts -- crash loop)
+    mem_limit: 512m                  # ADDED
+    cpus: "1.0"                      # ADDED
+    logging: *temporal-logging
+    environment:
+      - DB=sqlite
+      - TEMPORAL_ADDRESS=temporal-server:7233
+    depends_on:
+      temporal-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "tctl --address temporal-server:7233 namespace list 2>/dev/null || exit 0"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ── Temporal UI ────────────────────────────────────────────────────
+  temporal-temporal-ui-1:
+    image: temporalio/ui:latest
+    container_name: temporal-temporal-ui-1
+    restart: unless-stopped
+    mem_limit: 256m                  # ADDED
+    cpus: "0.5"                      # ADDED
+    logging: *temporal-logging
+    ports:
+      - "8080:8080"
+    environment:
+      - TEMPORAL_ADDRESS=temporal-server:7233
+      - TEMPORAL_CORS_ORIGINS=http://localhost:8080
+    depends_on:
+      temporal-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ══════════════════════════════════════════════════════════════════
+  # SHARED INFRASTRUCTURE
+  # ══════════════════════════════════════════════════════════════════
+
+  # ── Shared Postgres (Recovery) ─────────────────────────────────────
+  shared-postgres-recovery:
+    image: postgres:15
+    container_name: shared-postgres-recovery
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5432:5432"       # Already localhost -- keep
+    mem_limit: 1g                    # ADDED
+    cpus: "2.0"                      # ADDED
+    logging: *default-logging
+    volumes:
+      - recovery_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  # ── Postgres Exporter ──────────────────────────────────────────────
+  shared-postgres-exporter:
+    image: quay.io/prometheuscommunity/postgres-exporter:latest
+    container_name: shared-postgres-exporter
+    restart: unless-stopped          # WAS: always (overly aggressive)
+    mem_limit: 64m                   # ADDED
+    cpus: "0.25"                     # ADDED
+    logging: *default-logging
+    environment:
+      - DATA_SOURCE_NAME=postgresql://postgres:${POSTGRES_PASSWORD}@127.0.0.1:5432/postgres?sslmode=disable
+
+  # ══════════════════════════════════════════════════════════════════
+  # PREDICTION RADAR (EDGE instance)
+  # ══════════════════════════════════════════════════════════════════
+
+  prediction-radar-app-scheduler:
+    image: prediction-radar-app-scheduler:latest
+    container_name: prediction-radar-app-scheduler
+    restart: on-failure:5            # keep existing
+    mem_limit: 512m                  # existing
+    cpus: "0.5"                      # ADDED
+    logging: *default-logging        # reduce from 100m max-size
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f scheduler || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  prediction-radar-app-worker:
+    image: prediction-radar-app-worker:latest
+    container_name: prediction-radar-app-worker
+    restart: on-failure:5            # keep existing
+    mem_limit: 1g                    # existing
+    cpus: "0.5"                      # ADDED
+    logging: *default-logging        # reduce from 100m max-size
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f worker || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ══════════════════════════════════════════════════════════════════
+  # USESEND
+  # ══════════════════════════════════════════════════════════════════
+
+  usesend:
+    image: usesend/usesend:latest
+    container_name: usesend
+    restart: unless-stopped           # WAS: always (overly aggressive)
+    ports:
+      - "3007:3000"
+    mem_limit: 512m                   # ADDED
+    cpus: "1.0"                       # ADDED
+    logging: *default-logging
+    depends_on:
+      - usesend-redis
+      - usesend-storage
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  usesend-storage:
+    image: minio/minio:latest
+    container_name: usesend-storage
+    restart: unless-stopped           # WAS: always (overly aggressive)
+    ports:
+      - "9003:9001"
+      - "9004:9002"
+    mem_limit: 512m                   # ADDED
+    cpus: "0.5"                       # ADDED
+    logging: *default-logging
+    volumes:
+      - usesend_storage_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9000/minio/health/live"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  usesend-redis:
+    image: redis:7
+    container_name: usesend-redis
+    restart: unless-stopped           # WAS: always (overly aggressive)
+    mem_limit: 256m                   # ADDED
+    cpus: "0.5"                       # ADDED (44% CPU anomaly -- capped)
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # ══════════════════════════════════════════════════════════════════
+  # PRIVATE AI WEB UI
+  # ══════════════════════════════════════════════════════════════════
+
+  private-ai-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: private-ai-webui
+    restart: unless-stopped
+    ports:
+      - "3015:8080"
+    mem_limit: 1.5g                   # existing
+    cpus: "1.0"                       # was 0.75; increase slightly for ML tasks
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  recovery_pgdata:
+  usesend_storage_data:

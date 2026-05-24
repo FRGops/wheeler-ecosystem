@@ -1,0 +1,113 @@
+# =============================================================================
+# Repo Router - Node.js Docker Compose Template
+# Source: templates/docker/compose.nodejs.yml
+# Description: Production Node.js service with healthcheck, resource limits,
+#              and internal network isolation.
+# =============================================================================
+
+version: "3.8"
+
+x-logging:
+  &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  app:
+    image: ${IMAGE_TAG:-node:20-alpine}
+    container_name: ${CONTAINER_NAME:-node-service}
+    build:
+      context: ${BUILD_CONTEXT:-.}
+      dockerfile: ${DOCKERFILE:-Dockerfile}
+      args:
+        NODE_ENV: ${NODE_ENV:-production}
+    restart: unless-stopped
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${PORT:-3000}:${PORT:-3000}"
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: ${PORT:-3000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DB_HOST: ${DB_HOST:-db}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_USER: ${DB_USER:-app}
+      DB_PASSWORD: ${DB_PASSWORD:-}
+      DB_NAME: ${DB_NAME:-app}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      SECRET_KEY: ${SECRET_KEY:-}
+      API_BASE_URL: ${API_BASE_URL:-http://localhost:8080}
+    volumes:
+      - app_data:/app/data
+      - app_logs:/app/logs
+      - ./uploads:/app/uploads:ro
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:${PORT:-3000}/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "${CPU_LIMIT:-1.0}"
+          memory: "${MEM_LIMIT:-512M}"
+        reservations:
+          cpus: "${CPU_RESERVE:-0.25}"
+          memory: "${MEM_RESERVE:-128M}"
+    networks:
+      - internal
+      - monitoring
+    logging: *default-logging
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:size=64M
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+
+  redis:
+    image: redis:7-alpine
+    container_name: ${CONTAINER_NAME:-node-service}-redis
+    restart: unless-stopped
+    expose:
+      - "6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: "${REDIS_MEM_LIMIT:-128M}"
+    networks:
+      - internal
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETGID
+      - SETUID
+      - DAC_OVERRIDE
+
+volumes:
+  app_data:
+    driver: local
+  app_logs:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  internal:
+    driver: bridge
+    internal: true
+  monitoring:
+    driver: bridge
+    external: false

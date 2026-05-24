@@ -1,0 +1,271 @@
+# Worker Count Recommendations
+# Generated: 2026-05-23
+# Target: AIOPS (5.78.140.118) — 16 CPU cores, 31 GB RAM, 17 GB used
+
+# ============================================================================
+# CURRENT STATE
+# ============================================================================
+# 18 PM2 processes, all fork_mode with 1 instance each
+# frgcrm-api: uvicorn --workers 2 (2 Python worker processes)
+# 9 agent-svc: single-threaded Node.js Express (1 event loop each)
+# Total API workers: 11
+# CPU utilization: ~25% (load 4.3 / 16 cores)
+# Available memory: 13.6 GB
+
+# ============================================================================
+# WORKER SIZING PRINCIPLES
+# ============================================================================
+
+WORKER_SIZING_GUIDELINES = """
+# Python (FastAPI/uvicorn):
+#   CPU-bound: workers = CPU_CORES (16)
+#   I/O-bound: workers = (2 * CPU_CORES) + 1 = 33
+#   Memory-limited: workers = available_RAM / per_worker_memory
+#   Practical: start with 4-6, scale based on memory and DB connection limits
+#
+# Node.js (Express/cluster):
+#   Single-threaded event loop per worker
+#   CPU-bound: workers = CPU_CORES (16)
+#   I/O-bound: workers = CPU_CORES (16) — event loop handles concurrency
+#   BUT: PM2 fork_mode means 1 worker per PM2 process
+#   Recommended: switch to cluster_mode, or stay fork_mode with express
+#                built-in cluster module
+#
+# Key constraint: LiteLLM is the bottleneck — all agents route through it.
+#                 Scaling agents without scaling LiteLLM is counterproductive.
+"""
+
+# ============================================================================
+# PER-SERVICE RECOMMENDATIONS
+# ============================================================================
+
+WORKER_RECOMMENDATIONS = {
+    # ─── CRITICAL PATH SERVICES ───
+
+    "frgcrm-api": {
+        "current": {"mode": "fork", "instances": 1, "uvicorn_workers": 2, "total_workers": 2},
+        "recommended": {"mode": "fork", "instances": 1, "uvicorn_workers": 6, "total_workers": 6},
+        "memory_per_worker": "~120 MB",
+        "total_memory_impact": "+480 MB (to ~716 MB)",
+        "rationale": "I/O-bound FastAPI. 6 workers balances DB connection limits and memory.",
+        "max_workers_by_db": 10,  # pool_size(10) * workers <= DB max_connections / safe_margin
+        "max_workers_by_memory": 113,  # 13.6 GB / 120 MB
+        "uvicorn_flags": "--workers 6 --limit-concurrency 200 --limit-max-requests 10000",
+    },
+
+    "litellm": {
+        "current": {"mode": "fork", "instances": 1, "total_workers": 1},
+        "recommended": {"mode": "fork", "instances": 1, "total_workers": 1},
+        "secondary_recommended": {"mode": "fork", "instances": 1, "port": 4050, "total_workers": 1},
+        "memory_per_worker": "~360 MB",
+        "total_memory_impact": "+360 MB (secondary instance)",
+        "rationale": "Keep 1 primary instance. Add 1 secondary on port 4050 for redundancy. LiteLLM handles concurrency internally via thread pool.",
+        "note": "DO NOT scale LiteLLM horizontally without understanding upstream API rate limits (DeepSeek).",
+    },
+
+    # ─── AGENT SERVICES ───
+
+    "frgcrm-agent-svc": {
+        "current": {"mode": "fork", "instances": 1, "total_workers": 1},
+        "recommended": {"mode": "cluster", "instances": 2, "total_workers": 2},
+        "memory_per_worker": "~100 MB",
+        "total_memory_impact": "+100 MB (to ~200 MB)",
+        "rationale": "Heaviest LLM usage (630 latency hits logged). 2 cluster instances for throughput and resilience.",
+        "after_litellm_redundancy": "Can scale to 3 instances when LiteLLM redundancy in place.",
+    },
+
+    "surplusai-scraper-agent-svc": {
+        "current": {"mode": "fork", "instances": 1, "total_workers": 1},
+        "recommended": {"mode": "fork", "instances": 1, "total_workers": 1},
+        "rationale": "Scraper workload — sequential by nature. Adding instances risks duplicate scraping.",
+    },
+
+    "voice-agent-svc": {
+        "current": {"mode": "fork", "instances": 1, "total_workers": 1},
+        "recommended": {"mode": "fork", "instances": 1, "total_workers": 1},
+        "rationale": "Voice calls are inherently sequential (real-time audio). Single worker appropriate.",
+    },
+
+    "insforge-agent-svc": {
+        "current": {"mode": "fork", "instances": 1, "total_workers": 1},
+        "recommended": {"mode": "fork", "instances": 1, "total_workers": 1},
+        "rationale": "Low traffic (14 latency hits). No scaling needed currently.",
+    },
+
+    "horizon-agent-svc": {
+        "current": {"mode": "fork", "instances": 1, "total_workers": 1},
+        "recommended": {"mode": "fork", "instances": 1, "total_workers": 1},
+        "rationale": "GovRider API calls — external rate-limited. Extra workers would hit GovRider limits.",
+    },
+
+    "design-agent-svc": {
+        "current": {"mode": "fork", "instances": 1, "total_workers": 1},
+        "recommended": {"mode": "fork", "instances": 1, "total_workers": 1},
+        "rationale": "Design generation — bursty, resource-intensive. Keep single to avoid resource contention.",
+    },
+
+    "paperless-agent-svc": {
+        "current": {"mode": "fork", "instances": 1, "total_workers": 1},
+        "recommended": {"mode": "fork", "instances": 1, "total_workers": 1},
+        "rationale": "OCR and document processing — CPU-intensive. Single worker prevents resource starvation.",
+    },
+
+    "prediction-radar-agent-svc": {
+        "current": {"mode": "fork", "instances": 1, "total_workers": 1},
+        "recommended": {"mode": "fork", "instances": 1, "total_workers": 1},
+        "rationale": "Low latency (0 hits logged). No scaling needed.",
+    },
+
+    "ravyn-agent-svc": {
+        "current": {"mode": "fork", "instances": 1, "total_workers": 1},
+        "recommended": {"mode": "fork", "instances": 1, "total_workers": 1},
+        "rationale": "Low latency (0 hits logged). No scaling needed.",
+    },
+
+    # ─── SUPPORT SERVICES ───
+
+    "openclaw-dashboard": {
+        "current": {"mode": "fork", "instances": 1, "total_workers": 1},
+        "recommended": {"mode": "fork", "instances": 1, "total_workers": 1},
+        "rationale": "Internal dashboard — low concurrency. No scaling needed.",
+    },
+
+    "war-room-server": {
+        "current": {"mode": "fork", "instances": 1, "total_workers": 1},
+        "recommended": {"mode": "fork", "instances": 1, "total_workers": 1},
+        "rationale": "Internal tool — low concurrency. No scaling needed.",
+    },
+
+    "voice-outreach-service": {
+        "current": {"mode": "fork", "instances": 1, "total_workers": 1},
+        "recommended": {"mode": "fork", "instances": 1, "total_workers": 1},
+        "rationale": "Sequential voice calling. Single worker correct.",
+    },
+
+    "ecosystem-guardian": {
+        "current": {"mode": "fork", "instances": 1, "total_workers": 1},
+        "recommended": {"mode": "fork", "instances": 1, "total_workers": 1},
+        "rationale": "Health checks — lightweight. No scaling needed.",
+    },
+
+    "event-bus-relay": {
+        "current": {"mode": "fork", "instances": 1, "total_workers": 1},
+        "recommended": {"mode": "fork", "instances": 1, "total_workers": 1},
+        "rationale": "Event relay — single subscriber model. Single worker correct.",
+    },
+}
+
+# ============================================================================
+# CONSOLIDATED SUMMARY
+# ============================================================================
+
+CONSOLIDATED = """
+                      Current     Recommended    Memory Impact
+Service               Workers     Workers        (approx)
+─────────────────────────────────────────────────────────────
+frgcrm-api            2 (uvicorn)  6 (uvicorn)   +480 MB
+litellm               1            1 (+1 backup) +360 MB
+frgcrm-agent-svc      1            2             +100 MB
+All other agent-svc   8            8             0
+Support services      5            5             0
+─────────────────────────────────────────────────────────────
+TOTAL API WORKERS     11           14 (+3)
+TOTAL MEMORY IMPACT                              +940 MB
+POST-CHANGE TOTAL RAM                           ~18.6 GB (of 31 GB)
+"""
+
+# ============================================================================
+# CPU PINNING (OPTIONAL, FOR DEDICATED WORKLOADS)
+# ============================================================================
+
+CPU_PINNING_EXAMPLE = """
+# For CPU-intensive services (LiteLLM, frgcrm-api), consider CPU pinning
+# to avoid cache thrashing between processes.
+
+# In PM2 ecosystem.config.js:
+{
+  name: "litellm",
+  exec_mode: "fork",
+  instances: 1,
+  // Pin to cores 0-3
+  env: {
+    CPUAFFINITY: "0-3",
+  },
+}
+
+# Or use taskset after process start:
+# pm2 start litellm && taskset -cp 0-3 $(pm2 pid litellm)
+"""
+
+# ============================================================================
+# MEMORY HEADROOM ANALYSIS
+# ============================================================================
+
+MEMORY_ANALYSIS = """
+Total RAM:        31,337 MB
+Currently used:   17,703 MB  (57%)
+Available:        13,634 MB  (43%)
+Swap:              8,191 MB  (0 used)
+
+After recommended worker changes:
+  Additional PM2 memory:  +940 MB
+  Estimated total:       18,643 MB  (60%)
+  Available after:       12,694 MB  (40%)
+
+  Sufficient headroom remains for:
+  - BullMQ job workers (estimated +500 MB for 5 queue workers)
+  - Redis cache growth (up to 256 MB)
+  - Load spikes
+
+  At 80% RAM (25 GB), we still have 6 GB headroom for growth.
+"""
+
+# ============================================================================
+# SCALING DECISION TREE
+# ============================================================================
+
+SCALING_DECISION_TREE = """
+Q: Is the service CPU-bound or I/O-bound?
+   CPU-bound:  Scale workers to num_cores (max 16)
+   I/O-bound:  Scale workers to (2 * num_cores) + 1 (max 33)
+
+Q: Is the service bottlenecked by an upstream dependency?
+   Yes (LiteLLM, GovRider): Scale the dependency first
+   No:  Proceed with worker scaling
+
+Q: Is the service sequential by nature?
+   Yes (voice, scraping): Keep at 1 worker
+   No:  Safe to scale
+
+Q: Will scaling increase memory beyond available headroom?
+   Check: new_workers * memory_per_worker < available_RAM * 0.8
+   If yes: Scale vertically (more RAM) or horizontally (more servers)
+   If no:  Safe to scale
+
+Q: Will scaling saturate PostgreSQL connections?
+   Check: total_pool_connections < pg_max_connections * 0.7
+   If yes: Reduce pool_size or increase pg_max_connections
+   If no:  Safe to scale
+"""
+
+# ============================================================================
+# MONITORING SCALING EFFECTIVENESS
+# ============================================================================
+
+SCALING_MONITORING = """
+# After changing worker counts, monitor these metrics for 24-48 hours:
+
+1. Request latency (p50, p95, p99) — should decrease
+2. Request throughput (req/s) — should increase
+3. CPU utilization — should increase (up to ~70% target)
+4. Memory usage — should increase predictably
+5. PM2 restart count — should not increase
+6. PostgreSQL connection count — should not hit max
+7. LiteLLM queue depth / latency — should not increase
+
+# Rollback triggers:
+# - If p95 latency increases > 20%: roll back worker count
+# - If PostgreSQL hits 80% of max_connections: reduce pool_size
+# - If any service exceeds 80% memory: add max_memory_restart and scale down
+# - If PM2 restarts increase: investigate instability
+"""

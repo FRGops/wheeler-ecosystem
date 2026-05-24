@@ -1,0 +1,326 @@
+# =============================================================================
+# Trading Engine — Worker Stack with Redis Streams Event Bus
+# =============================================================================
+# Deploys a high-throughput trading engine using Redis Streams as the event
+# bus. This architecture provides:
+#   - At-least-once delivery (consumer groups with acks)
+#   - Message replay on failure (stream persistence)
+#   - Fan-out to multiple strategy workers
+#   - Ordered message processing within partitions
+#
+# Architecture:
+#   Feed Ingestor → Redis Stream (raw_feed) → Strategy Workers → Redis Stream (signals)
+#     → Order Manager → Redis Stream (orders) → Exchange Adapter (future)
+#
+# WHY Redis Streams instead of Kafka:
+#   - Lower operational complexity (no Zookeeper, no separate broker)
+#   - Sufficient throughput for our volume (< 10K msg/sec)
+#   - Redis is already in our stack (fewer services to manage)
+#   - Consumer groups provide exactly the semantics we need
+#   - If we outgrow Redis Streams, migration to Kafka/NATS is straightforward
+#     (same consumer group + commit log pattern)
+#
+# Scaling:
+#   - Strategy workers scale via --scale strategy-worker=N
+#   - Consumer groups distribute partitions across workers
+#   - Each worker processes a subset of symbols/instruments
+#
+# Security: All services on trading internal network.
+#   No public access — trading data is sensitive.
+#   Access via Redis CLI on Tailscale for debugging.
+# =============================================================================
+
+services:
+  # ===========================================================================
+  # REDIS STREAMS — Event bus + state store + cache
+  # ===========================================================================
+  # Dedicated Redis instance for trading to:
+  #   1. Isolate from other services (no noise from agent tasks)
+  #   2. Fine-tune persistence (less aggressive AOF for high throughput)
+  #   3. Prevent one service from starving another (separate CPU/mem budgets)
+  #
+  # Redis Streams configuration:
+  #   - Consumer groups auto-created by feed-ingestor
+  #   - Messages auto-trimmed to max 100K per stream (prevents unbounded growth)
+  #   - Keyspace notifications for real-time pub/sub on trade signals
+  redis:
+    image: redis:7-alpine
+    container_name: trading-redis
+    restart: unless-stopped
+
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory 2gb
+      --maxmemory-policy allkeys-lru
+      --save 300 1
+      --save 60 1000
+      --notify-keyspace-events KEA
+
+    volumes:
+      - trading-redis:/data
+
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+    networks:
+      - trading
+
+  # ===========================================================================
+  # FEED INGESTOR — Market data feed handler
+  # ===========================================================================
+  # Ingests real-time market data from external providers (Polygon, Alpaca,
+  # Binance, etc.) and publishes to Redis Streams.
+  #
+  # Key features:
+  #   - WebSocket reconnection with exponential backoff
+  #   - Multiple provider support (configurable via env)
+  #   - Data normalization (all providers → unified schema)
+  #   - Heartbeat monitoring (dead feed detection)
+  #   - Backpressure handling (slow consumers get lagging messages)
+  #
+  # Reconnection strategy:
+  #   1. On disconnect, wait 1s, retry
+  #   2. Double wait each failure (1, 2, 4, 8... up to 60s)
+  #   3. Reset to 1s on successful reconnect
+  #   4. Log every reconnection attempt (for debugging)
+  feed-ingestor:
+    image: "${TRADING_FEED_IMAGE:-ghcr.io/wheelerai/trading-feed-ingestor:latest}"
+    container_name: trading-feed-ingestor
+    restart: unless-stopped
+
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    environment:
+      REDIS_URL: "redis://redis:6379/0"
+      ENVIRONMENT: "${ENVIRONMENT:-production}"
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+      TZ: "${TZ:-UTC}"
+
+      # Data provider configuration
+      # Only enable the providers you subscribe to
+      PROVIDER_POLYGON_ENABLED: "${PROVIDER_POLYGON_ENABLED:-false}"
+      PROVIDER_POLYGON_API_KEY: "${PROVIDER_POLYGON_API_KEY:-}"
+      PROVIDER_ALPACA_ENABLED: "${PROVIDER_ALPACA_ENABLED:-false}"
+      PROVIDER_ALPACA_API_KEY: "${PROVIDER_ALPACA_API_KEY:-}"
+      PROVIDER_ALPACA_SECRET_KEY: "${PROVIDER_ALPACA_SECRET_KEY:-}"
+      PROVIDER_BINANCE_ENABLED: "${PROVIDER_BINANCE_ENABLED:-false}"
+      PROVIDER_BINANCE_API_KEY: "${PROVIDER_BINANCE_API_KEY:-}"
+      PROVIDER_BINANCE_SECRET_KEY: "${PROVIDER_BINANCE_SECRET_KEY:-}"
+
+      # Symbol subscriptions (comma-separated)
+      SYMBOLS: "${TRADING_SYMBOLS:-BTC/USD,ETH/USD,SPY,QQQ}"
+
+      # Stream configuration
+      STREAM_MAXLEN: "${STREAM_MAXLEN:-100000}"
+      RECONNECT_BASE_DELAY: "1"
+      RECONNECT_MAX_DELAY: "60"
+
+    depends_on:
+      redis:
+        condition: service_healthy
+
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -h redis ping && redis-cli -h redis XLEN feed:raw | grep -v '^(error)' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    networks:
+      - trading
+
+  # ===========================================================================
+  # STRATEGY WORKER — Trading strategy executor
+  # ===========================================================================
+  # Consumes market data from Redis Streams and generates trading signals.
+  # Each worker instance processes a subset of symbols.
+  #
+  # To scale: docker compose -f trading.yml up -d --scale strategy-worker=3
+  #
+  # Consumer group ensures each message is processed exactly once per group.
+  # Workers auto-assign partitions (symbols) from the consumer group.
+  strategy-worker:
+    image: "${TRADING_STRATEGY_IMAGE:-ghcr.io/wheelerai/trading-strategy-worker:latest}"
+    container_name: trading-strategy-1
+    restart: unless-stopped
+
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    environment:
+      REDIS_URL: "redis://redis:6379/0"
+      ENVIRONMENT: "${ENVIRONMENT:-production}"
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+      TZ: "${TZ:-UTC}"
+
+      # Strategy selection
+      STRATEGY_NAME: "${STRATEGY_NAME:-momentum}"
+      # Valid strategies: momentum, mean-reversion, arbitrage, grid, custom
+
+      # Consumer group configuration
+      CONSUMER_GROUP: "strategy-workers"
+      CONSUMER_ID: "${HOSTNAME:-strategy-worker}"
+
+      # Risk parameters
+      MAX_POSITION_SIZE: "${MAX_POSITION_SIZE:-0.1}"
+      MAX_LEVERAGE: "${MAX_LEVERAGE:-2.0}"
+      STOP_LOSS_PERCENT: "${STOP_LOSS_PERCENT:-5.0}"
+      TAKE_PROFIT_PERCENT: "${TAKE_PROFIT_PERCENT:-10.0}"
+
+      # Model inference (optional, if using ML models)
+      MODEL_PATH: "${MODEL_PATH:-/models/strategy.pkl}"
+
+    depends_on:
+      redis:
+        condition: service_healthy
+      feed-ingestor:
+        condition: service_started
+
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -h redis ping || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    # Optional: mount ML models
+    # volumes:
+    #   - /opt/trading/models:/models:ro
+
+    networks:
+      - trading
+
+  # ===========================================================================
+  # ORDER MANAGER — Order execution and risk management
+  # ===========================================================================
+  # Receives trading signals from strategy workers, validates them against
+  # risk rules, and submits orders to exchange APIs.
+  #
+  # Responsibilities:
+  #   - Signal validation (price bounds, size limits, rate limits)
+  #   - Position tracking (current exposure per symbol)
+  #   - Order lifecycle management (new → accepted → filled/partial/cancelled)
+  #   - Dead man's switch (automatic position close on signal loss)
+  #   - Circuit breaker (pause trading on abnormal conditions)
+  #
+  # Risk checks applied to every signal:
+  #   1. Max position size check
+  #   2. Max drawdown check
+  #   3. Rate limit check (max orders/min)
+  #   4. Trading hours check (if applicable)
+  #   5. Circuit breaker state
+  order-manager:
+    image: "${TRADING_ORDER_MGR_IMAGE:-ghcr.io/wheelerai/trading-order-manager:latest}"
+    container_name: trading-order-manager
+    restart: unless-stopped
+
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    environment:
+      REDIS_URL: "redis://redis:6379/0"
+      ENVIRONMENT: "${ENVIRONMENT:-production}"
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+      TZ: "${TZ:-UTC}"
+
+      # Exchange API configuration
+      EXCHANGE: "${EXCHANGE:-paper}"  # paper = simulated trading
+      EXCHANGE_API_KEY: "${EXCHANGE_API_KEY:-}"
+      EXCHANGE_SECRET_KEY: "${EXCHANGE_SECRET_KEY:-}"
+      EXCHANGE_BASE_URL: "${EXCHANGE_BASE_URL:-}"
+
+      # Risk management
+      MAX_DAILY_LOSS: "${MAX_DAILY_LOSS:--1000}"  # Stop trading if loss exceeds
+      MAX_OPEN_ORDERS: "${MAX_OPEN_ORDERS:-10}"
+      CIRCUIT_BREAKER_THRESHOLD: "${CIRCUIT_BREAKER_THRESHOLD:-3}"  # Consecutive failures
+
+      # Dead man's switch
+      HEARTBEAT_INTERVAL: "30"
+      HEARTBEAT_TIMEOUT: "120"  # Auto-close positions after 2min without signal
+
+    depends_on:
+      redis:
+        condition: service_healthy
+
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -h redis ping || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    networks:
+      - trading
+
+# =============================================================================
+# VOLUMES
+# =============================================================================
+volumes:
+  trading-redis:
+    name: trading-redis
+
+# =============================================================================
+# NETWORKS
+# =============================================================================
+networks:
+  trading:
+    external: true
+    name: trading

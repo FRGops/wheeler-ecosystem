@@ -1,0 +1,175 @@
+# =============================================================================
+# Wheeler Enterprise — Alertmanager Configuration
+# =============================================================================
+# Routes alerts from Prometheus to appropriate notification channels.
+# Strategy: severity-based routing with time-of-day awareness.
+#
+# CRITICAL → PagerDuty + Slack #alerts-critical (24/7)
+# WARNING → Slack #alerts-warning (business hours) + email (24/7)
+# INFO    → Slack #alerts-info (no notification, just log)
+# =============================================================================
+
+global:
+  resolve_timeout: 5m  # Auto-resolve if not firing for 5 minutes
+  slack_api_url: "${SLACK_WEBHOOK_URL}"  # Set via environment variable
+
+# ── Templates ────────────────────────────────────────────────────────────
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# ── Routing Tree ─────────────────────────────────────────────────────────
+route:
+  # Top-level config
+  receiver: 'fallback-email'
+  group_by: ['alertname', 'severity', 'server']
+  group_wait: 30s       # Wait to collect alerts from same group
+  group_interval: 5m    # How often to send grouped alerts
+  repeat_interval: 4h   # Re-notify for ongoing alerts every 4 hours
+
+  routes:
+    # ── CRITICAL alerts → PagerDuty + Slack ───────────────────────────
+    - match:
+        severity: critical
+      receiver: 'critical-pagerduty-slack'
+      group_wait: 10s     # Minimal wait for critical alerts
+      group_interval: 2m  # Re-notify every 2 minutes
+      repeat_interval: 10m
+      continue: true      # Continue matching for additional receivers
+
+    # ── Availability alerts → PagerDuty ───────────────────────────────
+    - match:
+        group: 'availability'
+      receiver: 'critical-pagerduty-slack'
+      group_wait: 10s
+      group_interval: 1m
+      repeat_interval: 5m
+
+    # ── Database alerts → DB team ─────────────────────────────────────
+    - match:
+        group: 'database'
+      receiver: 'database-team'
+      group_wait: 1m
+      group_interval: 10m
+      repeat_interval: 2h
+
+    # ── WARNING alerts → Slack only in business hours ─────────────────
+    - match:
+        severity: warning
+      receiver: 'warning-slack'
+      group_wait: 1m
+      group_interval: 15m
+      repeat_interval: 4h
+
+    # ── Maintenance alerts → email digest ─────────────────────────────
+    - match:
+        group: 'maintenance'
+      receiver: 'email-digest'
+      group_wait: 5m
+      group_interval: 1h
+      repeat_interval: 24h
+
+# ── Inhibition Rules ─────────────────────────────────────────────────────
+# Suppress less important alerts when critical ones are already firing.
+inhibit_rules:
+  # If a server is down, don't alert about individual services on it
+  - source_match:
+      alertname: HostUnreachable
+    target_match_re:
+      alertname: '^(ContainerDown|PostgresDown|RedisDown|HighAPILatency).*'
+    equal: ['server']
+
+  # If Postgres is down, suppress related query latency alerts
+  - source_match:
+      alertname: PostgresDown
+    target_match:
+      alertname: PostgresHighConnections
+    equal: ['server', 'db_name']
+
+  # If Redis is down, suppress cache-related alerts
+  - source_match:
+      alertname: RedisDown
+    target_match_re:
+      alertname: '^(RedisHighMemory|RedisCacheHitRateLow).*'
+    equal: ['server', 'redis_name']
+
+# ── Receivers ────────────────────────────────────────────────────────────
+# Where alerts are sent. Each receiver can have multiple integrations.
+
+receivers:
+  # ── CRITICAL: PagerDuty + Slack (24/7 on-call) ─────────────────────
+  - name: 'critical-pagerduty-slack'
+    slack_configs:
+      - channel: '#alerts-critical'
+        title: '{{ .GroupLabels.alertname }} [CRITICAL]'
+        text: |
+          *Alert:* {{ .CommonAnnotations.summary }}
+          *Severity:* {{ .CommonLabels.severity }}
+          *Server:* {{ .CommonLabels.server }}
+          *Details:* {{ .CommonAnnotations.description }}
+          {{ if .CommonAnnotations.runbook_url }}*Runbook:* {{ .CommonAnnotations.runbook_url }}{{ end }}
+          {{ if .CommonAnnotations.grafana_url }}*Dashboard:* {{ .CommonAnnotations.grafana_url }}{{ end }}
+        send_resolved: true
+        color: '{{ if eq .Status "firing" }}danger{{ else }}good{{ end }}'
+        actions:
+          - text: 'View Runbook'
+            url: '{{ .CommonAnnotations.runbook_url }}'
+            type: button
+          - text: 'View Dashboard'
+            url: '{{ .CommonAnnotations.grafana_url }}'
+            type: button
+
+  # ── WARNING: Slack only (investigate during business hours) ────────
+  - name: 'warning-slack'
+    slack_configs:
+      - channel: '#alerts-warning'
+        title: '{{ .GroupLabels.alertname }} [WARNING]'
+        text: |
+          *Alert:* {{ .CommonAnnotations.summary }}
+          *Server:* {{ .CommonLabels.server }}
+          *Details:* {{ .CommonAnnotations.description }}
+        send_resolved: true
+        color: 'warning'
+
+  # ── Database: Dedicated DB team channel ─────────────────────────────
+  - name: 'database-team'
+    slack_configs:
+      - channel: '#alerts-database'
+        title: '{{ .GroupLabels.alertname }} [DB]'
+        text: |
+          *Alert:* {{ .CommonAnnotations.summary }}
+          *Database:* {{ .CommonLabels.db_name }}
+          *Server:* {{ .CommonLabels.server }}
+          *Details:* {{ .CommonAnnotations.description }}
+        send_resolved: true
+
+  # ── Email: Daily digest for maintenance alerts ──────────────────────
+  - name: 'email-digest'
+    email_configs:
+      - to: 'infra-ops@wheeler.ai'
+        from: 'alertmanager@wheeler.ai'
+        smarthost: 'smtp.sendgrid.net:587'
+        auth_username: 'apikey'
+        auth_password: '${SENDGRID_API_KEY}'
+        headers:
+          Subject: '[Wheeler Infra] Daily Alert Digest'
+        send_resolved: false
+
+  # ── Fallback: Email for anything unmatched ──────────────────────────
+  - name: 'fallback-email'
+    email_configs:
+      - to: 'infra-ops@wheeler.ai'
+        from: 'alertmanager@wheeler.ai'
+        smarthost: 'smtp.sendgrid.net:587'
+        auth_username: 'apikey'
+        auth_password: '${SENDGRID_API_KEY}'
+        send_resolved: true
+
+  # ── Silenced: PagerDuty only ────────────────────────────────────────
+  # Uncomment when PagerDuty is configured:
+  # - name: 'pagerduty-critical'
+  #   pagerduty_configs:
+  #     - routing_key: '${PAGERDUTY_ROUTING_KEY}'
+  #       severity: '{{ if eq .CommonLabels.severity "critical" }}critical{{ else }}error{{ end }}'
+  #       description: '{{ .CommonAnnotations.description }}'
+  #       client: 'Prometheus'
+  #       client_url: '{{ .CommonAnnotations.grafana_url }}'

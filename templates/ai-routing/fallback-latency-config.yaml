@@ -1,0 +1,257 @@
+# =============================================================================
+# Wheeler AI Routing — Fallback Chain & Latency Optimization
+# =============================================================================
+# This file documents the fallback chain design and latency targets.
+# The actual fallback config is in litellm-optimized.yaml (router_settings section).
+#
+# Use this as reference for:
+#   - Understanding the fallback decision tree
+#   - Tuning latency thresholds
+#   - Configuring alerting thresholds
+#   - Setting fallback rate budgets
+# =============================================================================
+
+# ─── Fallback Decision Tree ───────────────────────────────────────────────────
+#
+#   Request arrives for model X
+#          │
+#          ▼
+#   ┌─────────────────┐
+#   │ Try model X      │──── Success? ────▶ Return response
+#   └────────┬────────┘
+#            │ Failure (5xx or timeout)
+#            ▼
+#   ┌─────────────────┐
+#   │ Check fallback   │──── No fallback configured? ────▶ Return error
+#   │ chain for X      │
+#   └────────┬────────┘
+#            │ Fallback found
+#            ▼
+#   ┌─────────────────┐
+#   │ Check rate limit │──── Exceeded hourly limit? ────▶ Return error
+#   │ for this path    │
+#   └────────┬────────┘
+#            │ Within limit
+#            ▼
+#   ┌─────────────────┐
+#   │ Try fallback Y   │──── Success? ────▶ Return response + alert
+#   └────────┬────────┘
+#            │ Failure
+#            ▼
+#   ┌─────────────────┐
+#   │ Next fallback?   │──── Yes? ────▶ Loop to "Try fallback"
+#   └────────┬────────┘
+#            │ No more fallbacks
+#            ▼
+#        Return error + alert
+#
+# =============================================================================
+
+fallback_chain:
+  # ── Tier 1: Flash -> Reasoner ──
+  # Most common fallback. DeepSeek Flash is fast/cheap; Reasoner is the backup.
+  # If Flash is down, Reasoner handles the load until Flash recovers.
+  flash_to_reasoner:
+    enabled: true
+    conditions:
+      status_codes: [500, 502, 503, 504]  # Server-side failures only
+      timeout_seconds: 30                   # Trigger if Flash takes >30s
+      consecutive_failures: 3              # Or after 3 consecutive failures
+    rate_limit:
+      max_per_hour: 50                     # Can handle many fallbacks (same provider)
+      max_per_5min: 10                     # Burst cap
+    alerting:
+      alert_on_fallback: true
+      alert_channel: "aiops-alerts"
+      alert_after_consecutive: 5           # Alert after 5 consecutive fallbacks
+
+  # ── Tier 2: Reasoner -> Sonnet ──
+  # When both DeepSeek endpoints are down, fail over to Claude.
+  # Limited because Claude is 10-20x more expensive.
+  reasoner_to_sonnet:
+    enabled: true
+    conditions:
+      status_codes: [500, 502, 503, 504]
+      timeout_seconds: 60
+      consecutive_failures: 2              # Faster trigger for expensive fallback
+    rate_limit:
+      max_per_hour: 10                     # Tight limit — Claude is expensive
+      max_per_5min: 3
+    alerting:
+      alert_on_fallback: true
+      alert_channel: "aiops-alerts"
+      alert_after_consecutive: 1           # Alert immediately on each Claude fallback
+
+  # ── Tier 3: Flash -> Sonnet (DIRECT, highly restricted) ──
+  # Direct Flash->Sonnet skips Reasoner. Only when Reasoner is also down.
+  # Extremely limited rate.
+  flash_to_sonnet_direct:
+    enabled: true
+    conditions:
+      status_codes: [500, 502, 503, 504]
+      timeout_seconds: 30
+      consecutive_failures: 0              # Must also have failed Reasoner fallback
+    rate_limit:
+      max_per_hour: 5                      # Very restrictive
+      max_per_5min: 1
+    alerting:
+      alert_on_fallback: true
+      alert_channel: "aiops-pager"         # Page on-call for direct Claude escalation
+      alert_after_consecutive: 1
+
+  # NEVER CONFIGURED: Opus as fallback
+  # Claude Opus is 50x more expensive than Flash. Auto-fallback to Opus
+  # would risk cost explosion. Opus must be explicitly requested.
+  opus_fallback: DISABLED
+
+
+# ─── Latency Targets (SLO) ────────────────────────────────────────────────────
+
+latency_service_level_objectives:
+  # These are targets to monitor against. LiteLLM doesn't enforce them
+  # directly — use the alerting system to notify when SLOs are breached.
+
+  deepseek-chat:
+    p50_latency_ms:  2000       # 50% of requests complete within 2s
+    p95_latency_ms:  5000       # 95% within 5s
+    p99_latency_ms:  10000      # 99% within 10s
+    timeout_seconds: 30         # Hard cutoff
+    alert_if_p95_exceeds_ms: 8000   # Alert if p95 > 8s for 5+ minutes
+
+  deepseek-reasoner:
+    p50_latency_ms:  5000       # Reasoning models are slower
+    p95_latency_ms:  15000
+    p99_latency_ms:  30000
+    timeout_seconds: 60
+    alert_if_p95_exceeds_ms: 25000
+
+  claude-sonnet-4:
+    p50_latency_ms:  3000
+    p95_latency_ms:  10000
+    p99_latency_ms:  20000
+    timeout_seconds: 90
+    alert_if_p95_exceeds_ms: 15000
+
+  claude-opus-4:
+    p50_latency_ms:  5000
+    p95_latency_ms:  20000
+    p99_latency_ms:  40000
+    timeout_seconds: 120
+    alert_if_p95_exceeds_ms: 30000
+
+
+# ─── Circuit Breaker Configuration ────────────────────────────────────────────
+
+circuit_breaker:
+  # Models are removed from rotation after `allowed_fails` consecutive failures.
+  # After `cooldown_time` seconds, the model is retried once.
+  # If that retry succeeds, the model is restored.
+  # If it fails, the cooldown doubles (exponential backoff for circuit reset).
+
+  global:
+    allowed_fails: 3
+    cooldown_time: 30           # Initial cooldown: 30s
+    max_cooldown_time: 300      # Max cooldown: 5 minutes
+
+  per_model:
+    deepseek-chat:
+      allowed_fails: 5          # More lenient for primary model
+      cooldown_time: 30
+    deepseek-reasoner:
+      allowed_fails: 3
+      cooldown_time: 60
+    claude-sonnet-4:
+      allowed_fails: 2          # Tighter for expensive model
+      cooldown_time: 120
+    claude-opus-4:
+      allowed_fails: 1          # Single failure triggers cooldown
+      cooldown_time: 300
+
+
+# ─── Rate Limiting Per Model (Enforced at LiteLLM Proxy) ─────────────────────
+
+rate_limits:
+  deepseek-chat:
+    requests_per_minute: 500
+    requests_per_hour: 10000
+    tokens_per_minute: 1000000
+    tokens_per_hour: 50000000
+    max_concurrent_requests: 10
+
+  deepseek-reasoner:
+    requests_per_minute: 200
+    requests_per_hour: 5000
+    tokens_per_minute: 300000
+    tokens_per_hour: 15000000
+    max_concurrent_requests: 5
+
+  claude-sonnet-4:
+    requests_per_minute: 100
+    requests_per_hour: 2000
+    tokens_per_minute: 100000
+    tokens_per_hour: 5000000
+    max_concurrent_requests: 2
+
+  claude-opus-4:
+    requests_per_minute: 50
+    requests_per_hour: 500
+    tokens_per_minute: 30000
+    tokens_per_hour: 1500000
+    max_concurrent_requests: 1
+
+
+# ─── Alerting Thresholds ──────────────────────────────────────────────────────
+
+alerting:
+  # Percentage of requests that fall back (rolling 5-minute window)
+  fallback_rate:
+    warning: 5                  # >5% fallback rate
+    critical: 20                # >20% fallback rate
+    emergency: 50               # >50% fallback rate (primary model is DOWN)
+
+  # Error rate by model
+  error_rate:
+    deepseek-chat:
+      warning: 2                # >2% error rate
+      critical: 10              # >10% error rate
+    deepseek-reasoner:
+      warning: 5
+      critical: 15
+    claude-sonnet-4:
+      warning: 1                # Tighter because it's expensive
+      critical: 5
+    claude-opus-4:
+      warning: 1
+      critical: 5
+
+  # Latency alerting
+  latency_p95:
+    deepseek-chat:
+      warning_ms: 5000
+      critical_ms: 10000
+    deepseek-reasoner:
+      warning_ms: 15000
+      critical_ms: 30000
+    claude-sonnet-4:
+      warning_ms: 8000
+      critical_ms: 20000
+    claude-opus-4:
+      warning_ms: 15000
+      critical_ms: 40000
+
+
+# ─── Cost Guardrails for Fallback ─────────────────────────────────────────────
+
+cost_guardrails:
+  # Auto-disable fallbacks if daily cost exceeds these thresholds
+  daily_fallback_cost_limit_usd: 5.00    # Max $5/day in fallback costs
+  alert_at_pct: 50                       # Alert at 50% of limit
+  emergency_stop_at_pct: 100             # Stop all fallbacks at 100%
+
+  # Per-model cost multipliers (for estimating fallback cost)
+  # Relative cost vs deepseek-chat baseline
+  cost_multipliers:
+    deepseek-chat: 1.0
+    deepseek-reasoner: 3.0               # ~3x more expensive than chat
+    claude-sonnet-4: 20.0                # ~20x more expensive
+    claude-opus-4: 100.0                 # ~100x more expensive (never auto-fallback)

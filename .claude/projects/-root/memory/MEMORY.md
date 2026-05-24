@@ -1,0 +1,17 @@
+# Memory Index
+
+- [PM2 Restart Patterns](pm2-restart-patterns.md) — 3 broken PM2 processes share DEEPSEEK_API_KEY root cause
+- [PM2 Restart Commands](pm2-restart.md) — Wheeler ecosystem PM2 restart commands, safe procedure, danger thresholds
+- [PM2 Restart Safety Pattern](pm2_restart_pattern.md) — verify→act→verify pattern for safe PM2 process recovery
+- [PM2 Deploy State](pm2-deploy-state.md) — Current PM2 state post-remediation + cleanup governance (2026-05-23). surplusai-portal-frontend migrated AIOPS→EDGE, dead containers purged, node-exporter fixed, stale envs archived
+- [PM2 Env Var Update Pattern](pm2-restart-pattern-20260523.md) — env var changes in ecosystem.config.js require delete+start not restart; Docker HEALTHCHECK localhost vs 127.0.0.1 trap; PM2 crash investigation checklist
+- [PM2 Restart Canonical Skill](pm2-restart-canonical.md) — PM2 restart procedures now codified as a Claude Code skill at capabilities/skills/pm2-recovery/SKILL.md
+- [Hostinger Stage 2 Cleanup](hostinger-stage2-cleanup.md) — UFW reduced 95→64 rules, 8 admin panels closed to internet, node_exporter fixed (2026-05-24)
+- [AI Ops Remediation 2026-05-24](aiops-remediation-20260524.md) — Full AI Ops security hardening: all Docker→127.0.0.1, Langflow auth, nginx basic auth + rate limiting
+- [Secret Rotation 2026-05-24](secret-rotation-20260524.md) — Internal DB/Redis passwords rotated; FRGpassword1! replaced with unique hex passwords
+- [SSH Secret Rotation Pattern](ssh-secret-rotation-pattern.md) — Use scp tmp files for cross-server secrets; never trust bash variable persistence
+- [cap_drop ALL Patterns](cap-drop-patterns.md) — s6-overlay needs SETGID/SETUID, nginx needs CHOWN, postgres needs DAC_OVERRIDE
+- [PM2 env -i Delete+Start Pattern](pm2-env-i-pattern.md) — restart reuses stored pm2_env.env; only delete+start with env -i creates clean processes. Daemon auto-restart preserves state.
+- [QA Scorecard 100/100](qa-scorecard-100.md) — Wheeler ecosystem Stage 2 QA achieved A+ (100/100) on 2026-05-24. Scorecard at /root/STAGE2_QA_SCORECARD_FINAL.md.
+- [/slay](.claude/skills/slay/SKILL.md) — Full ecosystem health audit + auto-remediation. 20-endpoint check, PM2 jlist secret scan, Docker :latest audit, network bind verification. Fixes broken processes with env -i delete+start.
+- [Autonomous AI Ops Platform](autonomous-aiops-platform.md) — Wheeler Autonomous AI Ops + Self-Healing Engine architecture, 10 deliverables, watchdog scripts (2026-05-24)

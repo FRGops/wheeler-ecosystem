@@ -1,0 +1,127 @@
+###############################################################################
+# TRAEFIK V3 — DOCKER COMPOSE (PUBLIC EDGE ROUTER)
+# =====================================================
+# Deployed on Hostinger VPS (resource-constrained: 4-8 vCPU, 8-16 GB RAM)
+#
+# CRITICAL: This is the PUBLIC ENTRY POINT for ALL services.  Only ports 80
+# and 443 are exposed to the internet.  Every other service must route through
+# Traefik and should NOT bind host ports directly.
+#
+# IMPORTANT RESOURCE RULES:
+# - Memory limit: 256MB — Traefik is efficient; spikes above this indicate
+#   a config issue (e.g., too many backends, leaky middleware)
+# - CPU limit: 0.50 cores — Traefik is I/O-bound on connections, not CPU
+# - Logging: 10MB per file, max 3 rotated files — logs grow FAST at the edge
+###############################################################################
+
+version: "3.8"
+
+services:
+  traefik:
+    image: traefik:v3.1
+    container_name: traefik-edge
+    restart: unless-stopped
+
+    # ==================== RESOURCE CONSTRAINTS ====================
+    # Traefik on a resource-constrained edge server must never OOM.
+    # 256MB is generous for routing ~15 backends with TLS termination.
+    # If you see OOM kills, check for memory leaks in middleware plugins
+    # or an unexpected surge in concurrent connections.
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+        reservations:
+          cpus: "0.10"
+          memory: 64M
+
+    # ==================== NETWORKING ====================
+    # Only two ports exposed to the host:
+    #   :80   → HTTP (immediately redirects to HTTPS)
+    #   :443  → HTTPS (TLS termination)
+    # NO OTHER PORTS SHOULD BE EXPOSED THROUGH THE FIREWALL.
+    ports:
+      - "80:80"
+      - "443:443"
+
+    networks:
+      - traefik-public
+      # Docker socket network is implicit via bind mount
+
+    # ==================== VOLUMES ====================
+    volumes:
+      # Docker socket: required for Docker provider (service discovery)
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Static config (this file's counterpart)
+      - ./traefik.yml:/etc/traefik/traefik.yml:ro
+      # Dynamic config (routers, services, middlewares)
+      - ./dynamic.yml:/etc/traefik/dynamic/dynamic.yml:ro
+      # Service routing table (additional routers/services)
+      - ./routers.yml:/etc/traefik/dynamic/routers.yml:ro
+      # ACME certificate storage — must be persistent across restarts!
+      # If lost, Let's Encrypt will rate-limit you (5 certs/domain/week).
+      - traefik-acme:/etc/traefik/acme
+      # Optional: log file if file logging is enabled
+      # - traefik-logs:/var/log/traefik
+
+    # ==================== ENVIRONMENT ====================
+    environment:
+      # REQUIRED: Cloudflare API token for DNS-01 ACME challenge.
+      # Create at https://dash.cloudflare.com/profile/api-tokens
+      # Permissions needed: Zone:DNS:Edit
+      # Set this in your .env file or in the shell before docker compose up
+      - CF_API_TOKEN=${CF_API_TOKEN:?error}
+      # Optional: CrowdSec bouncer API key (if deploying CrowdSec)
+      - CROWDSEC_BOUNCER_API_KEY=${CROWDSEC_BOUNCER_API_KEY:-}
+
+    # ==================== HEALTH CHECK ====================
+    # Uses Traefik's internal ping endpoint — lightweight inetd-style check.
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+    # ==================== LOGGING ====================
+    # Keep logs tight: 10MB max per file, 3 rotated files.
+    # On a busy edge server, access logs can fill disk quickly.
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # ==================== LABELS ====================
+    # Dashboard: only accessible via internal IP (Tailscale or Docker network)
+    labels:
+      # Dashboard router — DO NOT expose to public internet
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik-dashboard.rule=Host(`traefik.wheeler.ai`)"
+      - "traefik.http.routers.traefik-dashboard.service=api@internal"
+      # Middleware chain: dashboard gets auth + internal-only restrictions
+      - "traefik.http.routers.traefik-dashboard.middlewares=dashboard-auth,internal-ip-whitelist"
+      - "traefik.http.routers.traefik-dashboard.tls=true"
+      - "traefik.http.routers.traefik-dashboard.tls.certresolver=cloudflare"
+      - "traefik.http.routers.traefik-dashboard.entrypoints=websecure"
+      # Internal IP whitelist: Tailscale subnet + Docker subnet
+      - "traefik.http.middlewares.internal-ip-whitelist.ipwhitelist.sourcerange=100.64.0.0/10,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+      # Dashboard auth: use a simple HTTP basic auth (replace with your htpasswd)
+      # Generate: $(openssl passwd -apr1)
+      - "traefik.http.middlewares.dashboard-auth.basicauth.users=${DASHBOARD_USERS:-admin:$$apr1$$HASH_PLACEHOLDER}"
+
+# ==================== NETWORKS ====================
+# Shared external network that ALL frontend services connect to.
+# This allows Traefik to route to any service on this network by service name.
+# Must be created before any service stack is deployed:
+#   docker network create traefik-public
+networks:
+  traefik-public:
+    external: true
+    name: traefik-public
+
+# ==================== VOLUMES ====================
+volumes:
+  traefik-acme:
+    name: traefik-acme

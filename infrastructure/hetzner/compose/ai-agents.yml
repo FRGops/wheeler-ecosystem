@@ -1,0 +1,237 @@
+# =============================================================================
+# AI Agent Runtimes — Scalable Agent Execution Platform
+# =============================================================================
+# Deploys a platform for running AI agents (LangChain, CrewAI, AutoGen, etc.)
+# with a shared Redis task queue and a management API.
+#
+# Architecture:
+#   agent-api (FastAPI)  →  Redis (task broker + state store)
+#                         →  agent-runner (Celery workers, scalable)
+#   agent-runner (x N)   →  Redis (picks up tasks, reports state)
+#
+# Scaling: The agent-runner service can be scaled horizontally:
+#   docker compose -f ai-agents.yml up -d --scale agent-runner=5
+#
+# Each runner is stateless — all state is in Redis. This means:
+#   - Zero-downtime scaling (just start/stop runners)
+#   - Failed runners restart and pick up new tasks
+#   - No persistent storage needed for runners
+#
+# Agent types supported:
+#   - langchain: Standard LangChain agents
+#   - crewai: CrewAI multi-agent crews
+#   - autogen: Microsoft AutoGen agents
+#   - custom: Bring your own agent (extend the runner)
+#
+# Network: All services on ai-agents internal network.
+#   API gateway attaches to traefik-public for external access.
+# =============================================================================
+
+services:
+  # ===========================================================================
+  # REDIS — Task queue + agent state store + result backend
+  # ===========================================================================
+  # Redis is the backbone of the agent platform:
+  #   - Queue: Pending agent tasks (Celery/Redis list)
+  #   - State: Running agent state (HASH per agent session)
+  #   - Results: Completed agent outputs (temporary, TTL-based)
+  #   - Pub/Sub: Real-time agent logs streaming
+  #
+  # For production, consider Redis Sentinel or Redis Cluster for HA.
+  # For Phase 2, single-instance with AOF persistence is sufficient.
+  redis:
+    image: redis:7-alpine
+    container_name: ai-agents-redis
+    restart: unless-stopped
+
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1G
+        reservations:
+          cpus: "0.5"
+          memory: 256M
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 1gb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+
+    volumes:
+      - ai-agents-redis:/data
+
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+    networks:
+      - ai-agents
+
+  # ===========================================================================
+  # AGENT API — Gateway for agent management
+  # ===========================================================================
+  # Provides REST API for:
+  #   - Creating agent sessions
+  #   - Submitting tasks to agents
+  #   - Querying agent state and results
+  #   - Streaming agent logs (SSE)
+  #   - Managing agent configurations
+  agent-api:
+    image: "${AI_AGENTS_API_IMAGE:-ghcr.io/wheelerai/agent-api:latest}"
+    container_name: agent-api
+    restart: unless-stopped
+
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1G
+        reservations:
+          cpus: "0.5"
+          memory: 256M
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    environment:
+      REDIS_URL: "redis://redis:6379/0"
+      CELERY_BROKER_URL: "redis://redis:6379/1"
+      CELERY_RESULT_BACKEND: "redis://redis:6379/2"
+      SECRET_KEY: "${AI_AGENTS_SECRET_KEY:?Must set AI_AGENTS_SECRET_KEY}"
+      ENVIRONMENT: "${ENVIRONMENT:-production}"
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+      TZ: "${TZ:-UTC}"
+      # Agent configuration
+      MAX_AGENT_TIMEOUT_MINUTES: "${MAX_AGENT_TIMEOUT_MINUTES:-60}"
+      MAX_CONCURRENT_AGENTS: "${MAX_CONCURRENT_AGENTS:-20}"
+      # LLM API keys (agents will use these)
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      # Anthropic API key for Claude-powered agents
+      ANTHROPIC_BASE_URL: "${ANTHROPIC_BASE_URL:-}"
+
+    depends_on:
+      redis:
+        condition: service_healthy
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    networks:
+      - ai-agents
+      - traefik-public
+
+    ports:
+      # API port for direct access (via Docker DNS, not host)
+      - "127.0.0.1:8001:8001"
+
+    labels:
+      - "traefik.enable=true"
+
+      # Agent API Router
+      - "traefik.http.routers.agent-api.rule=Host(`agents.internal.wheeler.ai`)"
+      - "traefik.http.routers.agent-api.entrypoints=websecure"
+      - "traefik.http.routers.agent-api.tls=true"
+      - "traefik.http.routers.agent-api.tls.certresolver=letsencrypt-staging"
+      - "traefik.http.routers.agent-api.middlewares=chain-internal@file"
+      - "traefik.http.services.agent-api.loadbalancer.server.port=8001"
+      - "traefik.http.services.agent-api.loadbalancer.healthCheck.path=/health"
+      - "traefik.http.services.agent-api.loadbalancer.healthCheck.interval=30s"
+
+  # ===========================================================================
+  # AGENT RUNNER — Scalable agent worker
+  # ===========================================================================
+  # Scaled horizontally for multiple concurrent agent sessions.
+  # Each runner picks up tasks from Redis and executes them.
+  #
+  # Runner types (set via AGENT_RUNNER_TYPE env var):
+  #   - langchain: Python LangChain agents
+  #   - crewai: CrewAI multi-agent crews
+  #   - autogen: AutoGen conversational agents
+  #   - generic: Custom agent script executor
+  agent-runner:
+    image: "${AI_AGENTS_RUNNER_IMAGE:-ghcr.io/wheelerai/agent-runner:latest}"
+    container_name: agent-runner-1  # Will be auto-named when scaled
+    restart: unless-stopped
+
+    deploy:
+      resources:
+        limits:
+          cpus: "4.0"
+          memory: 4G
+        reservations:
+          cpus: "1.0"
+          memory: 1G
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    environment:
+      REDIS_URL: "redis://redis:6379/0"
+      CELERY_BROKER_URL: "redis://redis:6379/1"
+      CELERY_RESULT_BACKEND: "redis://redis:6379/2"
+      ENVIRONMENT: "${ENVIRONMENT:-production}"
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+      TZ: "${TZ:-UTC}"
+      # Runner configuration
+      AGENT_RUNNER_TYPE: "${AGENT_RUNNER_TYPE:-generic}"
+      CELERY_CONCURRENCY: "${AGENT_CELERY_CONCURRENCY:-2}"
+      # LLM API keys
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+
+    depends_on:
+      redis:
+        condition: service_healthy
+
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A runner inspect ping -d celery@$$HOSTNAME || exit 1"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    networks:
+      - ai-agents
+
+# =============================================================================
+# VOLUMES
+# =============================================================================
+volumes:
+  ai-agents-redis:
+    name: ai-agents-redis
+
+# =============================================================================
+# NETWORKS
+# =============================================================================
+networks:
+  ai-agents:
+    external: true
+    name: ai-agents
+  traefik-public:
+    external: true
+    name: traefik-public

@@ -1,0 +1,68 @@
+# =============================================================================
+# Wheeler Enterprise — Unattended Security Upgrades
+# Deploy to: /etc/apt/apt.conf.d/50wheeler-unattended-upgrades
+# =============================================================================
+# Automatically installs security updates. NEVER auto-upgrades major versions.
+# Reboots are scripted (not automatic) to avoid disrupting production traffic.
+# =============================================================================
+
+Unattended-Upgrade::Allowed-Origins {
+    "${distro_id}:${distro_codename}-security";        # Security patches
+    "${distro_id}ESMApps:${distro_codename}-apps-security"; # ESM apps
+    "${distro_id}ESM:${distro_codename}-infra-security";    # ESM infra
+};
+
+# ── Package Blacklist ────────────────────────────────────────────────────
+# Never auto-upgrade these — they require coordination:
+Unattended-Upgrade::Package-Blacklist {
+    "docker-ce";
+    "docker-ce-cli";
+    "containerd.io";
+    "linux-image";
+    "linux-headers";
+    "linux-modules";
+    "libc6";
+    "postgresql";
+    "redis-server";
+    "nginx";
+    "traefik";
+};
+
+# ── Auto-Remove ──────────────────────────────────────────────────────────
+# Clean up old kernels and unused dependencies
+Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
+Unattended-Upgrade::Remove-New-Unused-Dependencies "true";
+Unattended-Upgrade::Remove-Unused-Dependencies "true";
+
+# ── Auto-Reboot ──────────────────────────────────────────────────────────
+# We NEVER auto-reboot. The self-healing layer handles controlled restarts
+# during maintenance windows. Critical services have redundancy.
+Unattended-Upgrade::Automatic-Reboot "false";
+
+# If we DID auto-reboot, wait 5 minutes:
+Unattended-Upgrade::Automatic-Reboot-Time "05:00";
+Unattended-Upgrade::Automatic-Reboot-WithUsers "false";
+
+# ── Update Frequency ─────────────────────────────────────────────────────
+# Check every 6 hours
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Download-Upgradeable-Packages "1";
+APT::Periodic::AutocleanInterval "7";
+APT::Periodic::Unattended-Upgrade "1";
+
+# ── Split Upgrades ───────────────────────────────────────────────────────
+# Install upgrades in smallest possible chunks (safer)
+Unattended-Upgrade::MinimalSteps "true";
+
+# ── Shut Down Services During Upgrade ────────────────────────────────────
+# Only non-critical services. Databases are blacklisted above.
+Unattended-Upgrade::AutoFixInterruptedDpkg "true";
+
+# ── Email Reports ────────────────────────────────────────────────────────
+# Send summary to infrastructure team
+Unattended-Upgrade::Mail "infra-alerts@wheeler.ai";
+Unattended-Upgrade::MailReport "only-on-error";
+
+# ── Bandwidth Limit ──────────────────────────────────────────────────────
+# Avoid saturating the link during business hours
+Acquire::http::Dl-Limit "2000";  # 2000 KB/s = ~16 Mbps

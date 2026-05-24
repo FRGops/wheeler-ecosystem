@@ -1,0 +1,172 @@
+{
+    "//": "===================================================================",
+    "//": " Tailscale ACL Configuration — Wheeler AIOps Infrastructure",
+    "//": "===================================================================",
+    "//": "",
+    "//": "Security Rationale:",
+    "//": "  Tailscale ACLs (Access Control Lists) govern which machines in",
+    "//": "  the Tailscale mesh can communicate with each other, on which",
+    "//": "  ports, and by which users. They are the AUTHORITATIVE policy",
+    "//": "  layer for ALL tailnet traffic.",
+    "//": "",
+    "//": "  Unlike UFW (which runs on each machine individually), Tailscale",
+    "//": "  ACLs are CENTRALLY MANAGED in the Tailscale admin console or",
+    "//": "  checked into your repo. This ensures consistent policy even if",
+    "//": "  a server's local firewall is misconfigured.",
+    "//": "",
+    "//": "  These ACLs enforce:",
+    "//": "    1. Admin users have full access to all machines for management",
+    "//": "    2. Hostinger (edge) can only reach specific Hetzner ports for",
+    "//": "       reverse proxy (80, 443, 8098, 8007, 8088, 5000, 3130, 3002, 3001)",
+    "//": "    3. Hetzner can reach Hostinger's database ports for sync",
+    "//": "    4. Auto-approvers allow automatic subnet route propagation",
+    "//": "",
+    "//": "Tag Definitions:",
+    "//": "  tag:hetzner     — Primary AIOps orchestrator server",
+    "//": "  tag:hostinger   — Public edge / frontend server",
+    "//": "  tag:admin       — Administrator workstations with full access",
+    "//": "",
+    "//": "Deployment:",
+    "//": "  Apply via Tailscale admin console (ACLs tab), or",
+    "//": "  via tailscale CLI: tailscale set --acls-file=tailscale-acls.json",
+    "//": "",
+    "//": "Documentation:",
+    "//": "  https://tailscale.com/kb/1018/acls/",
+    "//": "===================================================================",
+
+    "groups": {
+        "group:admins": [
+            "admin@wheeler.ai",
+            "devops@wheeler.ai"
+        ]
+    },
+
+    "tagOwners": {
+        "tag:hetzner":     ["group:admins"],
+        "tag:hostinger":   ["group:admins"],
+        "tag:admin":       ["group:admins"]
+    },
+
+    "autoApprovers": {
+        "//": "Auto-approve subnet routes from tagged devices",
+        "//": "Hetzner can advertise routes to Docker networks (172.x.x.x)",
+        "//": "so admin machines can reach containers directly.",
+        "routes": {
+            "tag:hetzner":   ["100.64.0.0/10", "172.16.0.0/12"],
+            "tag:hostinger": ["100.64.0.0/10"]
+        },
+        "exitNode": {
+            "tag:hetzner": ["group:admins"]
+        }
+    },
+
+    "acls": [
+        {
+            "//": "RULE 1: Admin full access",
+            "//": "Admin users can access ALL ports on ALL tagged servers.",
+            "//": "This is necessary for SSH, debugging, and management.",
+            "//": "Since admin machines are personal workstations (not public",
+            "//": "servers), this is a reasonable trust model.",
+            "action": "accept",
+            "src": ["tag:admin"],
+            "dst": [
+                "tag:hetzner:*",
+                "tag:hostinger:*"
+            ]
+        },
+
+        {
+            "//": "RULE 2: Hostinger → Hetzner (reverse proxy access)",
+            "//": "Hostinger's Traefik reverse proxies traffic to Hetzner's",
+            "//": "backend services. Hostinger ONLY needs access to the",
+            "//": "specific ports that serve web traffic.",
+            "//": "",
+            "//": "Allowed ports:",
+            "//": "   80/443   — Traefik (internal routing)",
+            "//": "   8098     — Prediction Radar web",
+            "//": "   8007     — RavynAI API",
+            "//": "   8088     — Superset",
+            "//": "   5000     — ChangeDetection",
+            "//": "   3130     — Healthchecks",
+            "//": "   3002     — Grafana",
+            "//": "   3001     — Uptime Kuma",
+            "action": "accept",
+            "src": ["tag:hostinger"],
+            "dst": [
+                "tag:hetzner:80",
+                "tag:hetzner:443",
+                "tag:hetzner:8098",
+                "tag:hetzner:8007",
+                "tag:hetzner:8088",
+                "tag:hetzner:5000",
+                "tag:hetzner:3130",
+                "tag:hetzner:3002",
+                "tag:hetzner:3001"
+            ]
+        },
+
+        {
+            "//": "RULE 3: Hetzner → Hostinger (data sync access)",
+            "//": "Hetzner needs to reach Hostinger's databases for",
+            "//": "cross-server data synchronization.",
+            "//": "",
+            "//": "Allowed ports:",
+            "//": "   5432     — PostgreSQL (FRGops DB)",
+            "//": "   6379     — Redis (FRGops cache)",
+            "action": "accept",
+            "src": ["tag:hetzner"],
+            "dst": [
+                "tag:hostinger:5432",
+                "tag:hostinger:6379"
+            ]
+        },
+
+        {
+            "//": "RULE 4: Intra-server management",
+            "//": "Hetzner can access all of its own services.",
+            "//": "Hostinger can access all of its own services.",
+            "//": "Essential for Docker health checks and local monitoring.",
+            "action": "accept",
+            "src": ["tag:hetzner"],
+            "dst": ["tag:hetzner:*"]
+        },
+        {
+            "action": "accept",
+            "src": ["tag:hostinger"],
+            "dst": ["tag:hostinger:*"]
+        },
+
+        {
+            "//": "RULE 5: ICMP (ping) — ALLOW",
+            "//": "Ping is useful for connectivity testing and monitoring.",
+            "//": "Disabling ICMP breaks PMTU discovery, which causes",
+            "//": "performance issues. Keep enabled.",
+            "action": "accept",
+            "src": ["*"],
+            "dst": ["*:icmp"]
+        }
+    ],
+
+    "//": "SSH: Allow Tailscale SSH for admin convenience",
+    "//": "Tailscale SSH provides an additional SSH access path that",
+    "//": "bypasses the server's sshd_config. This is useful for emergency",
+    "//": "access if SSH is misconfigured.",
+    "ssh": [
+        {
+            "action": "accept",
+            "src": ["tag:admin"],
+            "dst": ["tag:hetzner", "tag:hostinger"],
+            "users": ["group:admins"]
+        }
+    ],
+
+    "//": "Node attributes for additional security properties",
+    "//": "This marks our servers so Tailscale can enforce additional checks.",
+    "nodeAttrs": [
+        {
+            "//": "Mark both servers as 'production' grade",
+            "target": ["tag:hetzner", "tag:hostinger"],
+            "attr": ["production"]
+        }
+    ]
+}

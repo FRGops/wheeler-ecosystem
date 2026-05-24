@@ -1,0 +1,72 @@
+# =============================================================================
+# Wheeler Enterprise — Grafana Datasources (Enterprise Edition)
+# =============================================================================
+apiVersion: 1
+
+datasources:
+  # ── Prometheus (Primary) ─────────────────────────────────────────────
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    uid: PBFA97CFB590B2093
+    jsonData:
+      httpMethod: POST
+      timeInterval: 15s
+      queryTimeout: 60s
+      manageAlerts: true
+      prometheusType: Prometheus
+      cacheLevel: High
+      incrementalQuerying: true
+      incrementalQueryOverlapWindow: 10m
+      exemplarTraceIdDestinations:
+        - name: traceID
+          url: http://tempo:3200
+          displayName: Tempo (placeholder)
+
+  # ── Loki (Logs) ────────────────────────────────────────────────────
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    isDefault: false
+    uid: P8E80F9AEF21F6940
+    jsonData:
+      timeout: 60
+      maxLines: 5000
+      derivedFields:
+        - name: traceID
+          matcherRegex: 'traceID=(\w+)'
+          url: '${__value.raw}'
+
+  # ── ClickHouse (Analytics) ─────────────────────────────────────────
+  - name: ClickHouse
+    type: grafana-clickhouse-datasource
+    access: proxy
+    url: http://clickhouse:8123
+    isDefault: false
+    uid: clickhouse
+    jsonData:
+      port: 8123
+      protocol: http
+      defaultDatabase: default
+      tlsSkipVerify: true
+
+  # ── PostgreSQL (Direct DB queries for diagnostics) ─────────────────
+  - name: PostgreSQL-AIOps
+    type: postgres
+    access: proxy
+    url: aiops-postgres:5432
+    isDefault: false
+    uid: postgres-aiops
+    database: postgres
+    user: grafana_reader
+    secureJsonData:
+      password: ${GRAFANA_PG_PASSWORD}
+    jsonData:
+      sslmode: disable
+      maxOpenConns: 5
+      maxIdleConns: 2
+      connMaxLifetime: 300

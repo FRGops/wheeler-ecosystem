@@ -1,0 +1,213 @@
+# =============================================================================
+# AlertManager Configuration — Wheeler AIOps Stack
+# =============================================================================
+# Routes: CRITICAL → PagerDuty + Slack #alerts-critical
+#         WARNING  → Slack #alerts
+# Inhibit: InstanceDown silences child alerts for that instance (no noise)
+# Grouping: Group by instance to prevent alert storms
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# GLOBAL SETTINGS
+# ---------------------------------------------------------------------------
+global:
+  # Slack
+  slack_api_url: 'https://hooks.slack.com/services/YOUR/WEBHOOK/HERE'
+  slack_api_url_file: '/etc/alertmanager/slack-webhook-secret'  # Prefer file-based
+
+  # PagerDuty
+  pagerduty_url: 'https://events.pagerduty.com/v2/enqueue'
+
+  # SMTP (for email fallback)
+  smtp_from: 'alertmanager@wheeler.ai'
+  smtp_smarthost: 'localhost:25'
+  smtp_auth_username: ''
+  smtp_auth_password: ''
+  smtp_require_tls: false
+
+  # Resolve timeout — auto-resolve after 5m if metric returns
+  resolve_timeout: 5m
+
+# ---------------------------------------------------------------------------
+# ROOT ROUTE — Entry point for all alerts
+# ---------------------------------------------------------------------------
+route:
+  receiver: 'default'
+  group_by: ['instance', 'server', 'severity']
+  group_wait: 30s           # Wait 30s before sending first notification
+  group_interval: 5m         # Deduplicate within group, wait 5m between batches
+  repeat_interval: 4h        # Re-notify every 4h for unresolved alerts
+
+  # Initial silence period after deployment (uncomment during maintenance)
+  # mute_time_intervals:
+  #   - maintenance_window
+
+  # Sub-routes based on severity
+  routes:
+
+    # ---- CRITICAL alerts → PagerDuty + Slack critical channel ----
+    - receiver: 'pagerduty-critical'
+      matchers:
+        - severity = "critical"
+      continue: true  # Continue to also send to Slack critical
+
+    - receiver: 'slack-critical'
+      matchers:
+        - severity = "critical"
+
+    # ---- WARNING alerts → Slack warnings channel ----
+    - receiver: 'slack-warning'
+      matchers:
+        - severity = "warning"
+
+    # ---- SSL alerts → dedicated channel (high volume but slow cadence) ----
+    - receiver: 'slack-ssl'
+      matchers:
+        - group = "ssl"
+
+    # ---- Maintenance silence — suppress alerts during deployments ----
+    - receiver: 'null'
+      matchers:
+        - severity =~ "warning|critical"
+        - env = "maintenance"
+
+# ---------------------------------------------------------------------------
+# INHIBITION RULES — Prevent cascading alert storms
+# ---------------------------------------------------------------------------
+# If InstanceDown fires for a host, ALL other alerts for that host
+# are suppressed. No point alerting about Postgres down when the
+# entire server is unreachable.
+inhibit_rules:
+
+  # Server down suppresses all other alerts for that instance
+  - source_match:
+      severity: 'critical'
+      alertname: 'InstanceDown'
+    target_match_re:
+      severity: 'warning|critical'
+    # Inhibit when the source alert (InstanceDown) and target have
+    # the same instance label
+    equal: ['instance']
+
+  # Host unreachable suppresses all container alerts for that server
+  - source_match:
+      severity: 'critical'
+      alertname: 'HostUnreachable'
+    target_match_re:
+      severity: 'warning|critical'
+    equal: ['server']
+
+  # PostgresDown suppresses DB-related alerts for same db_name
+  - source_match:
+      severity: 'critical'
+      alertname: 'PostgresDown'
+    target_match_re:
+      group: 'database'
+    equal: ['db_name']
+
+  # RedisDown suppresses cache alerts for same redis_name
+  - source_match:
+      severity: 'warning'
+      alertname: 'RedisDown'
+    target_match_re:
+      group: 'cache'
+    equal: ['redis_name']
+
+# ---------------------------------------------------------------------------
+# TIME INTERVALS — For maintenance windows
+# ---------------------------------------------------------------------------
+time_intervals:
+  - name: 'maintenance_window'
+    time_intervals:
+      # Weekday deployments: Mon-Fri 02:00-04:00 UTC
+      - weekdays: ['monday:friday']
+        times:
+          - start_time: '02:00'
+            end_time: '04:00'
+      # Weekend maintenance: Sat-Sun whole day
+      - weekdays: ['saturday', 'sunday']
+
+# ---------------------------------------------------------------------------
+# RECEIVERS — Where alerts go
+# ---------------------------------------------------------------------------
+receivers:
+
+  # ---- DEFAULT: Black hole (shouldn't hit this with proper routing) ----
+  - name: 'default'
+    slack_configs:
+      - channel: '#alerts-default'
+        title: '{{ template "slack.default.title" . }}'
+        text: '{{ template "slack.default.text" . }}'
+        send_resolved: true
+
+  # ---- NULL / SILENT — For maintenance ----
+  - name: 'null'
+
+  # ---- SLACK: CRITICAL alerts ----
+  - name: 'slack-critical'
+    slack_configs:
+      - channel: '#alerts-critical'
+        title: '🚨 CRITICAL: {{ .GroupLabels.alertname }} — {{ .GroupLabels.server }}'
+        text: '{{ template "slack.critical.text" . }}'
+        send_resolved: true
+        color: 'danger'
+        icon_emoji: ':rotating_light:'
+
+  # ---- SLACK: WARNING alerts ----
+  - name: 'slack-warning'
+    slack_configs:
+      - channel: '#alerts'
+        title: '⚠️ WARNING: {{ .GroupLabels.alertname }} — {{ .GroupLabels.server }}'
+        text: '{{ template "slack.warning.text" . }}'
+        send_resolved: true
+        color: 'warning'
+        icon_emoji: ':warning:'
+
+  # ---- SLACK: SSL-specific ----
+  - name: 'slack-ssl'
+    slack_configs:
+      - channel: '#alerts-ssl'
+        title: '🔒 SSL: {{ .GroupLabels.alertname }} — {{ .GroupLabels.instance }}'
+        text: '{{ template "slack.ssl.text" . }}'
+        send_resolved: true
+        color: '#36a64f' if resolved else '#ff6600'
+
+  # ---- PAGERDUTY: CRITICAL alerts only ----
+  - name: 'pagerduty-critical'
+    pagerduty_configs:
+      - routing_key: 'YOUR_PAGERDUTY_INTEGRATION_KEY'
+        severity: 'critical'
+        client: 'Wheeler AIOps'
+        client_url: 'https://grafana.wheeler.ai'
+        description: '{{ .GroupLabels.alertname }} on {{ .GroupLabels.server }}'
+        details:
+          firing: '{{ .Alerts.Firing | len }}'
+          resolved: '{{ .Alerts.Resolved | len }}'
+          summary: '{{ template "pagerduty.default.description" .}}'
+        send_resolved: true
+
+  # ---- EMAIL: Fallback for all alerts ----
+  - name: 'email-admin'
+    email_configs:
+      - to: 'admin@wheeler.ai'
+        send_resolved: false
+        headers:
+          subject: '{{ .GroupLabels.severity | toUpper }}: {{ .GroupLabels.alertname }} on {{ .GroupLabels.server }}'
+
+  # ---- WEBHOOK: Generic (for custom automation) ----
+  - name: 'webhook-generic'
+    webhook_configs:
+      - url: 'http://100.121.230.28:3130/api/v1/cron/alertmanager-webhook'
+        send_resolved: true
+        http_config:
+          headers:
+            X-Source: 'alertmanager'
+
+# ---------------------------------------------------------------------------
+# SLACK MESSAGE TEMPLATES
+# ---------------------------------------------------------------------------
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Inline templates (if template files don't exist)
+# These are also defined in /etc/alertmanager/templates/slack.tmpl

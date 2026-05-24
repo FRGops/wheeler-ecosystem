@@ -1,0 +1,54 @@
+# =============================================================================
+# Grafana Dashboard Providers — Wheeler AIOps Stack
+# =============================================================================
+# Auto-provisions dashboards from JSON files in the dashboards/ directory.
+# Dashboards are created if they don't exist, updated on version change.
+# =============================================================================
+
+apiVersion: 1
+
+providers:
+  # ---------------------------------------------------------------------------
+  # AIOps Overview — Main operational dashboard
+  # ---------------------------------------------------------------------------
+  - name: 'AIOps Overview'
+    orgId: 1
+    folder: 'AIOps'
+    folderUid: 'aiops'
+    type: file
+    disableDeletion: true  # Prevent accidental deletion from UI
+    updateIntervalSeconds: 60  # Check for file changes every 60s
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: false
+
+  # ---------------------------------------------------------------------------
+  # Application Dashboards — Individual app dashboards
+  # ---------------------------------------------------------------------------
+  - name: 'Applications'
+    orgId: 1
+    folder: 'Applications'
+    folderUid: 'apps'
+    type: file
+    disableDeletion: true
+    updateIntervalSeconds: 60
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: true
+
+  # ---------------------------------------------------------------------------
+  # Traefik — Proxy/API metrics
+  # ---------------------------------------------------------------------------
+  - name: 'Traefik'
+    orgId: 1
+    folder: 'Infrastructure'
+    folderUid: 'infra'
+    type: file
+    disableDeletion: true
+    updateIntervalSeconds: 60
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: true

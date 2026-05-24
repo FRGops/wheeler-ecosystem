@@ -1,0 +1,383 @@
+###############################################################################
+# FRGOPS ESSENTIAL STACK
+# ==========================
+# Services: FRGops, FRGCRM, Chatwoot, Docuseal
+# Dependencies: Postgres 15, Redis 7
+#
+# RESOURCE RATIONALE:
+# This is the most critical stack on the Hostinger VPS.  These are
+# business-facing apps that must stay online.  However, the VPS is
+# resource-constrained (4-8 vCPU, 8-16 GB RAM), so every container
+# has aggressive limits.
+#
+# MEMORY BUDGET:
+#   Postgres:       512MB  (will use more if needed, but OOM kills at 512MB)
+#   Redis:          128MB  (cache-only for FRGops)
+#   FRGops:         256MB
+#   FRGCRM:         256MB
+#   Chatwoot:       512MB  (Rails + Sidekiq — heaviest in this stack)
+#   Docuseal:       256MB
+#   ------------------------
+#   Total:         ~2GB    (acceptable for 8GB VPS with Traefik + other stacks)
+#
+# LOGGING: 10MB per file, max 3 rotated files.
+#   These apps can be chatty (especially Chatwoot with Rails logs).
+#   Use `docker logs --tail 100 <container>` for debugging instead of
+#   persistent log storage.
+###############################################################################
+
+version: "3.8"
+
+# =============================================================================
+# NETWORKS
+# =============================================================================
+networks:
+  traefik-public:
+    external: true
+    name: traefik-public
+  frgops-internal:
+    driver: bridge
+    internal: true  # No external access — Postgres and Redis are not exposed
+    ipam:
+      config:
+        - subnet: "172.20.1.0/24"
+
+# =============================================================================
+# VOLUMES
+# =============================================================================
+volumes:
+  frgops-postgres-data:
+    name: frgops-postgres-data
+  frgops-redis-data:
+    name: frgops-redis-data
+  frgops-uploads:
+    name: frgops-uploads
+  frgcrm-uploads:
+    name: frgcrm-uploads
+  chatwoot-data:
+    name: chatwoot-data
+  docuseal-data:
+    name: docuseal-data
+
+# =============================================================================
+# SERVICES
+# =============================================================================
+services:
+
+  # ---------------------------------------------------------------------------
+  # POSTGRES — FRGops Database
+  # ONLY serves the FRGops/FRGCRM/Chatwoot/Docuseal stack.
+  # No heavy analytical queries — those stay on Hetzner with ClickHouse.
+  #
+  # LIMITS: 512MB RAM, 0.5 CPU
+  # Postgres will try to use all available RAM for caching.  On a constrained
+  # VPS, we must cap this aggressively.  The shared_buffers config below is
+  # set to 128MB (25% of the memory limit), which is frugal but sufficient
+  # for light transactional workloads.
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:15-alpine
+    container_name: frgops-postgres
+    restart: unless-stopped
+    networks:
+      - frgops-internal
+      # NOT on traefik-public — Postgres must NEVER be publicly accessible
+    volumes:
+      - frgops-postgres-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: ${FRGOPS_DB_USER:-frgops}
+      POSTGRES_PASSWORD: ${FRGOPS_DB_PASSWORD:?required}
+      POSTGRES_DB: frgops
+      # Additional databases created by init script if needed
+      POSTGRES_MULTIPLE_DATABASES: frgops,frgcrm,chatwoot_production,docuseal_production
+    command:
+      # Aggressive resource caps for constrained VPS
+      - "postgres"
+      - "-c"
+      - "shared_buffers=128MB"        # 25% of memory limit — conservative
+      - "-c"
+      - "effective_cache_size=256MB"   # Optimistic estimate
+      - "-c"
+      - "work_mem=4MB"                 # Per-operation sort memory — keep tight
+      - "-c"
+      - "maintenance_work_mem=32MB"    # For VACUUM, CREATE INDEX
+      - "-c"
+      - "max_connections=50"           # Plenty for 4 apps; each uses ~2-5 conns
+      - "-c"
+      - "random_page_cost=1.1"         # SSD storage
+      - "-c"
+      - "effective_io_concurrency=200"  # SSD can handle parallel I/O
+      - "-c"
+      - "wal_level=minimal"            # Reduce WAL overhead — no replication needed
+      - "-c"
+      - "max_wal_size=1GB"             # Keep WAL size reasonable
+      - "-c"
+      - "checkpoint_completion_target=0.9"
+      - "-c"
+      - "log_min_duration_statement=1000"  # Log queries > 1 second
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+        reservations:
+          cpus: "0.10"
+          memory: 64M
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${FRGOPS_DB_USER:-frgops}"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # REDIS — FRGops Cache
+  # Used for session storage, background job queues, and cache.
+  # Redis is efficient — 128MB limit is generous for these use cases.
+  # No persistence (RDB/AOF) to save disk I/O — cache can be rebuilt.
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: frgops-redis
+    restart: unless-stopped
+    networks:
+      - frgops-internal
+      # NOT on traefik-public
+    volumes:
+      - frgops-redis-data:/data
+    command:
+      # Memory limit + no persistence = lower disk wear on constrained VPS
+      - "redis-server"
+      - "--appendonly"
+      - "no"
+      - "--maxmemory"
+      - "100mb"
+      - "--maxmemory-policy"
+      - "allkeys-lru"  # Evict least recently used when full
+      - "--save"
+      - ""  # Disable RDB snapshots entirely
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+        reservations:
+          cpus: "0.05"
+          memory: 16M
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # FRGOPS APP
+  # Main business application.  Replace image with your actual registry image.
+  # ---------------------------------------------------------------------------
+  frgops:
+    image: ${FRGOPS_IMAGE:-ghcr.io/wheeler-ai/frgops:latest}
+    container_name: frgops
+    restart: unless-stopped
+    networks:
+      - traefik-public
+      - frgops-internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgres://${FRGOPS_DB_USER:-frgops}:${FRGOPS_DB_PASSWORD:?required}@postgres:5432/frgops"
+      REDIS_URL: "redis://redis:6379/0"
+      RAILS_ENV: ${RAILS_ENV:-production}
+      RAILS_LOG_TO_STDOUT: "true"
+      SECRET_KEY_BASE: ${FRGOPS_SECRET_KEY_BASE:?required}
+      HOST: "frgops.wheeler.ai"
+      # Upload storage path
+      UPLOADS_PATH: "/data/uploads"
+    volumes:
+      - frgops-uploads:/data/uploads
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+        reservations:
+          cpus: "0.10"
+          memory: 64M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      # Traefik handles routing via file provider (routers.yml)
+      # But we still need this for Docker health check display
+      - "traefik.enable=false"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # FRGCRM
+  # Customer relationship management — companion to FRGops.
+  # ---------------------------------------------------------------------------
+  frgcrm:
+    image: ${FRGCRM_IMAGE:-ghcr.io/wheeler-ai/frgcrm:latest}
+    container_name: frgcrm
+    restart: unless-stopped
+    networks:
+      - traefik-public
+      - frgops-internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgres://${FRGOPS_DB_USER:-frgops}:${FRGOPS_DB_PASSWORD:?required}@postgres:5432/frgcrm"
+      REDIS_URL: "redis://redis:6379/1"
+      RAILS_ENV: ${RAILS_ENV:-production}
+      SECRET_KEY_BASE: ${FRGCRM_SECRET_KEY_BASE:?required}
+      HOST: "frgcrm.wheeler.ai"
+    volumes:
+      - frgcrm-uploads:/data/uploads
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+        reservations:
+          cpus: "0.10"
+          memory: 64M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - "traefik.enable=false"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # CHATWOOT
+  # Customer support chat platform.  Heavier than other services — runs
+  # Rails + Sidekiq in the same container (or split if needed).
+  #
+  # NOTE: Chatwoot requires its own background worker for email processing.
+  # If you need full email capability, deploy a separate sidekiq container.
+  # For resource-constrained edge, this single-container setup handles
+  # real-time chat only (no email ingestion).
+  # ---------------------------------------------------------------------------
+  chatwoot:
+    image: chatwoot/chatwoot:latest
+    container_name: chatwoot
+    restart: unless-stopped
+    networks:
+      - traefik-public
+      - frgops-internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      POSTGRES_DATABASE: chatwoot_production
+      POSTGRES_HOST: postgres
+      POSTGRES_USERNAME: ${FRGOPS_DB_USER:-frgops}
+      POSTGRES_PASSWORD: ${FRGOPS_DB_PASSWORD:?required}
+      REDIS_URL: "redis://redis:6379/2"
+      SECRET_KEY_BASE: ${CHATWOOT_SECRET_KEY_BASE:?required}
+      FRONTEND_URL: "https://chatwoot.wheeler.ai"
+      INSTALLATION_ENV: "docker"
+      DISABLE_DATABASE_ENVIRONMENT_CHECK: "true"
+      # Disable email (requires SES/SMTP config) — saves worker threads
+      # MAILER_SENDER_EMAIL: "chatwoot@wheeler.ai"
+      # SMTP_ADDRESS: ... (set if email is needed)
+      # SMTP_USERNAME: ...
+      # SMTP_PASSWORD: ...
+      ENABLE_EMAIL_CHANNEL: "false"  # Disable email channel to save workers
+      ACTIVE_STORAGE_SERVICE: "local"  # Local file storage (not S3)
+    volumes:
+      - chatwoot-data:/app/storage
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"    # Rails can spike during asset compilation
+          memory: 512M   # Chatwoot is RAM-hungry — 512MB is the floor
+        reservations:
+          cpus: "0.25"
+          memory: 128M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s  # Chatwoot takes longer to boot (Rails asset precompile)
+    labels:
+      - "traefik.enable=false"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # DOCUSEAL
+  # Document signing platform.  Lightweight Ruby/Sinatra app.
+  # ---------------------------------------------------------------------------
+  docuseal:
+    image: docuseal/docuseal:latest
+    container_name: docuseal
+    restart: unless-stopped
+    networks:
+      - traefik-public
+      - frgops-internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgres://${FRGOPS_DB_USER:-frgops}:${FRGOPS_DB_PASSWORD:?required}@postgres:5432/docuseal_production"
+      SECRET_KEY_BASE: ${DOCUSEAL_SECRET_KEY_BASE:?required}
+      HOST: "https://docuseal.wheeler.ai"
+      FORCE_SSL: "true"
+    volumes:
+      - docuseal-data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+        reservations:
+          cpus: "0.10"
+          memory: 64M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    labels:
+      - "traefik.enable=false"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

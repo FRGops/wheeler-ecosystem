@@ -1,0 +1,413 @@
+# =============================================================================
+# Real-time Data Feed Handlers — Auto-Reconnecting Consumer Workers
+# =============================================================================
+# Deploys a fleet of real-time data feed handlers that consume data from
+# external streaming sources (WebSocket, SSE, gRPC streams) and publish to
+# Redis Streams for downstream processing.
+#
+# Key design features:
+#   - Built-in auto-reconnect with exponential backoff
+#   - Health check reporting via Redis heartbeat
+#   - Graceful shutdown (finish processing current message)
+#   - Configurable per-feed (symbols, endpoints, intervals)
+#   - Metrics exposition for Prometheus scraping
+#
+# Feed types supported:
+#   - crypto: Cryptocurrency tickers (Binance, Coinbase, Kraken)
+#   - equities: Stock market data (Polygon, Alpaca, IEX)
+#   - forex: Foreign exchange rates (many free APIs)
+#   - news: News headlines + sentiment (NewsAPI, RSS)
+#   - economic: Economic indicators (FRED, World Bank)
+#   - weather: Weather data for location-based strategies
+#   - social: Social media sentiment (Twitter/X, Reddit)
+#
+# Each feed handler is a separate service so:
+#   1. One failing feed doesn't affect others
+#   2. Resource limits can be set per feed
+#   3. Independent scaling
+#   4. Independent updates/deployments
+# =============================================================================
+
+services:
+  # ===========================================================================
+  # REDIS — Stream aggregation + state + pub/sub
+  # ===========================================================================
+  # WH共用 Redis — shared with trading (if on same server) or dedicated
+  # For CPX51: Using the trading Redis instance is fine since they're on
+  # the same server. For multi-server, each feed handler should have
+  # its own Redis or connect to a shared Redis cluster.
+  redis:
+    image: redis:7-alpine
+    container_name: feeds-redis
+    restart: unless-stopped
+
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 1gb
+      --maxmemory-policy allkeys-lru
+      --save 300 1
+      --save 60 1000
+
+    volumes:
+      - feeds-redis:/data
+
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+    networks:
+      - realtime-feeds
+
+  # ===========================================================================
+  # CRYPTO FEED — Cryptocurrency market data
+  # ===========================================================================
+  # Consumes real-time crypto tickers from Binance WebSocket API.
+  # Binance has the most reliable free WebSocket feed.
+  #
+  # Reconnection:
+  #   - WebSocket disconnect → exponential backoff (1s → 60s max)
+  #   - Re-subscribes to all symbols on reconnect
+  #   - Missing data gap detection (sequence number tracking)
+  crypto-feed:
+    image: "${FEEDS_CRYPTO_IMAGE:-ghcr.io/wheelerai/feeds-crypto:latest}"
+    container_name: feeds-crypto
+    restart: unless-stopped
+
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    environment:
+      REDIS_URL: "redis://redis:6379/0"
+      ENVIRONMENT: "${ENVIRONMENT:-production}"
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+      TZ: "${TZ:-UTC}"
+
+      FEED_TYPE: "crypto"
+      FEED_ID: "crypto-feed-1"
+
+      # Exchange configuration
+      CRYPTO_EXCHANGE: "${CRYPTO_EXCHANGE:-binance}"
+      CRYPTO_SYMBOLS: "${CRYPTO_SYMBOLS:-btcusdt,ethusdt,solusdt,adausdt,dotusdt}"
+      CRYPTO_WS_URL: "${CRYPTO_WS_URL:-wss://stream.binance.com:9443/ws}"
+
+      # Reconnection settings
+      RECONNECT_BASE_DELAY_SEC: "1"
+      RECONNECT_MAX_DELAY_SEC: "60"
+      RECONNECT_JITTER: "0.1"
+
+      # Heartbeat
+      HEARTBEAT_INTERVAL_SEC: "15"
+      HEARTBEAT_KEY: "feed:crypto:heartbeat"
+
+    depends_on:
+      redis:
+        condition: service_healthy
+
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -h redis GET feed:crypto:heartbeat | head -c 10 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    networks:
+      - realtime-feeds
+
+  # ===========================================================================
+  # EQUITIES FEED — Stock market data
+  # ===========================================================================
+  # Consumes equities data from Polygon.io (or Alpaca) WebSocket API.
+  # Polygon provides reliable delayed data on the free tier.
+  #
+  # Note: Real-time US equities data requires a paid subscription or
+  # a brokerage account (Alpaca, TD Ameritrade, etc.).
+  equities-feed:
+    image: "${FEEDS_EQUITIES_IMAGE:-ghcr.io/wheelerai/feeds-equities:latest}"
+    container_name: feeds-equities
+    restart: unless-stopped
+
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    environment:
+      REDIS_URL: "redis://redis:6379/0"
+      ENVIRONMENT: "${ENVIRONMENT:-production}"
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+      TZ: "${TZ:-UTC}"
+
+      FEED_TYPE: "equities"
+      FEED_ID: "equities-feed-1"
+
+      # Provider configuration
+      EQUITIES_PROVIDER: "${EQUITIES_PROVIDER:-polygon}"
+      EQUITIES_API_KEY: "${EQUITIES_API_KEY:-}"
+      EQUITIES_SYMBOLS: "${EQUITIES_SYMBOLS:-SPY,QQQ,IWM,AAPL,MSFT,GOOGL,AMZN,NVDA,TSLA,META}"
+      EQUITIES_WS_URL: "${EQUITIES_WS_URL:-wss://delayed.polygon.io/stocks}"
+
+      # Data resolution
+      EQUITIES_FEED_TYPE: "${EQUITIES_FEED_TYPE:-trades}"  # trades, quotes, minute_bars
+
+      # Reconnection settings
+      RECONNECT_BASE_DELAY_SEC: "1"
+      RECONNECT_MAX_DELAY_SEC: "60"
+
+      # Heartbeat
+      HEARTBEAT_INTERVAL_SEC: "15"
+      HEARTBEAT_KEY: "feed:equities:heartbeat"
+
+    depends_on:
+      redis:
+        condition: service_healthy
+
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -h redis GET feed:equities:heartbeat | head -c 10 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    networks:
+      - realtime-feeds
+
+  # ===========================================================================
+  # NEWS FEED — News headlines + sentiment
+  # ===========================================================================
+  # Periodically fetches news articles and computes sentiment scores.
+  # Uses a combination of NewsAPI, RSS feeds, and optional NLP sentiment.
+  #
+  # Unlike crypto/equities feeds which are WebSocket-based, news is
+  # polled on an interval (every 5-15 minutes depending on tier).
+  news-feed:
+    image: "${FEEDS_NEWS_IMAGE:-ghcr.io/wheelerai/feeds-news:latest}"
+    container_name: feeds-news
+    restart: unless-stopped
+
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    environment:
+      REDIS_URL: "redis://redis:6379/0"
+      ENVIRONMENT: "${ENVIRONMENT:-production}"
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+      TZ: "${TZ:-UTC}"
+
+      FEED_TYPE: "news"
+      FEED_ID: "news-feed-1"
+
+      # News API configuration
+      NEWSAPI_ENABLED: "${NEWSAPI_ENABLED:-true}"
+      NEWSAPI_API_KEY: "${NEWSAPI_API_KEY:-}"
+      NEWSAPI_QUERIES: "${NEWSAPI_QUERIES:-cryptocurrency,stock market,AI,technology,earnings}"
+
+      # RSS Feeds (comma-separated URLs)
+      RSS_FEEDS: "${RSS_FEEDS:-https://feeds.content.dowjones.io/public/rss/mw_topstories,https://www.investopedia.com/feed-builder/feed/rss5,https://feeds.bloomberg.com/markets/news.rss}"
+
+      # Sentiment analysis
+      SENTIMENT_ENABLED: "${SENTIMENT_ENABLED:-false}"
+      SENTIMENT_MODEL: "${SENTIMENT_MODEL:-vader}"  # vader, textblob, transformer
+
+      # Polling interval
+      POLL_INTERVAL_MINUTES: "${NEWS_POLL_INTERVAL:-15}"
+
+    depends_on:
+      redis:
+        condition: service_healthy
+
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -h redis GET feed:news:heartbeat | head -c 10 || exit 1"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    networks:
+      - realtime-feeds
+
+  # ===========================================================================
+  # ECONOMIC FEED — Economic indicators and forex
+  # ===========================================================================
+  # Fetches economic indicators from public APIs (FRED, World Bank, etc.)
+  # and forex rates from free exchange rate APIs.
+  economic-feed:
+    image: "${FEEDS_ECONOMIC_IMAGE:-ghcr.io/wheelerai/feeds-economic:latest}"
+    container_name: feeds-economic
+    restart: unless-stopped
+
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    environment:
+      REDIS_URL: "redis://redis:6379/0"
+      ENVIRONMENT: "${ENVIRONMENT:-production}"
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+      TZ: "${TZ:-UTC}"
+
+      FEED_TYPE: "economic"
+      FEED_ID: "economic-feed-1"
+
+      # FRED API (Federal Reserve Economic Data)
+      FRED_ENABLED: "${FRED_ENABLED:-false}"
+      FRED_API_KEY: "${FRED_API_KEY:-}"
+      FRED_SERIES: "${FRED_SERIES:-GDP,UNRATE,CPIAUCSL,FEDFUNDS,DFII10}"
+
+      # Forex rates
+      FOREX_ENABLED: "${FOREX_ENABLED:-true}"
+      FOREX_API_KEY: "${FOREX_API_KEY:-}"
+      FOREX_BASE_CURRENCY: "${FOREX_BASE_CURRENCY:-USD}"
+      FOREX_TARGET_CURRENCIES: "${FOREX_TARGET_CURRENCIES:-EUR,GBP,JPY,CHF,CAD,AUD,NZD,CNY}"
+
+      # Polling interval (economic data changes slowly)
+      POLL_INTERVAL_MINUTES: "${ECONOMIC_POLL_INTERVAL:-60}"
+
+    depends_on:
+      redis:
+        condition: service_healthy
+
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -h redis GET feed:economic:heartbeat | head -c 10 || exit 1"]
+      interval: 120s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    networks:
+      - realtime-feeds
+
+  # ===========================================================================
+  # FEED MONITOR — Centralized feed health monitor
+  # ===========================================================================
+  # Monitors all feed heartbeats and reports overall feed health.
+  # Exposes a Prometheus endpoint for Grafana dashboards.
+  #
+  # Alert triggers:
+  #   - Heartbeat older than 2x interval → WARNING
+  #   - Heartbeat older than 5x interval → CRITICAL
+  #   - No data in stream for 10 minutes → STALE
+  feed-monitor:
+    image: "${FEEDS_MONITOR_IMAGE:-ghcr.io/wheelerai/feeds-monitor:latest}"
+    container_name: feeds-monitor
+    restart: unless-stopped
+
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+        reservations:
+          cpus: "0.05"
+          memory: 64M
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    environment:
+      REDIS_URL: "redis://redis:6379/0"
+      ENVIRONMENT: "${ENVIRONMENT:-production}"
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+      TZ: "${TZ:-UTC}"
+
+      CHECK_INTERVAL_SECONDS: "60"
+      STALE_THRESHOLD_MINUTES: "10"
+
+    depends_on:
+      redis:
+        condition: service_healthy
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9095/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+    ports:
+      - "127.0.0.1:9095:9095"  # Prometheus metrics
+
+    networks:
+      - realtime-feeds
+
+# =============================================================================
+# VOLUMES
+# =============================================================================
+volumes:
+  feeds-redis:
+    name: feeds-redis
+
+# =============================================================================
+# NETWORKS
+# =============================================================================
+networks:
+  realtime-feeds:
+    external: true
+    # Uses the trading network if feeds share infrastructure with trading
+    # name: trading

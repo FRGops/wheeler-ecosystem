@@ -1,0 +1,109 @@
+# =============================================================================
+# Traefik v3 Reverse Proxy — Hetzner CPX51 Internal Router
+# =============================================================================
+# This Traefik instance routes public and internal traffic for ALL services
+# running on the Hetzner CPX51. It provides TLS termination, automatic
+# Let's Encrypt certificates, rate limiting, and security headers.
+#
+# Architecture context:
+#   - External traffic flows: Cloudflare → Hostinger Traefik → (Tailscale) →
+#     Hetzner Traefik → Container
+#   - Internal traffic flows: Container → Traefik (Docker provider) → Container
+#   - Admin dashboards are Tailscale-only (no public DNS)
+#
+# Security model:
+#   - HTTP-01 challenges (port 80) for Let's Encrypt
+#   - exposedByDefault=false prevents accidental exposure
+#   - Staging LE resolver first, then production to avoid rate limits
+#   - CrowdSec bouncer middleware (placeholder until CrowdSec is deployed)
+#
+# Network: Attached to traefik-public AND every other network via labels
+#   so it can route to any container. Each service only needs to attach
+#   to its specific internal network + traefik-public.
+# =============================================================================
+
+services:
+  traefik:
+    image: traefik:v3.3
+    container_name: traefik
+    restart: unless-stopped
+
+    # Resource limits — CPX51 has 16 vCPUs / 32GB RAM, so Traefik gets modest
+    # guarantees with burst headroom for traffic spikes.
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 512M
+        reservations:
+          cpus: "0.5"
+          memory: 128M
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # Ports 80/443 MUST be bound to host → they are the ingress points.
+    # The dashboard is exposed on port 8080 internally (Tailscale-only).
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+
+    volumes:
+      # Docker socket: read-only for security — Traefik only needs to inspect
+      # containers (for labels), never create them.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+      # Config files: static config (traefik.yml) + dynamic config files
+      - ./traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./dynamic.yml:/etc/traefik/dynamic/dynamic.yml:ro
+      - ./middleware.yml:/etc/traefik/dynamic/middleware.yml:ro
+
+      # Let's Encrypt certificate storage — persisted so certs survive restart
+      - traefik-acme:/etc/traefik/acme
+
+      # Optional: custom error pages, templates, etc.
+      # - ./errors:/etc/traefik/errors:ro
+
+    networks:
+      - traefik-public
+
+    # Health check: Traefik exposes a /ping endpoint via the API.
+    # Required for deployment orchestration and Docker health condition.
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+    labels:
+      # Enable routing to Traefik's own dashboard
+      - "traefik.enable=true"
+
+      # Dashboard — ONLY accessible via Tailscale internal DNS
+      # traefik.internal.wheeler.ai resolves to 100.121.230.28 (Tailscale)
+      - "traefik.http.routers.traefik-dashboard.rule=Host(`traefik.internal.wheeler.ai`)"
+      - "traefik.http.routers.traefik-dashboard.service=api@internal"
+      - "traefik.http.routers.traefik-dashboard.entrypoints=websecure"
+      - "traefik.http.routers.traefik-dashboard.tls=true"
+      - "traefik.http.routers.traefik-dashboard.tls.certresolver=letsencrypt-staging"
+      - "traefik.http.routers.traefik-dashboard.middlewares=chain-admin@file"
+      - "traefik.http.routers.traefik-dashboard.tls.options=modern@file"
+
+      # Redirect all HTTP (entrypoint web) to HTTPS (entrypoint websecure)
+      - "traefik.http.routers.http-catchall.rule=HostRegexp(`{host:.+}`)"
+      - "traefik.http.routers.http-catchall.entrypoints=web"
+      - "traefik.http.routers.http-catchall.middlewares=redirect-https@file"
+
+networks:
+  traefik-public:
+    external: true
+    name: traefik-public
+
+volumes:
+  traefik-acme:
+    name: traefik-acme

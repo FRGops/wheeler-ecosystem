@@ -1,0 +1,242 @@
+# =============================================================================
+# Wheeler Enterprise — Promtail Configuration (Log Collector)
+# =============================================================================
+# Deployed on ALL 3 servers. Ships logs to Loki on AIOPS (via Tailscale mesh).
+#
+# Server-specific sections are marked with [EDGE], [AIOPS], [COREDB].
+# Copy this file and comment out sections not relevant to the target server.
+# =============================================================================
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+  log_level: info
+
+# Loki push endpoint — uses Docker DNS (loki service name) when deployed via compose.
+# Falls back to direct IP for standalone docker run deployments.
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+    batchwait: 1s
+    batchsize: 1048576      # 1MB batches — balances latency vs throughput
+    timeout: 10s
+    backoff_config:
+      min_period: 500ms
+      max_period: 5m
+      max_retries: 10
+    external_labels:
+      cluster: wheeler
+      server: ${SERVER_NAME:-unknown}  # Set per-server: edge/aiops/coredb
+
+# ── Positions File ───────────────────────────────────────────────────────
+# Tracks where Promtail left off reading each file — survives restarts
+positions:
+  filename: /tmp/positions.yaml
+
+# ── Scrape Configs ───────────────────────────────────────────────────────
+scrape_configs:
+
+  # ── Docker Container Logs ──────────────────────────────────────────────
+  # Captures ALL container stdout/stderr with container metadata.
+  # [ALL servers]
+  - job_name: docker-containers
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 15s
+        filters:
+          - name: name
+            values: [".+"]  # Match all containers
+    relabel_configs:
+      # Use container name as the log stream identifier
+      - source_labels: [__meta_docker_container_name]
+        target_label: container_name
+        action: keep
+        regex: ".+"
+      - source_labels: [__meta_docker_container_name]
+        target_label: container_name
+      # Extract Docker image name without tag
+      - source_labels: [__meta_docker_container_image]
+        target_label: image
+        regex: '(.+?)(?::.+)?$'
+        replacement: '$1'
+      # Map Docker labels to Loki labels
+      - source_labels: [__meta_docker_container_label_com_wheeler_service]
+        target_label: wheeler_service
+      - source_labels: [__meta_docker_container_label_com_wheeler_role]
+        target_label: wheeler_role
+      # Remove high-cardinality labels that would explode Loki's index
+      - action: labeldrop
+        regex: '(__meta_docker_container_id|__meta_docker_container_label_.*)'
+
+    # Pipeline stages for Docker JSON-file logs
+    pipeline_stages:
+      - json:
+          expressions:
+            log: log
+            stream: stream
+            time: time
+      - timestamp:
+          source: time
+          format: RFC3339Nano
+      - output:
+          source: log
+      - labels:
+          stream:
+
+  # ── PM2 Application Logs ──────────────────────────────────────────────
+  # [AIOPS] All PM2-managed Node.js services
+  - job_name: pm2-apps
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: pm2
+          log_type: application
+          __path__: /root/.pm2/logs/*.log
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})'
+      - timestamp:
+          source: timestamp
+          format: RFC3339
+      - labels:
+          stream: stdout
+
+  # ── Nginx Access Logs (JSON format) ────────────────────────────────────
+  # [EDGE] [AIOPS]
+  - job_name: nginx-access
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx
+          log_type: access
+          __path__: /var/log/nginx/access.log
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<remote_addr>\S+) - (?P<remote_user>\S+) \[(?P<time_local>[^\]]+)\] "(?P<request>[^"]*)" (?P<status>\d+) (?P<body_bytes_sent>\d+) "(?P<http_referer>[^"]*)" "(?P<http_user_agent>[^"]*)"'
+      - timestamp:
+          source: time_local
+          format: "02/Jan/2006:15:04:05 -0700"
+      - metrics:
+          nginx_status_total:
+            type: Counter
+            description: HTTP status codes
+            source: status
+            config:
+              match_all: true
+              action: inc
+
+  # ── Nginx Error Logs ──────────────────────────────────────────────────
+  # [EDGE] [AIOPS]
+  - job_name: nginx-error
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx
+          log_type: error
+          __path__: /var/log/nginx/error.log
+
+  # ── Traefik Access Logs (JSON) ─────────────────────────────────────────
+  # [EDGE] [AIOPS]
+  - job_name: traefik-access
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: traefik
+          log_type: access
+          __path__: /var/log/traefik/access.log
+    pipeline_stages:
+      - json:
+          expressions:
+            ClientHost: ClientHost
+            RequestPath: RequestPath
+            RequestMethod: RequestMethod
+            Status: Status
+            Duration: Duration
+            RouterName: RouterName
+      - labels:
+          RouterName:
+          Status:
+
+  # ── System Auth Log (Security Auditing) ────────────────────────────────
+  # [ALL servers] Tracks SSH logins, sudo usage, auth failures
+  - job_name: auth-log
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: auth
+          log_type: security
+          __path__: /var/log/auth.log
+
+  # ── System Log ─────────────────────────────────────────────────────────
+  # [ALL servers]
+  - job_name: syslog
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: system
+          __path__: /var/log/syslog
+
+  # ── AI Agent Logs (Structured JSON) ────────────────────────────────────
+  # [AIOPS] Custom AI agent logs in JSON format
+  - job_name: ai-agents
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: ai-agent
+          log_type: application
+          __path__: /var/log/wheeler/agents/*.log
+    pipeline_stages:
+      - json:
+          expressions:
+            level: level
+            agent: agent
+            model: model
+            tokens: tokens
+            cost: cost
+            latency_ms: latency_ms
+            request_id: request_id
+      - labels:
+          level:
+          agent:
+          model:
+      - timestamp:
+          source: timestamp
+          format: RFC3339
+
+  # ── PostgreSQL Logs ────────────────────────────────────────────────────
+  # [COREDB] Database server logs
+  - job_name: postgres-logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: postgresql
+          log_type: database
+          __path__: /var/log/postgresql/*.log
+
+  # ── Redis Logs ─────────────────────────────────────────────────────────
+  # [COREDB]
+  - job_name: redis-logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: redis
+          log_type: database
+          __path__: /var/log/redis/*.log
+
+  # ── Kernel Logs ────────────────────────────────────────────────────────
+  # [ALL servers] OOM kills, hardware errors, kernel panics
+  - job_name: kernel
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: kernel
+          __path__: /var/log/kern.log

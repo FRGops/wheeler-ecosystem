@@ -1,0 +1,382 @@
+###############################################################################
+# Wheeler — Docker HEALTHCHECK Instruction Templates
+# =============================================================================
+# Purpose: Standardized health check patterns for every service type in the
+#          Wheeler ecosystem.  Copy the relevant template into your
+#          docker-compose.yml or Dockerfile.
+#
+# =============================================================================
+# TABLE OF CONTENTS
+# =============================================================================
+#   Template 1 — Web Service (curl-based)
+#   Template 2 — PostgreSQL (pg_isready)
+#   Template 3 — Redis (redis-cli ping)
+#   Template 4 — MongoDB / MinIO / Object Storage
+#   Template 5 — AI Worker / ML Inference Service
+#   Template 6 — Custom Script Health Check
+#   Template 7 — TCP Port Check (no HTTP dependency)
+#   Template 8 — Spring Boot / Java Service
+#   Template 9 — Nginx / Static File Server
+#   Template 10 — Interval & Timeout Guidelines per Service Type
+#
+###############################################################################
+
+# =============================================================================
+# TEMPLATE 1: Web Service (curl-based)
+# =============================================================================
+# Use for: Node.js, Python, Go, Ruby, PHP web services with HTTP endpoints.
+# Requirements: curl must be available in the container image.
+#              If curl is not available, use wget (Template 9).
+
+healthcheck:
+  test: ["CMD", "curl", "-f", "http://localhost:{{PORT}}/health"]
+    # -f: fail silently on HTTP errors (returns exit code 22 for 4xx/5xx).
+    # Without -f, curl returns exit code 0 even for HTTP 500s.
+    #
+    # Alternative endpoints:
+    #   /health           — basic liveness check (recommended for routing).
+    #   /health/deep       — full dependency check (for canary validation).
+    #   /healthz           — Kubernetes-style liveness probe.
+    #   /readyz            — Kubernetes-style readiness probe.
+    #   /api/v1/health     — versioned health endpoint.
+    #
+    # Expected response: HTTP 200 OK
+    # Expected body: { "status": "ok" } or similar JSON.
+
+  interval: 30s
+    # Health check frequency.  See Template 10 for service-type guidelines.
+
+  timeout: 10s
+    # Must be < interval.  Should account for normal request processing time
+    # plus a buffer for transient load.
+
+  retries: 3
+    # 3 consecutive failures = unhealthy.
+    # Detection time: 30s * 3 = 90 seconds worst case.
+
+  start_period: 30s
+    # Grace period before the first health check.
+    # Account for: app boot time + dependency connection time.
+    # Fast apps (Go, compiled):  10-15s
+    # Node.js/Python apps:      20-30s
+    # Java/Spring Boot:         60-120s
+
+# =============================================================================
+# TEMPLATE 2: PostgreSQL (pg_isready)
+# =============================================================================
+# Use for: All PostgreSQL containers, including PostGIS.
+# Requirements: pg_isready is included in all postgres and postgis images.
+
+healthcheck:
+  test: ["CMD-SHELL", "pg_isready -U {{POSTGRES_USER}} -d {{POSTGRES_DB}} -t 5"]
+    # CMD-SHELL: runs the command through /bin/sh, enabling pipe and redirect.
+    # CMD: runs the command directly (no shell).  Prefer CMD-SHELL for
+    # complex checks; CMD for simple ones.
+    #
+    # Parameters:
+    #   -U <USERNAME>    — connect as this user (REQUIRED).
+    #   -d <DATABASE>    — check this specific database (REQUIRED).
+    #   -t <SECONDS>     — timeout in seconds (default 5).
+    #   -q               — quiet mode (no output, just exit code).
+    #
+    # Exit codes:
+    #   0 = server is accepting connections normally.
+    #   1 = server is rejecting connections (e.g., startup/recovery).
+    #   2 = no response (server is down or unreachable).
+    #   3 = no attempt (e.g., invalid parameters).
+
+  interval: 15s
+    # PostgreSQL responds quickly — faster interval helps detect issues sooner.
+
+  timeout: 5s
+    # pg_isready is very fast (< 1s normally).  5s is generous.
+
+  retries: 5
+    # 5 * 15s = 75 seconds before unhealthy.  Postgres recovery can take a
+    # few seconds, so allow more retries than web services.
+
+  start_period: 15s
+    # First-time init (creating database, running init scripts) can take a
+    # few extra seconds.  If using postgres:alpine, startup is fast (~5s).
+    # Full PostGIS init may take 30-60s.
+
+# Dockerfile variant (for custom Postgres images):
+# HEALTHCHECK --interval=15s --timeout=5s --retries=5 --start-period=15s \
+#   CMD pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB} -t 5 || exit 1
+
+# =============================================================================
+# TEMPLATE 3: Redis (redis-cli ping)
+# =============================================================================
+# Use for: All Redis containers (standalone, sentinel, cluster).
+# Requirements: redis-cli is included in all redis images.
+
+healthcheck:
+  test: ["CMD", "redis-cli", "ping"]
+    # redis-cli ping returns "PONG" on success.
+    # Exit code 0 = success, non-zero = failure.
+    #
+    # For Redis with authentication:
+    # test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+    #
+    # For Redis Sentinel:
+    # test: ["CMD", "redis-cli", "-p", "26379", "ping"]
+    #
+    # For Redis Cluster:
+    # test: ["CMD", "redis-cli", "-c", "ping"]
+
+  interval: 15s
+    # Redis responds nearly instantaneously.
+
+  timeout: 3s
+    # ping should complete in < 10ms.  3s covers any transient network blip.
+
+  retries: 5
+    # 5 * 15s = 75 seconds before unhealthy.  Redis restart is fast, but
+    # RDB/AOF loading can take a few seconds depending on data size.
+
+  start_period: 10s
+    # Very fast startup.  For Redis with large RDB/AOF files, increase to 30s.
+
+# =============================================================================
+# TEMPLATE 4: MinIO / S3-Compatible Object Storage
+# =============================================================================
+# Use for: MinIO, SeaweedFS, Ceph, or any S3-compatible object store.
+
+healthcheck:
+  test: ["CMD", "curl", "-f", "http://localhost:{{MINIO_PORT}}/minio/health/live"]
+    # MinIO provides multiple health endpoints:
+    #   /minio/health/live    — liveness probe (is the process alive?).
+    #   /minio/health/ready   — readiness probe (can it serve requests?).
+    #   /minio/health/cluster — cluster health (are all nodes available?).
+    #
+    # For production, use /ready for readiness and /live for liveness.
+
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 15s
+
+# =============================================================================
+# TEMPLATE 5: AI Worker / ML Inference Service
+# =============================================================================
+# Use for: LiteLLM, LangFlow, RavynAI, Wheeler Brain OS, Prediction Radar,
+#          or any service that loads ML models and runs inference.
+
+healthcheck:
+  # OPTION A: Simple HTTP health check (for AI services with HTTP endpoints):
+  test: ["CMD", "curl", "-f", "http://localhost:{{PORT}}/health"]
+
+  # OPTION B: Custom script with AI-specific checks (see Template 6):
+  # test: ["CMD", "/opt/wheeler/scripts/ai-health-check.sh"]
+  #   This script can:
+  #     - Verify model is loaded:       curl /v1/models | jq '.data | length > 0'
+  #     - Test inference:               curl /v1/chat/completions with small prompt
+  #     - Check cache hit rate:         curl /metrics | grep cache_hit_rate > 0.5
+  #     - Verify provider availability: check DeepSeek, Anthropic, OpenAI
+  #     - Check GPU if applicable:      nvidia-smi | grep "No running processes"
+  #
+  #   IMPORTANT: Keep the test prompt tiny (max 5 tokens) to avoid cost and
+  #   latency.  Use cached responses if available.
+
+  interval: 30s
+    # AI services may have slower health checks (model verification takes
+    # time).  Don't go higher than 60s.
+
+  timeout: 30s
+    # AI health checks can be slow (model inference, external API calls).
+    # Must be >= the time for the slowest check in the health script.
+    # 30s is sufficient for a small test prompt.
+
+  retries: 3
+    # 3 * 30s = 90 seconds.  Allows transient model loading issues to
+    # self-heal.
+
+  start_period: 60s
+    # AI services have long startup times:
+    #   LiteLLM:           15-30s (model list loading).
+    #   LangFlow:          30-60s (workflow compilation).
+    #   Prediction Radar:  60-120s (model weights loading).
+    #   Custom ML:         60-300s (depending on model size).
+    #
+    # Set start_period to the maximum observed startup time + 50% buffer.
+
+# =============================================================================
+# TEMPLATE 6: Custom Script Health Check
+# =============================================================================
+# Use for: Services that require multi-step validation beyond a simple
+#          HTTP endpoint or database ping.
+# Requirements: Script must be in the container image or mounted volume.
+
+healthcheck:
+  test: ["CMD", "/usr/local/bin/health-check.sh"]
+    # The script must:
+    #   - Be executable (chmod +x).
+    #   - Return exit code 0 for healthy, non-zero for unhealthy.
+    #   - Complete within the timeout period.
+    #   - Not generate excessive output (Docker logs every run).
+    #
+    # Example health-check.sh:
+    #   #!/bin/bash
+    #   # Check 1: Service HTTP endpoint
+    #   curl -sf http://localhost:8080/health || exit 1
+    #   # Check 2: Database connectivity
+    #   pg_isready -h ${DB_HOST} -U ${DB_USER} -d ${DB_NAME} -t 3 || exit 2
+    #   # Check 3: Redis connectivity
+    #   redis-cli -h ${REDIS_HOST} ping | grep -q PONG || exit 3
+    #   # Check 4: Disk space
+    #   [ $(df /data | tail -1 | awk '{print $5}' | tr -d '%') -lt 90 ] || exit 4
+    #   exit 0
+
+  interval: 30s
+  timeout: 15s
+    # Custom scripts may be slower than single-command checks.
+    # Set timeout based on the sum of individual check timeouts.
+
+  retries: 3
+  start_period: 30s
+
+# =============================================================================
+# TEMPLATE 7: TCP Port Check (no HTTP dependency)
+# =============================================================================
+# Use for: Services that listen on TCP but don't speak HTTP (databases not
+#          covered above, message queues, custom protocols).
+# Requirements: nc (netcat) or /dev/tcp (bash built-in).
+
+healthcheck:
+  # OPTION A: netcat (nc) — available in most images:
+  # test: ["CMD", "nc", "-z", "localhost", "{{PORT}}"]
+
+  # OPTION B: bash /dev/tcp (no external dependency):
+  test: ["CMD-SHELL", "timeout 3 bash -c 'cat < /dev/null > /dev/tcp/localhost/{{PORT}}' || exit 1"]
+    # Uses bash's built-in /dev/tcp device.  No extra packages needed.
+    # timeout 3: fails if connection doesn't establish within 3 seconds.
+
+  interval: 30s
+  timeout: 5s
+  retries: 3
+  start_period: 15s
+
+# =============================================================================
+# TEMPLATE 8: Spring Boot / Java Service
+# =============================================================================
+# Use for: Java Spring Boot applications, JVM-based services.
+
+healthcheck:
+  test: ["CMD", "curl", "-f", "http://localhost:{{PORT}}/actuator/health"]
+    # Spring Boot Actuator provides:
+    #   /actuator/health        — overall health (UP/DOWN).
+    #   /actuator/health/liveness  — Kubernetes liveness probe.
+    #   /actuator/health/readiness — Kubernetes readiness probe.
+    #
+    # Requires: management.endpoint.health.enabled=true in application.properties.
+
+  interval: 30s
+  timeout: 10s
+  retries: 5
+    # Java services may have slower recovery (GC pauses, JIT warmup).
+    # Allow more retries.
+
+  start_period: 120s
+    # JVM startup is slow.  120s is a reasonable default for Spring Boot.
+    # Adjust based on observed startup time in production.
+
+# =============================================================================
+# TEMPLATE 9: Nginx / Static File Server
+# =============================================================================
+# Use for: Nginx, Apache, Caddy, or any static file server.
+
+healthcheck:
+  # OPTION A: curl (if available in the image):
+  test: ["CMD", "curl", "-f", "http://localhost:{{PORT}}/health"]
+
+  # OPTION B: wget (if curl is not available):
+  # test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:{{PORT}}/health"]
+
+  # OPTION C: Simple homepage check:
+  # test: ["CMD", "curl", "-f", "http://localhost:{{PORT}}/"]
+
+  # NOTE: Nginx does not have a built-in health endpoint.  You must add one:
+  #   server {
+  #     listen 80;
+  #     location /health {
+  #       access_log off;
+  #       return 200 '{"status":"ok"}';
+  #       add_header Content-Type application/json;
+  #     }
+  #   }
+
+  interval: 30s
+  timeout: 5s
+    # Static responses are very fast.
+
+  retries: 3
+  start_period: 10s
+    # Nginx starts almost instantly.
+
+# =============================================================================
+# TEMPLATE 10: Interval & Timeout Guidelines per Service Type
+# =============================================================================
+#
+# ┌─────────────────────────────┬──────────┬─────────┬─────────┬──────────────┐
+# │ SERVICE TYPE                │ INTERVAL │ TIMEOUT │ RETRIES │ START_PERIOD │
+# ├─────────────────────────────┼──────────┼─────────┼─────────┼──────────────┤
+# │ Web UI / Static             │ 30s      │ 5s      │ 3       │ 10s          │
+# │ REST API (Node.js/Python)   │ 30s      │ 10s     │ 3       │ 30s          │
+# │ REST API (Go/compiled)      │ 30s      │ 5s      │ 3       │ 10s          │
+# │ REST API (Java/Spring)      │ 30s      │ 10s     │ 5       │ 120s         │
+# │ PostgreSQL                  │ 15s      │ 5s      │ 5       │ 15s          │
+# │ Redis                       │ 15s      │ 3s      │ 5       │ 10s          │
+# │ MinIO / Object Storage      │ 30s      │ 10s     │ 3       │ 15s          │
+# │ AI/ML Inference             │ 30s      │ 30s     │ 3       │ 60-120s      │
+# │ WebSocket Server            │ 30s      │ 10s     │ 3       │ 20s          │
+# │ Message Queue (RabbitMQ)    │ 30s      │ 5s      │ 3       │ 30s          │
+# │ Prometheus                  │ 30s      │ 10s     │ 3       │ 30s          │
+# │ Grafana                     │ 30s      │ 10s     │ 3       │ 30s          │
+# │ Loki                        │ 30s      │ 10s     │ 3       │ 30s          │
+# │ Nginx / Traefik             │ 30s      │ 5s      │ 3       │ 10s          │
+# │ Cron / One-Shot Task        │ N/A      │ N/A     │ N/A     │ N/A          │
+# └─────────────────────────────┴──────────┴─────────┴─────────┴──────────────┘
+#
+# =============================================================================
+# RULES OF THUMB
+# =============================================================================
+#
+# 1. DETECTION TIME:
+#    The worst-case time from "service is dead" to "Docker marks it unhealthy"
+#    is: interval * retries.
+#    Example: 30s * 3 = 90 seconds.
+#    Critical services should have detection time < 60 seconds.
+#    Non-critical services can have detection time up to 180 seconds.
+#
+# 2. TIMEOUT VS INTERVAL:
+#    timeout MUST be < interval.  Docker enforces this.
+#    If timeout equals interval, there is no room for the command to run
+#    before the next health check starts.
+#    Rule: timeout <= interval / 2 (at most half the interval).
+#
+# 3. RETRIES:
+#    retries >= 3 for most services.  This tolerates transient failures
+#    (network blips, GC pauses, brief resource contention).
+#    retries = 2 for critical services that need fast failure detection.
+#    retries = 5 for databases that have legitimate restart/recovery periods.
+#
+# 4. START PERIOD:
+#    Set this generously.  A container that is still in start_period cannot
+#    be marked unhealthy, even if health checks fail.  It's better to be
+#    slightly too long than too short (where a slow startup causes unnecessary
+#    container restarts).
+#
+#    Measure actual startup time in production and add 50%:
+#      start_period = measured_startup_time * 1.5
+#
+# 5. HEALTH CHECK COST:
+#    Health checks add load to the service.  For a simple /health endpoint:
+#    - 1 check every 30s = 2 checks/minute = 2,880 checks/day.
+#    - This is negligible for most services.
+#    For AI/ML services with test inference:
+#    - 1 test prompt every 30s = 2,880 API calls/day.
+#    - At ~10 tokens per test prompt = ~28,800 tokens/day.
+#    - At DeepSeek pricing (~$0.14/1M tokens) = ~$0.004/day.
+#    This is acceptable.  Use cached responses when possible.
+#
+###############################################################################

@@ -1,0 +1,158 @@
+# =============================================================================
+# Wheeler Enterprise — fail2ban jails (all 3 servers)
+# Deploy to: /etc/fail2ban/jail.local
+# =============================================================================
+# Strategy:
+#   - EDGE server: most aggressive (public-facing, 60s ban → 24h escalation)
+#   - AIOPS: moderate (API-facing, rate-limit focused)
+#   - COREDB: strict (database, only AIOPS IP allowed)
+# Tags after each jail: [EDGE] [AIOPS] [COREDB] [ALL]
+# =============================================================================
+
+[DEFAULT]
+
+# Ban time escalation: 1st offense = 10min, 2nd = 1hr, 3rd = 24hrs
+bantime.increment = true
+bantime.factor = 6
+bantime.maxtime = 86400
+bantime.rndtime = 120
+
+# Find time window for counting offenses
+findtime = 600
+
+# Max offenses in findtime before ban
+maxretry = 5
+
+# Ban action — use iptables for efficiency
+banaction = iptables-multiport
+banaction_allports = iptables-allports
+
+# Ignore internal network (Tailscale + Docker bridge)
+ignoreip = 127.0.0.1/8 ::1 100.64.0.0/10 172.16.0.0/12 10.0.0.0/8 192.168.0.0/16
+
+# Destination email for alerts (configure per server)
+destemail = infra-alerts@wheeler.ai
+
+# Send email with whois report on ban
+action = %(action_mwl)s
+
+# ── SSH Protection ────────────────────────────────────────────────────────
+# [ALL] Critical on all servers
+
+[sshd]
+enabled = true
+port = ssh
+filter = sshd
+logpath = /var/log/auth.log
+maxretry = 3
+findtime = 300
+bantime = 3600
+
+# Aggressive SSH mode — blocks port scanners using recidive filter
+[sshd-recidive]
+enabled = true
+filter = sshd
+logpath = /var/log/auth.log
+maxretry = 5
+findtime = 86400
+bantime = 604800
+
+# ── Web Authentication Attacks ────────────────────────────────────────────
+# [EDGE] [AIOPS] Protect Traefik, nginx, any web auth endpoints
+
+[traefik-auth]
+enabled = true
+filter = traefik-auth
+logpath = /var/log/traefik/access.log
+maxretry = 10
+findtime = 300
+bantime = 3600
+port = http,https
+
+# ── API Rate Limiting ─────────────────────────────────────────────────────
+# [AIOPS] Protect AI APIs
+
+[nginx-http-auth]
+enabled = true
+filter = nginx-http-auth
+logpath = /var/log/nginx/error.log
+maxretry = 5
+findtime = 300
+bantime = 1800
+
+# ── Port Scanning ─────────────────────────────────────────────────────────
+# [ALL] Detect and ban port scanners
+
+[portscan]
+enabled = true
+filter = portscan
+logpath = /var/log/syslog
+maxretry = 1
+findtime = 300
+bantime = 86400
+
+# ── Web Application Attacks ──────────────────────────────────────────────
+# [EDGE] Protect frontend
+
+[nginx-botsearch]
+enabled = true
+filter = nginx-botsearch
+logpath = /var/log/nginx/access.log
+maxretry = 3
+findtime = 300
+bantime = 7200
+
+# ── Generic Web Attacks ──────────────────────────────────────────────────
+# [EDGE] [AIOPS]
+
+[nginx-noscript]
+enabled = true
+filter = nginx-noscript
+logpath = /var/log/nginx/access.log
+maxretry = 3
+findtime = 300
+bantime = 3600
+
+# ── Malicious User-Agent Blocking ────────────────────────────────────────
+# [EDGE]
+
+[nginx-bad-request]
+enabled = true
+filter = nginx-bad-request
+logpath = /var/log/nginx/access.log
+maxretry = 1
+findtime = 60
+bantime = 86400
+
+# ── Postgres Authentication Failures ─────────────────────────────────────
+# [COREDB] Protect database
+
+[postgres]
+enabled = true
+filter = postgres
+logpath = /var/log/postgresql/postgresql-*.log
+maxretry = 5
+findtime = 300
+bantime = 7200
+
+# ── Redis Authentication Failures ────────────────────────────────────────
+# [COREDB]
+
+[redis]
+enabled = true
+filter = redis
+logpath = /var/log/redis/redis-server.log
+maxretry = 5
+findtime = 300
+bantime = 7200
+
+# ── Proxmox / Container Attacks ──────────────────────────────────────────
+# [ALL] Protect against container escape attempts
+
+[docker]
+enabled = true
+filter = docker
+logpath = /var/log/syslog
+maxretry = 3
+findtime = 300
+bantime = 3600

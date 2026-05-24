@@ -1,0 +1,81 @@
+# Wheeler AI Ops Platform - Port Baseline
+# Known-good listening ports for the ecosystem.
+# Generated: 2026-05-24
+# Format: <bind-address>:<port>  # <service description>
+#
+# This file is consumed by port-watchdog.sh for drift detection.
+# Add new expected listeners here before deploying new services.
+
+# === SSH (only expected 0.0.0.0 bind) ===
+0.0.0.0:22                       # SSH daemon (system)
+
+# === DNS ===
+127.0.0.53:53                    # systemd-resolved (stub listener)
+127.0.0.54:53                    # systemd-resolved (stub listener)
+
+# === Tailscale (IPv4 + IPv6) ===
+100.121.230.28:443               # Tailscale nginx
+100.121.230.28:3007              # Tailscale usesend
+100.121.230.28:33512             # Tailscale
+
+# === Core Monitoring Stack ===
+127.0.0.1:9090                   # aiops-prometheus (Prometheus)
+127.0.0.1:9091                   # hostinger-health-exporter
+127.0.0.1:9092                   # aiops-pushgateway
+127.0.0.1:9093                   # aiops-alertmanager (Alertmanager)
+127.0.0.1:3100                   # aiops-loki (Loki)
+127.0.0.1:3002                   # aiops-grafana (Grafana)
+127.0.0.1:3001                   # uptime-kuma / prediction-radar-uptime-kuma
+127.0.0.1:19999                  # netdata / netdata-backup
+127.0.0.1:3130                   # aiops-healthchecks
+
+# === AI / ML Services ===
+127.0.0.1:3000                   # open-webui
+127.0.0.1:7860                   # langflow
+127.0.0.1:8007                   # aiops-ravynai-app
+
+# === Temporal Workflow Engine ===
+127.0.0.1:7233                   # temporal-server
+127.0.0.1:8089                   # temporal-ui
+
+# === Databases ===
+127.0.0.1:5433                   # frgops-standby (PostgreSQL)
+127.0.0.1:5434                   # aiops-ravynai-postgres (PostGIS)
+127.0.0.1:6399                   # Redis (custom port)
+127.0.0.1:7474                   # ecosystem-graph (Neo4j HTTP)
+127.0.0.1:7687                   # ecosystem-graph (Neo4j Bolt)
+127.0.0.1:8123                   # aiops-clickhouse
+
+# === Application Services ===
+127.0.0.1:3010                   # docuseal
+127.0.0.1:8085                   # aiops-webhook-relay
+127.0.0.1:8088                   # aiops-superset
+127.0.0.1:8098                   # prediction-radar-app-web
+127.0.0.1:5000                   # aiops-changedetection
+127.0.0.1:3007                   # usesend
+
+# === Command & Control ===
+127.0.0.1:8003                   # command-center
+127.0.0.1:8095                   # ecosystem-guardian
+127.0.0.1:8100                   # war-room-server
+
+# === PM2 Agent Services ===
+127.0.0.1:4049                   # PM2 agent/hub
+127.0.0.1:8005                   # PM2 service
+127.0.0.1:8006                   # PM2 service
+127.0.0.1:8008                   # PM2 service
+127.0.0.1:8009                   # PM2 service
+127.0.0.1:8011                   # PM2 service
+127.0.0.1:8013                   # PM2 service
+127.0.0.1:8020                   # PM2 service
+127.0.0.1:8082                   # PM2 service
+127.0.0.1:8090                   # PM2 service
+127.0.0.1:8091                   # PM2 service
+127.0.0.1:8103                   # PM2 service
+127.0.0.1:8110                   # PM2 service
+
+# === Prometheus Node Exporter ===
+127.0.0.1:9100                   # node_exporter (system)
+
+# === Docker Engine Metrics ===
+127.0.0.1:9323                   # dockerd metrics

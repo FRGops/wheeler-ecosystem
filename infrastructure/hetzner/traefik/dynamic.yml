@@ -1,0 +1,195 @@
+# =============================================================================
+# Traefik Dynamic Configuration — TLS & Core Middlewares
+# =============================================================================
+# This file is hot-reloaded by Traefik's file provider. Changes here take
+# effect immediately without a restart.
+#
+# Contents:
+#   1. TLS options (modern security profile)
+#   2. Core middlewares (referenced by middleware.yml chains)
+#   3. HTTP→HTTPS redirect
+# =============================================================================
+
+# =============================================================================
+# TLS OPTIONS
+# =============================================================================
+# Modern TLS configuration based on Mozilla's recommendations:
+#   https://ssl-config.mozilla.org/
+#
+# We use the "intermediate" profile (not "modern") because:
+#   - Old clients (some IoT devices, old bots) still need TLS 1.2
+#   - Modern profile requires TLS 1.3 only, breaking some monitoring tools
+#   - The intermediate profile still scores A+ on SSL Labs
+#
+# The "modern" profile is available for admin endpoints where we control
+# the client (browsers via Tailscale).
+tls:
+  options:
+    # Default TLS options — applied to all secured routes
+    default:
+      minVersion: VersionTLS12
+      maxVersion: VersionTLS13
+      # Strong cipher suites only. No RC4, 3DES, or CBC ciphers.
+      cipherSuites:
+        - TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256
+        - TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256
+      curvePreferences:
+        - CurveP256
+        - CurveP384
+        - X25519
+      sniStrict: false
+      # Enable ALPN protocol negotiation (HTTP/2 support)
+      alpnProtocols:
+        - h2
+        - http/1.1
+
+    # Modern TLS — stricter, admin-only endpoints
+    modern:
+      minVersion: VersionTLS13
+      sniStrict: true
+      alpnProtocols:
+        - h2
+
+  # Default certificate from Let's Encrypt
+  certificates:
+    - certFile: /etc/traefik/acme/acme-staging.json
+      keyFile: /etc/traefik/acme/acme-staging.json
+
+# =============================================================================
+# CORE MIDDLEWARES
+# =============================================================================
+http:
+  middlewares:
+
+    # --- Rate Limiting ---
+    # Protects backend services from abuse. 100 requests/second per IP with
+    # a burst allowance of 50. The "clientIP" strategy means each unique IP
+    # gets its own bucket.
+    # WHY 100 req/s? Most of our APIs are AI-heavy (slow, <10 req/s expected).
+    # The 100/s limit provides DDoS protection without impairing legit traffic.
+    rate-limit:
+      rateLimit:
+        average: 100
+        burst: 50
+        period: 1s
+        sourceCriterion:
+          ipStrategy:
+            # Use the actual client IP, respecting X-Forwarded-For when
+            # behind Cloudflare (which sets this header).
+            depth: 1
+
+    # --- CrowdSec Bouncer (Placeholder) ---
+    # CrowdSec is a collaborative IPS. Once deployed, the bouncer middleware
+    # will check every request against CrowdSec's decision list.
+    # Until CrowdSec is deployed, this is a passthrough (no-op).
+    #
+    # Deployment steps when CrowdSec is ready:
+    #   1. Deploy crowdsec container with docker socket
+    #   2. Deploy crowdsec-bouncer-traefik container
+    #   3. Update this middleware to use the bouncer's forwardAuth
+    #
+    # Reference implementation:
+    #   https://hub.docker.com/r/crowdsecurity/crowdsec-bouncer-traefik
+    crowdsec-bouncer:
+      # Placeholder: replace with actual forwardAuth when CrowdSec is active
+      # forwardAuth:
+      #   address: "http://crowdsec-bouncer:8080/api/v1/forwardAuth"
+      #   trustForwardHeader: true
+      #   authResponseHeaders:
+      #     - X-CrowdSec-Remediation
+      # Placeholder passthrough (no-op)
+      chain:
+        middlewares:
+          - noop
+
+    # --- No-op Middleware (for placeholders) ---
+    noop:
+      ipWhiteList:
+        sourceRange:
+          - "0.0.0.0/0"
+          - "::/0"
+
+    # --- Security Headers ---
+    # Comprehensive security headers based on OWASP recommendations:
+    #   https://owasp.org/www-project-secure-headers/
+    #
+    # These headers tell browsers to enforce strict security policies.
+    # Without them, the app is vulnerable to XSS, clickjacking, MIME sniffing.
+    security-headers:
+      headers:
+        # HTTP Strict Transport Security (HSTS)
+        # Tells browsers to ONLY connect via HTTPS for 2 years.
+        # preload: allows submission to browser HSTS preload lists.
+        # includeSubDomains: protects all subdomains.
+        hstsMaxAge: 63072000          # 2 years in seconds
+        hstsIncludeSubDomains: true
+        hstsPreload: true
+
+        # Prevent clickjacking attacks by disallowing framing
+        frameDeny: true
+
+        # Prevent MIME type sniffing (browsers rendering executables as HTML)
+        contentTypeNosniff: true
+
+        # Referrer policy: only send origin for cross-origin requests
+        # Prevents leaking full URLs in the Referer header
+        referrerPolicy: "strict-origin-when-cross-origin"
+
+        # Content Security Policy — comprehensive default policy
+        #
+        # This is intentionally permissive (same-origin) as a base.
+        # Individual services should override with stricter policies where
+        # appropriate (e.g., Superset needs 'unsafe-inline' for its UI).
+        #
+        # CSP tuning process:
+        #   1. Set to report-only mode first
+        #   2. Monitor reports via dedicated endpoint
+        #   3. Tighten to enforced mode
+        contentSecurityPolicy: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https: ws:; frame-ancestors 'none'; form-action 'self'; base-uri 'self';"
+
+        # Permissions Policy (formerly Feature-Policy)
+        # Disables features that services don't need (camera, mic, geolocation)
+        permissionsPolicy: "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+
+        # Remove server info from headers
+        customServerHeaders: false
+        server: ""
+
+        # Custom headers for additional security
+        customResponseHeaders:
+          X-Content-Type-Options: "nosniff"
+          X-Robots-Tag: "noindex, nofollow"
+          X-Powered-By: ""                     # Remove this if present
+
+    # --- Response Compression ---
+    # Compress responses for supported content types. Reduces bandwidth by
+    # ~70% for text-based responses (HTML, JSON, CSS, JS).
+    # Images and videos are typically already compressed and are excluded.
+    compress:
+      compress:
+        excludedContentTypes:
+          - text/event-stream          # Don't compress SSE (streaming)
+          - image/png
+          - image/jpeg
+          - image/webp
+          - image/gif
+          - video/mp4
+          - video/webm
+          - application/octet-stream   # Binary downloads (already compressed)
+
+    # --- Basic Auth for staging/testing ---
+    basic-auth:
+      basicAuth:
+        users:
+          - "${TRAEFIK_ADMIN_USER}:${TRAEFIK_ADMIN_PASSWORD_HASH}"
+
+    # --- HTTP to HTTPS Redirect ---
+    redirect-https:
+      redirectScheme:
+        scheme: https
+        permanent: true
+        port: "443"

@@ -1,0 +1,267 @@
+# =============================================================================
+# Analytics Stack — Apache Superset + ClickHouse
+# =============================================================================
+# Provides an enterprise analytics platform with:
+#   - ClickHouse: Columnar OLAP database for fast aggregations
+#   - Superset: Web-based data exploration and dashboarding
+#
+# Architecture:
+#   Superset  →  ClickHouse (SQL queries via native TCP)
+#             →  Postgres (Superset metadata)
+#   ClickHouse  ←  Prediction Radar, RavynAI (data ingestion)
+#
+# WHY ClickHouse instead of Postgres for analytics:
+#   - 100-1000x faster for aggregation queries on large datasets
+#   - Columnar storage is ideal for time-series analytics
+#   - Superset's ClickHouse dialect supports all needed SQL features
+#   - Postgres is better for OLTP (transactions), ClickHouse for OLAP (analytics)
+#
+# Network: All services on analytics internal network.
+#   Superset attaches to traefik-public for web UI access.
+#   ClickHouse exposed to other stacks via analytics network.
+#
+# Service ports:
+#   - Superset:      8088 (Traefik-routed)
+#   - ClickHouse:    8123 (HTTP API, Tailscale access)
+#   - ClickHouse:    9000 (Native TCP, internal only)
+# =============================================================================
+
+services:
+  # ===========================================================================
+  # SUPERSET METADATA DATABASE
+  # ===========================================================================
+  # Superset requires a Postgres (or MySQL) database for its own metadata
+  # (dashboards, charts, users, permissions). This is separate from the
+  # analytics data stored in ClickHouse.
+  superset-db:
+    image: postgres:16-alpine
+    container_name: superset-db
+    restart: unless-stopped
+
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    environment:
+      POSTGRES_DB: "${SUPERSET_DB_NAME:-superset}"
+      POSTGRES_USER: "${SUPERSET_DB_USER:-superset}"
+      POSTGRES_PASSWORD: "${SUPERSET_DB_PASSWORD:?Must set SUPERSET_DB_PASSWORD}"
+      TZ: "${TZ:-UTC}"
+
+    volumes:
+      - superset-postgres:/var/lib/postgresql/data
+      - type: tmpfs
+        target: /var/lib/postgresql/data/pg_stat_tmp
+        tmpfs:
+          size: 64M
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SUPERSET_DB_USER:-superset} -d ${SUPERSET_DB_NAME:-superset}"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+    networks:
+      - analytics
+
+  # ===========================================================================
+  # CLICKHOUSE — Columnar OLAP Database
+  # ===========================================================================
+  # ClickHouse is configured for high-performance analytics. Key settings:
+  #   - Multiple query threads for parallel execution
+  #   - MergeTree table engine by default (balanced read/write performance)
+  #   - Compression enabled (LZ4 is fast, ZSTD for cold data)
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.12-alpine
+    container_name: clickhouse
+    restart: unless-stopped
+
+    deploy:
+      resources:
+        limits:
+          cpus: "4.0"
+          memory: 8G
+        reservations:
+          cpus: "1.0"
+          memory: 2G
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    environment:
+      # Default user/password for ClickHouse
+      CLICKHOUSE_DB: "${CLICKHOUSE_DB:-analytics}"
+      CLICKHOUSE_USER: "${CLICKHOUSE_USER:-analytics}"
+      CLICKHOUSE_PASSWORD: "${CLICKHOUSE_PASSWORD:?Must set CLICKHOUSE_PASSWORD}"
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+      TZ: "${TZ:-UTC}"
+
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - clickhouse-log:/var/log/clickhouse-server
+      # Custom config: enable all network interfaces (Docker-specific)
+      # Default ClickHouse config only binds to localhost.
+      # We replace with a config that binds to 0.0.0.0 (safe because
+      # Docker network isolation prevents external access).
+      # - ./clickhouse/config.xml:/etc/clickhouse-server/config.xml:ro
+      # - ./clickhouse/users.xml:/etc/clickhouse-server/users.xml:ro
+
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8123/ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+    networks:
+      - analytics
+
+    ports:
+      # HTTP API — exposed for Tailscale admin queries and external tools
+      - "127.0.0.1:8123:8123"
+      # Native TCP — for Superset and app connections (internal only via Docker network)
+      # Not bound to host — accessed via Docker DNS (clickhouse:9000)
+
+  # ===========================================================================
+  # SUPERSET — Web-based Data Exploration Platform
+  # ===========================================================================
+  # Uses the official Apache Superset image. Initialize with:
+  #   docker compose -f analytics.yml run superset superset-init
+  #
+  # First-time setup:
+  #   1. Deploy the stack
+  #   2. Run: docker compose -f analytics.yml exec superset superset fab create-admin \
+  #           --username admin --firstname Admin --lastname User \
+  #           --email admin@wheeler.ai --password <strong-password>
+  #   3. Run: docker compose -f analytics.yml exec superset superset init
+  #   4. Log in at https://superset.wheeler.ai
+  #   5. Add ClickHouse database connection:
+  #      - Host: clickhouse
+  #      - Port: 8123
+  #      - Database: analytics
+  #      - Username: analytics
+  #      - Password: <from .env>
+  superset:
+    image: apache/superset:4.1.1
+    container_name: superset
+    restart: unless-stopped
+
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 4G
+        reservations:
+          cpus: "0.5"
+          memory: 1G
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    environment:
+      # Superset metadata database
+      SUPERSET_SECRET_KEY: "${SUPERSET_SECRET_KEY:?Must set SUPERSET_SECRET_KEY}"
+      SQLALCHEMY_DATABASE_URI: "postgresql+psycopg2://${SUPERSET_DB_USER:-superset}:${SUPERSET_DB_PASSWORD}@superset-db:5432/${SUPERSET_DB_NAME:-superset}"
+      SUPERSET_ENV: "${ENVIRONMENT:-production}"
+      SUPERSET_LOAD_EXAMPLES: "${SUPERSET_LOAD_EXAMPLES:-no}"
+      # Flask config
+      FLASK_ENV: "${ENVIRONMENT:-production}"
+      PYTHONPATH: "/app/pythonpath"
+      TZ: "${TZ:-UTC}"
+      # Enable ClickHouse support via SQLAlchemy dialect
+      # The clickhouse-connect library is pre-installed in newer Superset images.
+      # If not available, install via: pip install clickhouse-connect
+      SUPERSET_DATABASE_URI: "postgresql+psycopg2://${SUPERSET_DB_USER:-superset}:${SUPERSET_DB_PASSWORD}@superset-db:5432/${SUPERSET_DB_NAME:-superset}"
+
+    depends_on:
+      superset-db:
+        condition: service_healthy
+      clickhouse:
+        condition: service_started  # ClickHouse is a data source, not required for Superset to start
+
+    # Custom entrypoint to initialize database on first run
+    # The official image's entrypoint handles DB upgrade automatically.
+    command:
+      - "gunicorn"
+      - "--worker-class=gthread"
+      - "--workers=4"
+      - "--threads=8"
+      - "--timeout=120"
+      - "--bind=0.0.0.0:8088"
+      - "--max-requests=1000"
+      - "--max-requests-jitter=100"
+      - "superset.app:create_app()"
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s  # Superset can be slow to start on first run
+
+    networks:
+      - analytics
+      - traefik-public
+
+    labels:
+      - "traefik.enable=true"
+
+      # Superset Web UI
+      - "traefik.http.routers.superset.rule=Host(`superset.wheeler.ai`)"
+      - "traefik.http.routers.superset.entrypoints=websecure"
+      - "traefik.http.routers.superset.tls=true"
+      - "traefik.http.routers.superset.tls.certresolver=letsencrypt-staging"
+      - "traefik.http.routers.superset.middlewares=chain-public@file"
+      - "traefik.http.services.superset.loadbalancer.server.port=8088"
+      - "traefik.http.services.superset.loadbalancer.healthCheck.path=/health"
+      - "traefik.http.services.superset.loadbalancer.healthCheck.interval=30s"
+
+      # Stripe prefix for WebSocket connections (Superset uses WebSocket for
+      # long-running queries — NOT a real WebSocket, just long-polling, but
+      # we keep this as a good practice).
+      - "traefik.http.middlewares.superset-strip.stripprefix.prefixes=/superset"
+
+# =============================================================================
+# VOLUMES
+# =============================================================================
+volumes:
+  superset-postgres:
+    name: superset-postgres
+  clickhouse-data:
+    name: clickhouse-data
+  clickhouse-log:
+    name: clickhouse-log
+
+# =============================================================================
+# NETWORKS
+# =============================================================================
+networks:
+  analytics:
+    external: true
+    name: analytics
+  traefik-public:
+    external: true
+    name: traefik-public

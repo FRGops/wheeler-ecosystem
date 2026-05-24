@@ -1,0 +1,235 @@
+# =============================================================================
+# Repo Router - Prometheus Scrape Config Template
+# Source: templates/monitoring/prometheus.yml
+# Description: Prometheus configuration with job definitions for Docker
+#              containers, PM2 processes, node_exporter, and application metrics.
+# =============================================================================
+
+global:
+  scrape_interval:     15s
+  evaluation_interval: 15s
+  scrape_timeout:      10s
+
+  external_labels:
+    monitor: "wheeler-repo-router"
+    environment: "${ENVIRONMENT:-production}"
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - "${ALERTMANAGER_HOST:-127.0.0.1}:${ALERTMANAGER_PORT:-9093}"
+      timeout: 5s
+
+# Rule files
+rule_files:
+  - "/etc/prometheus/rules/*.yml"
+
+# Scrape configurations
+scrape_configs:
+
+  # ---------------------------------------------------------------------------
+  # Prometheus self-monitoring
+  # ---------------------------------------------------------------------------
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+        labels:
+          node: "${NODE_TYPE:-unknown}"
+          service: "monitoring"
+
+  # ---------------------------------------------------------------------------
+  # Node exporter - system metrics from every node
+  # ---------------------------------------------------------------------------
+  - job_name: "node_exporter"
+    scrape_interval: 30s
+    scrape_timeout: 5s
+    static_configs:
+      - targets:
+          - "${AIOPS_HOST:-127.0.0.1}:9100"
+          - "${HOSTINGER_HOST:-127.0.0.1}:9100"
+          - "${COREDB_HOST:-127.0.0.1}:9100"
+        labels:
+          job: "node_exporter"
+    relabel_configs:
+      - source_labels: ["__address__"]
+        regex: ".*:9100"
+        target_label: "node"
+        replacement: "${1}"
+      - source_labels: ["__address__"]
+        regex: "(.+):9100"
+        target_label: "instance"
+        replacement: "${1}"
+
+  # ---------------------------------------------------------------------------
+  # Docker daemon and container metrics via cadvisor or docker socket
+  # ---------------------------------------------------------------------------
+  - job_name: "docker"
+    scrape_interval: 30s
+    docker_sd_configs:
+      - host: "unix:///var/run/docker.sock"
+        host_networking_host: "${DOCKER_HOST:-localhost}"
+        refresh_interval: 30s
+        filters:
+          - name: "label"
+            values: ["monitoring.enabled=true"]
+    relabel_configs:
+      - source_labels: ["__meta_docker_container_name"]
+        regex: "/(.*)"
+        target_label: "container"
+      - source_labels: ["__meta_docker_container_label_monitoring_service"]
+        regex: "(.+)"
+        target_label: "service"
+      - source_labels: ["__meta_docker_container_label_compose_project"]
+        regex: "(.+)"
+        target_label: "project"
+
+  # ---------------------------------------------------------------------------
+  # cadvisor - detailed container resource metrics
+  # ---------------------------------------------------------------------------
+  - job_name: "cadvisor"
+    scrape_interval: 30s
+    static_configs:
+      - targets:
+          - "${CADVISOR_HOST:-127.0.0.1}:${CADVISOR_PORT:-8080}"
+        labels:
+          service: "cadvisor"
+
+  # ---------------------------------------------------------------------------
+  # PM2 process metrics via pm2-prometheus-exporter or custom endpoint
+  # ---------------------------------------------------------------------------
+  - job_name: "pm2"
+    scrape_interval: 30s
+    scrape_timeout: 5s
+    static_configs:
+      - targets:
+          - "${AIOPS_HOST:-127.0.0.1}:${PM2_METRICS_PORT:-9200}"
+          - "${HOSTINGER_HOST:-127.0.0.1}:${PM2_METRICS_PORT:-9200}"
+        labels:
+          service: "pm2"
+          job: "pm2_processes"
+    metrics_path: "/metrics"
+
+  # ---------------------------------------------------------------------------
+  # Application-specific metrics endpoints
+  # ---------------------------------------------------------------------------
+  - job_name: "frgcrm"
+    scrape_interval: 15s
+    metrics_path: "/metrics"
+    static_configs:
+      - targets:
+          - "127.0.0.1:3301"
+        labels:
+          app: "frgcrm"
+          service: "api"
+          node: "hostinger"
+
+  - job_name: "surplusai"
+    scrape_interval: 15s
+    metrics_path: "/metrics"
+    static_configs:
+      - targets:
+          - "127.0.0.1:3600"
+        labels:
+          app: "surplusai"
+          service: "api"
+          node: "aiops"
+
+  - job_name: "private-ai"
+    scrape_interval: 15s
+    metrics_path: "/metrics"
+    static_configs:
+      - targets:
+          - "127.0.0.1:3700"
+        labels:
+          app: "private-ai"
+          service: "api"
+          node: "aiops"
+
+  - job_name: "prediction-radar"
+    scrape_interval: 15s
+    metrics_path: "/metrics"
+    static_configs:
+      - targets:
+          - "127.0.0.1:3800"
+        labels:
+          app: "prediction-radar"
+          service: "api"
+          node: "aiops"
+
+  - job_name: "revenue-automation"
+    scrape_interval: 15s
+    metrics_path: "/metrics"
+    static_configs:
+      - targets:
+          - "127.0.0.1:3500"
+        labels:
+          app: "revenue-automation"
+          service: "api"
+          node: "hostinger"
+
+  # ---------------------------------------------------------------------------
+  # Nginx metrics
+  # ---------------------------------------------------------------------------
+  - job_name: "nginx"
+    scrape_interval: 30s
+    metrics_path: "/nginx_status"
+    static_configs:
+      - targets:
+          - "${AIOPS_HOST:-127.0.0.1}:${NGINX_METRICS_PORT:-8080}"
+          - "${HOSTINGER_HOST:-127.0.0.1}:${NGINX_METRICS_PORT:-8080}"
+        labels:
+          service: "nginx"
+          job: "nginx_status"
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL metrics
+  # ---------------------------------------------------------------------------
+  - job_name: "postgres"
+    scrape_interval: 30s
+    static_configs:
+      - targets:
+          - "${COREDB_HOST:-127.0.0.1}:${PG_METRICS_PORT:-9187}"
+        labels:
+          service: "postgres"
+          node: "coredb"
+
+  # ---------------------------------------------------------------------------
+  # Redis metrics
+  # ---------------------------------------------------------------------------
+  - job_name: "redis"
+    scrape_interval: 30s
+    static_configs:
+      - targets:
+          - "${REDIS_HOST:-127.0.0.1}:${REDIS_METRICS_PORT:-9121}"
+        labels:
+          service: "redis"
+
+  # ---------------------------------------------------------------------------
+  # Tailscale metrics (if applicable)
+  # ---------------------------------------------------------------------------
+  - job_name: "tailscale"
+    scrape_interval: 60s
+    metrics_path: "/metrics"
+    static_configs:
+      - targets:
+          - "100.100.100.100:9090"  # Tailscale local metrics
+        labels:
+          service: "tailscale"
+          network: "tailnet"
+
+# ---------------------------------------------------------------------------
+# Remote write configuration (if using long-term storage)
+# ---------------------------------------------------------------------------
+remote_write:
+  - url: "${REMOTE_WRITE_URL:-http://127.0.0.1:9090/api/v1/write}"
+    queue_config:
+      max_samples_per_send: 1000
+      max_shards: 10
+      min_shards: 1
+      capacity: 5000
+    write_relabel_configs:
+      - source_labels: ["__name__"]
+        regex: "up|down|scrape_.*"
+        action: "keep"

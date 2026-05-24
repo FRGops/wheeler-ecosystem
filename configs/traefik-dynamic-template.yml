@@ -1,0 +1,296 @@
+# =============================================================================
+# TEMPLATE — DO NOT APPLY WITHOUT REVIEW
+# =============================================================================
+# Traefik dynamic configuration template for Wheeler ecosystem 3-server cutover.
+#
+# This file models HTTP routers, middlewares, and services for all six
+# revenue-critical domains. It is intended as a reference for either:
+#   (a) the Traefik instance on the EDGE node (Hostinger), or
+#   (b) the Traefik instance on the AIOPS node (Hetzner).
+#
+# Before applying:
+#   1. Replace every {{VAR}} with the actual value.
+#   2. Validate:  traefik --configFile=this-file.yml --dryRun
+#   3. Apply during a low-traffic window.
+#   4. Keep the old config backed up for instant rollback.
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# SECTION 1 — MIDDLEWARES
+# Reusable middleware chains shared across multiple routers.
+# ---------------------------------------------------------------------------
+http:
+  middlewares:
+
+    # --- Rate Limiting -------------------------------------------------------
+    # Allow bursts but cap the average rate. Tune per domain based on real
+    # traffic data.  Values below are conservative starting points.
+    ratelimit-public:
+      rateLimit:
+        average: 100
+        burst: 200
+
+    ratelimit-api:                           # Stricter for prediction / AI APIs
+      rateLimit:
+        average: 30
+        burst: 60
+
+    # --- Security Headers ----------------------------------------------------
+    # Strip version info, enforce HSTS, prevent MIME sniffing and embedding.
+    security-headers:
+      headers:
+        frameDeny: true
+        contentTypeNosniff: true
+        browserXssFilter: true
+        referrerPolicy: "strict-origin-when-cross-origin"
+        customFrameOptionsValue: "DENY"
+        stsSeconds: 63072000
+        stsIncludeSubdomains: true
+        stsPreload: true
+        forceSTSHeader: true
+        customResponseHeaders:
+          X-Robots-Tag: "noindex, nofollow"
+
+    # --- Circuit Breaker -----------------------------------------------------
+    # If ≥ 50 % of requests error over the observation period, Trip the breaker
+    # for the recovery duration.  Requires Traefik >= 2.x with the
+    # circuitbreaker plugin or built-in expression (Traefik v3).
+    # NOTE: Traefik v2 built-in circuit breaker uses expressions on the router.
+    # For plugin-based breakers, uncomment the plugin block below.
+    # circuit-breaker:
+    #   plugin:
+    #     circuitbreaker:
+    #       expression: "NetworkErrorRatio() > 0.50"
+    #       checkPeriod: "10s"
+    #       fallbackDuration: "30s"
+    #       recoveryDuration: "60s"
+    #       responseCode: 503
+
+    # --- Retry (optimistic) --------------------------------------------------
+    # Retry idempotent GETs on network errors or 5xx before giving the user a
+    # failure page.
+    retry-backend:
+      retry:
+        attempts: 3
+        initialInterval: "100ms"
+
+    # --- Compression ---------------------------------------------------------
+    # Gzip / Brotli for text-heavy responses. Saves bandwidth on the Tailscale
+    # link between EDGE and AIOPS.
+    compress:
+      compress:
+        excludedContentTypes:
+          - "application/grpc"
+
+    # --- Strip Prefix (for path-based routing) -------------------------------
+    # strip-api-prefix:
+    #   stripPrefix:
+    #     prefixes:
+    #       - "/api"
+
+# ---------------------------------------------------------------------------
+# SECTION 2 — SERVICES
+# Each service points to one or more upstream servers. Health checks ensure
+# traffic is only sent to healthy backends.
+# ---------------------------------------------------------------------------
+  services:
+
+    # -----------------------------------------------------------------------
+    # fundsrecoverygroup.com — static + API
+    # -----------------------------------------------------------------------
+    srv-fundsrecoverygroup:
+      loadBalancer:
+        servers:
+          - url: "http://{{AIOPS_TAILSCALE_IP}}:{{PORT_FRG}}"
+        healthCheck:
+          path: "/health"
+          interval: "10s"
+          timeout: "3s"
+        sticky:
+          cookie:
+            name: "frg_srv"
+            httpOnly: true
+            secure: true
+        passHostHeader: true
+
+    # -----------------------------------------------------------------------
+    # predictionradar.app — FastAPI backend
+    # -----------------------------------------------------------------------
+    srv-predictionradar:
+      loadBalancer:
+        servers:
+          - url: "http://{{AIOPS_TAILSCALE_IP}}:{{PORT_PRADAR}}"
+        healthCheck:
+          path: "/healthz"
+          interval: "10s"
+          timeout: "3s"
+        sticky:
+          cookie:
+            name: "pradar_srv"
+            httpOnly: true
+            secure: true
+        passHostHeader: true
+
+    # -----------------------------------------------------------------------
+    # surplusai.io — AI inference
+    # -----------------------------------------------------------------------
+    srv-surplusai:
+      loadBalancer:
+        servers:
+          - url: "http://{{AIOPS_TAILSCALE_IP}}:{{PORT_SURPLUSAI}}"
+        healthCheck:
+          path: "/health"
+          interval: "10s"
+          timeout: "5s"                     # AI inference may be slower
+        sticky:
+          cookie:
+            name: "surplusai_srv"
+            httpOnly: true
+            secure: true
+        passHostHeader: true
+
+    # -----------------------------------------------------------------------
+    # frgops.fundsrecoverygroup.tech — ops dashboard (local to EDGE)
+    # -----------------------------------------------------------------------
+    srv-frgops-tech:
+      loadBalancer:
+        servers:
+          - url: "http://{{EDGE_LOCALHOST}}:{{PORT_FRGOPS}}"
+        healthCheck:
+          path: "/health"
+          interval: "10s"
+          timeout: "3s"
+        passHostHeader: true
+
+    # -----------------------------------------------------------------------
+    # radar.fundsrecoverygroup.tech — radar subdomain
+    # -----------------------------------------------------------------------
+    srv-radar-frg-tech:
+      loadBalancer:
+        servers:
+          - url: "http://{{AIOPS_TAILSCALE_IP}}:{{PORT_RADAR_FRG}}"
+        healthCheck:
+          path: "/health"
+          interval: "10s"
+          timeout: "3s"
+        passHostHeader: true
+
+    # -----------------------------------------------------------------------
+    # wheeler.frgop.io — main Wheeler app
+    # -----------------------------------------------------------------------
+    srv-wheeler-frgop-io:
+      loadBalancer:
+        servers:
+          - url: "http://{{AIOPS_TAILSCALE_IP}}:{{PORT_WHEELER}}"
+        healthCheck:
+          path: "/health"
+          interval: "10s"
+          timeout: "3s"
+        passHostHeader: true
+
+# ---------------------------------------------------------------------------
+# SECTION 3 — ROUTERS
+# Each router binds a Host() rule to one or more middlewares and a service.
+# TLS termination is assumed to already be configured on the EDGE entry point.
+# ---------------------------------------------------------------------------
+  routers:
+
+    # --- fundsrecoverygroup.com ----------------------------------------------
+    router-frg:
+      rule: "Host(`fundsrecoverygroup.com`) || Host(`www.fundsrecoverygroup.com`)"
+      entryPoints:
+        - websecure                         # HTTPS only (web→websecure redirect
+                                            # handled by a catch-all router)
+      middlewares:
+        - security-headers
+        - compress
+        - ratelimit-public
+        - retry-backend
+      service: srv-fundsrecoverygroup
+      priority: 100
+      tls: {}                              # Let the entry point serve the cert
+
+    # --- predictionradar.app -------------------------------------------------
+    router-predictionradar:
+      rule: "Host(`predictionradar.app`) || Host(`www.predictionradar.app`)"
+      entryPoints:
+        - websecure
+      middlewares:
+        - security-headers
+        - compress
+        - ratelimit-api                    # Tighter rate limit for API traffic
+        - retry-backend
+      service: srv-predictionradar
+      priority: 100
+      tls: {}
+
+    # --- surplusai.io --------------------------------------------------------
+    router-surplusai:
+      rule: "Host(`surplusai.io`) || Host(`www.surplusai.io`)"
+      entryPoints:
+        - websecure
+      middlewares:
+        - security-headers
+        - compress
+        - ratelimit-api
+        - retry-backend
+      service: srv-surplusai
+      priority: 100
+      tls: {}
+
+    # --- frgops.fundsrecoverygroup.tech -------------------------------------
+    router-frgops-tech:
+      rule: "Host(`frgops.fundsrecoverygroup.tech`)"
+      entryPoints:
+        - websecure
+      middlewares:
+        - security-headers
+        - compress
+        - ratelimit-public
+        - retry-backend
+      service: srv-frgops-tech
+      priority: 100
+      tls: {}
+
+    # --- radar.fundsrecoverygroup.tech --------------------------------------
+    router-radar-frg-tech:
+      rule: "Host(`radar.fundsrecoverygroup.tech`)"
+      entryPoints:
+        - websecure
+      middlewares:
+        - security-headers
+        - compress
+        - ratelimit-api
+        - retry-backend
+      service: srv-radar-frg-tech
+      priority: 100
+      tls: {}
+
+    # --- wheeler.frgop.io ----------------------------------------------------
+    router-wheeler-frgop-io:
+      rule: "Host(`wheeler.frgop.io`)"
+      entryPoints:
+        - websecure
+      middlewares:
+        - security-headers
+        - compress
+        - ratelimit-public
+        - retry-backend
+      service: srv-wheeler-frgop-io
+      priority: 100
+      tls: {}
+
+# ---------------------------------------------------------------------------
+# TEMPLATE VARIABLES — replace before applying
+# ---------------------------------------------------------------------------
+#
+# {{AIOPS_TAILSCALE_IP}}   = 100.121.230.28
+# {{EDGE_LOCALHOST}}       = 127.0.0.1
+#
+# {{PORT_FRG}}             = Port for fundsrecoverygroup.com backend
+# {{PORT_PRADAR}}          = 8098 (confirmed from current Traefik config)
+# {{PORT_SURPLUSAI}}       = Port for surplusai.io backend
+# {{PORT_FRGOPS}}          = 3000 (confirmed from current Traefik config)
+# {{PORT_RADAR_FRG}}       = Port for radar.fundsrecoverygroup.tech
+# {{PORT_WHEELER}}         = Port for wheeler.frgop.io
+# =============================================================================

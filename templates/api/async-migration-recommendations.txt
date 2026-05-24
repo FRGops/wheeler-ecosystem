@@ -1,0 +1,334 @@
+# Async Migration Recommendations for Blocking Endpoints
+# Generated: 2026-05-23
+# Target: FRG CRM API (FastAPI + SQLAlchemy sync -> async)
+
+# ============================================================================
+# CURRENT STATE: Synchronous Database Access
+# ============================================================================
+# The FRG CRM API at /opt/wheeler/apps/frgcrm/api uses synchronous SQLAlchemy:
+#   - engine = create_engine(DATABASE_URL, ...)  # Synchronous engine
+#   - def get_db(): yield db; db.commit()        # Synchronous generator
+#   - All routes: db: Session = Depends(get_db)  # Synchronous dependency
+#
+# FastAPI runs sync endpoints in a thread pool (default 40 threads).
+# Under load, all 40 threads can block on DB I/O, causing request queuing.
+
+# ============================================================================
+# PHASE 1: DUAL-RUNNING (Week 1-2)
+# ============================================================================
+# Create async engine alongside sync engine. No route changes yet.
+
+STEP_1_INSTALL_DEPENDENCIES = """
+pip install asyncpg sqlalchemy[asyncio] aioredis
+"""
+
+STEP_2_CREATE_ASYNC_DATABASE_MODULE = """
+# /opt/wheeler/apps/frgcrm/api/database_async.py
+import os
+import time
+import logging
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy import event, text
+from dotenv import load_dotenv
+
+load_dotenv()
+logger = logging.getLogger(__name__)
+
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql://frgops@127.0.0.1:5433/frgcrm"
+)
+
+# Convert sync URL to async URL (postgresql:// -> postgresql+asyncpg://)
+# Or read from DATABASE_URL_ASYNC env var directly
+DATABASE_URL_ASYNC = os.getenv(
+    "DATABASE_URL_ASYNC",
+    DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
+    if DATABASE_URL.startswith("postgresql://")
+    else f"postgresql+asyncpg://frgops@127.0.0.1:5433/frgcrm"
+)
+
+async_engine = create_async_engine(
+    DATABASE_URL_ASYNC,
+    pool_size=10,
+    max_overflow=20,
+    pool_recycle=3600,
+    pool_pre_ping=True,
+    pool_timeout=10,
+    echo_pool=False,
+    connect_args={
+        "timeout": 10,
+        "command_timeout": 10,
+        "server_settings": {
+            "statement_timeout": "10000",
+            "idle_in_transaction_session_timeout": "30000",
+        },
+    },
+)
+
+AsyncSessionLocal = async_sessionmaker(
+    async_engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+    autoflush=False,
+)
+
+async def get_async_db():
+    \"\"\"Async database session dependency.\"\"\"
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+
+async def check_async_db_health():
+    \"\"\"Health check for async engine.\"\"\"
+    try:
+        async with async_engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+        return True
+    except Exception as e:
+        logger.error(f"Async DB health check failed: {e}")
+        return False
+"""
+
+STEP_3_ADD_DUAL_HEALTH_CHECK = """
+# In main.py, add async DB health check alongside sync:
+@app.get("/api/health")
+async def health():
+    db_ok = True
+    async_db_ok = False
+    try:
+        from database_async import check_async_db_health
+        async_db_ok = await check_async_db_health()
+    except ImportError:
+        async_db_ok = None  # Not yet deployed
+
+    return {
+        "status": "ok" if db_ok else "degraded",
+        "database": "ok" if db_ok else "error",
+        "database_async": "ok" if async_db_ok else ("pending" if async_db_ok is None else "error"),
+        "version": "1.0.0",
+    }
+"""
+
+# ============================================================================
+# PHASE 2: MIGRATE READ ENDPOINTS (Week 2-3)
+# ============================================================================
+# Migrate high-traffic GET endpoints first. These are the safest to migrate.
+
+ASYNC_ROUTE_PATTERN = """
+# BEFORE (sync):
+from database import get_db
+from sqlalchemy.orm import Session
+
+@router.get("/api/cases")
+def list_cases(
+    stage: Optional[str] = None,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+):
+    query = db.query(Case)
+    if stage:
+        query = query.filter(Case.stage == stage)
+    return query.limit(limit).all()
+
+
+# AFTER (async):
+from database_async import get_async_db
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+
+@router.get("/api/cases")
+async def list_cases(
+    stage: Optional[str] = None,
+    limit: int = 50,
+    db: AsyncSession = Depends(get_async_db),
+):
+    query = select(Case)
+    if stage:
+        query = query.where(Case.stage == stage)
+    result = await db.execute(query.limit(limit))
+    return result.scalars().all()
+"""
+
+MIGRATION_PRIORITY_READ = [
+    # High traffic, simple SELECT queries
+    ("GET /api/cases",                    "High", "Heavily polled by agent-svc"),
+    ("GET /api/dashboard/stats",          "High", "Dashboard aggregation"),
+    ("GET /api/pipeline/stats",           "High", "Pipeline overview"),
+    ("GET /api/contacts",                 "High", "Contact listing"),
+    ("GET /api/attorney/prospects",       "Medium", "Attorney matching"),
+    ("GET /api/leads",                    "Medium", "Lead browsing"),
+    ("GET /api/tasks",                    "Medium", "Task listing"),
+    ("GET /api/reports",                  "Low", "Periodic reports"),
+    ("GET /api/notes",                    "Low", "Infrequent reads"),
+    ("GET /api/calendar",                 "Low", "Calendar views"),
+]
+
+# ============================================================================
+# PHASE 3: MIGRATE WRITE ENDPOINTS (Week 3-4)
+# ============================================================================
+
+ASYNC_WRITE_PATTERN = """
+# BEFORE (sync):
+@router.post("/api/cases")
+def create_case(
+    case_data: CaseCreate,
+    db: Session = Depends(get_db),
+):
+    case = Case(**case_data.dict())
+    db.add(case)
+    db.commit()
+    db.refresh(case)
+    return case
+
+
+# AFTER (async):
+@router.post("/api/cases")
+async def create_case(
+    case_data: CaseCreate,
+    db: AsyncSession = Depends(get_async_db),
+):
+    case = Case(**case_data.model_dump())
+    db.add(case)
+    await db.commit()
+    await db.refresh(case)
+    return case
+"""
+
+MIGRATION_PRIORITY_WRITE = [
+    ("POST /api/cases",                   "High", "Core business operation"),
+    ("PUT /api/cases/{id}",               "High", "Stage transitions"),
+    ("POST /api/contacts",                "High", "Contact creation"),
+    ("POST /api/surplusai/pipeline/promote", "High", "Pipeline automation"),
+    ("POST /api/notes",                   "Medium", "Note creation"),
+    ("DELETE /api/cases/{id}",            "Low", "Rare operation"),
+]
+
+# ============================================================================
+# PHASE 4: ASYNC MIDDLEWARE (Week 3-4)
+# ============================================================================
+
+ASYNC_MIDDLEWARE_MIGRATION = """
+# Current middleware stack (all synchronous BaseHTTPMiddleware):
+# - RequireAuthMiddleware
+# - RateLimitMiddleware
+# - AuditLogMiddleware
+# - SecurityHeadersMiddleware
+# - RequestIDMiddleware
+# - MetricsMiddleware
+
+# For async routes, use pure ASGI middleware instead of BaseHTTPMiddleware:
+from starlette.middleware.base import BaseHTTPMiddleware
+
+# BaseHTTPMiddleware works with async endpoints but has performance overhead.
+# For high-traffic middleware, use raw ASGI:
+
+class AsyncRateLimitMiddleware:
+    \"\"\"Pure ASGI rate limiter — faster than BaseHTTPMiddleware for async.\"\"\"
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        # Async rate limit check using Redis
+        key = f"ratelimit:{scope.get('client', ('unknown', 0))[0]}"
+        # ... check and enforce ...
+
+        await self.app(scope, receive, send)
+"""
+
+# ============================================================================
+# PHASE 5: REMOVE SYNC ENGINE (Week 5-6)
+# ============================================================================
+
+CLEANUP_CHECKLIST = """
+1. [ ] All routes migrated to get_async_db
+2. [ ] All middleware compatible with async
+3. [ ] APScheduler tasks using async session
+4. [ ] Webhook handlers using async session
+5. [ ] Integration tests pass with async engine
+6. [ ] Performance benchmarks show improvement
+7. [ ] Remove sync engine and get_db from database.py
+8. [ ] Update start.sh to remove sync-only dependencies notice
+"""
+
+# ============================================================================
+# EXPRESS AGENT-SVC: ALREADY ASYNC
+# ============================================================================
+# The agent-svc Express services already use async/await correctly.
+# Recommendations:
+
+EXPRESS_ASYNC_IMPROVEMENTS = """
+1. Use Promise pool for concurrent agent runs (p-limit or similar):
+   import pLimit from 'p-limit';
+   const limit = pLimit(3);  // Max 3 concurrent agent runs
+   const results = await Promise.all(agents.map(a => limit(() => a.run())));
+
+2. Add request timeout wrapper for all external API calls:
+   async function fetchWithTimeout(url, options = {}, timeoutMs = 30000) {
+     const controller = new AbortController();
+     const timer = setTimeout(() => controller.abort(), timeoutMs);
+     try {
+       const response = await fetch(url, { ...options, signal: controller.signal });
+       return response;
+     } finally {
+       clearTimeout(timer);
+     }
+   }
+
+3. Use streaming responses for long-running agent operations:
+   app.post('/agents/case-scorer/run', async (req, res) => {
+     res.setHeader('Content-Type', 'text/event-stream');
+     res.setHeader('Cache-Control', 'no-cache');
+     res.setHeader('Connection', 'keep-alive');
+
+     const agent = new CaseScorerAgent();
+     for await (const result of agent.runStreaming()) {
+       res.write(`data: ${JSON.stringify(result)}\\n\\n`);
+     }
+     res.write('data: [DONE]\\n\\n');
+     res.end();
+   });
+"""
+
+# ============================================================================
+# COUNTY ADAPTERS: WRAP BLOCKING CALLS
+# ============================================================================
+
+COUNTY_ADAPTER_ASYNC = """
+# Current: subprocess.run("pdftotext") and subprocess.run("ocrmypdf") block.
+# Wrap these in asyncio.to_thread() or run_in_executor:
+
+import asyncio
+import subprocess
+
+async def ocr_pdf_async(filepath: Path) -> Optional[str]:
+    \"\"\"Non-blocking OCR using subprocess in executor.\"\"\"
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(
+        None,  # Use default ThreadPoolExecutor
+        _ocr_pdf_sync,
+        filepath,
+    )
+
+def _ocr_pdf_sync(filepath: Path) -> Optional[str]:
+    \"\"\"Synchronous OCR implementation.\"\"\"
+    # ... existing ocr_pdf logic using subprocess.run ...
+    pass
+
+# For requests-based HTTP calls:
+import httpx  # Already async-capable, replace requests
+
+async def download_pdf_async(url: str) -> bytes:
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        response = await client.get(url)
+        response.raise_for_status()
+        return response.content
+"""

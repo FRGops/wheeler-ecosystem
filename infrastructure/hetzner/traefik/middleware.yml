@@ -1,0 +1,182 @@
+# =============================================================================
+# Traefik Middleware Chains
+# =============================================================================
+# Middleware chains compose individual middlewares into reusable pipeline stages.
+# These chains are referenced in container labels via the `middlewares` attribute.
+#
+# Chain types:
+#   chain-public:  For public-facing HTTP/HTTPS routes
+#   chain-admin:   For admin/dashboard endpoints (Tailscale-restricted)
+#   chain-internal: For backend-to-backend communication
+#   chain-api:     For API endpoints (stricter rate limit)
+# =============================================================================
+
+http:
+  middlewares:
+
+    # =========================================================================
+    # chain-public
+    # =========================================================================
+    # Applied to all publicly-routed services (e.g., predictionradar.wheeler.ai).
+    # Includes: rate limiting, security headers, and compression.
+    #
+    # NOT included here:
+    #   - crowdsec-bouncer: Add when CrowdSec is deployed (see dynamic.yml notes)
+    #   - IP whitelist: Public = open to all
+    #
+    # Usage in container labels:
+    #   traefik.http.routers.myapp.middlewares=chain-public@file
+    chain-public:
+      chain:
+        middlewares:
+          - rate-limit@file
+          - security-headers@file
+          - compress@file
+
+    # =========================================================================
+    # chain-admin
+    # =========================================================================
+    # Applied to admin dashboards (Grafana, Portainer, etc.) that should only
+    # be accessible via Tailscale. Adds IP whitelisting restricting to the
+    # Tailscale CGNAT range (100.64.0.0/10) and Docker internal networks.
+    #
+    # WHY include rate-limit?
+    #   Admin interfaces are high-value targets. Rate limiting prevents
+    #   brute-force attacks on login pages even from Tailscale.
+    #
+    # Usage in container labels:
+    #   traefik.http.routers.grafana.middlewares=chain-admin@file
+    chain-admin:
+      chain:
+        middlewares:
+          - rate-limit@file
+          - security-headers@file
+          - compress@file
+          - ip-whitelist-tailscale@file
+
+    # =========================================================================
+    # chain-internal
+    # =========================================================================
+    # Lighter chain for container-to-container communication within the Docker
+    # network. No rate limiting (internal traffic, trusted sources), no IP
+    # restrictions. Only security headers and compression.
+    #
+    # Usage: Applied when containers communicate via Traefik internally.
+    #   traefik.http.routers.myapp-internal.middlewares=chain-internal@file
+    chain-internal:
+      chain:
+        middlewares:
+          - security-headers@file
+          - compress@file
+
+    # =========================================================================
+    # chain-api
+    # =========================================================================
+    # Stricter chain for API endpoints. Lower rate limits and additional
+    # protections.
+    #
+    # Usage in container labels:
+    #   traefik.http.routers.myapp-api.middlewares=chain-api@file
+    #
+    # Note: 50 req/s is generous for most APIs. Adjust per-service via
+    # container labels if needed (e.g., high-traffic APIs get 200/s).
+    chain-api:
+      chain:
+        middlewares:
+          - rate-limit-api@file
+          - security-headers@file
+          - compress@file
+
+    # =========================================================================
+    # chain-auth
+    # =========================================================================
+    # For services with HTTP Basic Auth in front (staging tools, internal tools)
+    chain-auth:
+      chain:
+        middlewares:
+          - rate-limit@file
+          - security-headers@file
+          - basic-auth@file
+          - compress@file
+
+    # =========================================================================
+    # INDIVIDUAL MIDDLEWARE DEFINITIONS
+    # =========================================================================
+
+    # --- Rate Limit: API (stricter) ---
+    # 50 req/s per IP with 25 burst. Prevents API abuse.
+    rate-limit-api:
+      rateLimit:
+        average: 50
+        burst: 25
+        period: 1s
+        sourceCriterion:
+          ipStrategy:
+            depth: 1
+
+    # --- Tailscale IP Whitelist ---
+    # Restricts access to the Tailscale CGNAT range and Docker internal networks.
+    #
+    # Tailscale uses 100.64.0.0/10 (RFC 6598, CGNAT range).
+    # Docker network ranges (10.0.0.0/8) cover all Docker bridge networks
+    # and the Tailscale-operated Docker network bridge.
+    #
+    # WHY these ranges:
+    #   - 100.64.0.0/10: Official Tailscale IP range (100.x.x.x)
+    #   - 10.0.0.0/8: Catches Docker internal IPs (172.17-30.x.x is also
+    #     Docker, but 10.x is consistently used by Tailscale for overlay)
+    #   - 172.16.0.0/12: Docker bridge network range
+    #   - 127.0.0.1/32: Localhost for health checks from the host
+    ip-whitelist-tailscale:
+      ipWhiteList:
+        sourceRange:
+          - "100.64.0.0/10"     # Tailscale CGNAT range
+          - "10.0.0.0/8"        # Docker overlay internal
+          - "172.16.0.0/12"     # Docker bridge networks
+          - "127.0.0.1/32"      # Localhost
+
+    # --- Cloudflare IP Whitelist ---
+    # When a service should ONLY be accessed through Cloudflare.
+    # This is more restrictive than the Tailscale whitelist.
+    #
+    # Cloudflare proxy IPs are published at:
+    #   https://www.cloudflare.com/ips-v4
+    #   https://www.cloudflare.com/ips-v6
+    # These should be updated periodically via cron:
+    #   curl -s https://www.cloudflare.com/ips-v4 -o /etc/cloudflare-ips.txt
+    ip-whitelist-cloudflare:
+      ipWhiteList:
+        sourceRange:
+          - "173.245.48.0/20"
+          - "103.21.244.0/22"
+          - "103.22.200.0/22"
+          - "103.31.4.0/22"
+          - "141.101.64.0/18"
+          - "108.162.192.0/18"
+          - "190.93.240.0/20"
+          - "188.114.96.0/20"
+          - "197.234.240.0/22"
+          - "198.41.128.0/17"
+          - "162.158.0.0/15"
+          - "104.16.0.0/13"
+          - "104.24.0.0/14"
+          - "172.64.0.0/13"
+          - "131.0.72.0/22"
+          - "2400:cb00::/32"
+          - "2606:4700::/32"
+          - "2803:f800::/32"
+          - "2405:b500::/32"
+          - "2405:8100::/32"
+          - "2a06:98c0::/29"
+          - "2c0f:f248::/32"
+
+    # --- Error Pages ---
+    # Custom error pages for 4xx/5xx responses.
+    # Uncomment and configure when custom error pages are created.
+    # error-pages:
+    #   errors:
+    #     status:
+    #       - "404"
+    #       - "500-599"
+    #     service: error-pages-service@docker
+    #     query: "/{status}.html"

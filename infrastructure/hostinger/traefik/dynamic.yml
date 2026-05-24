@@ -1,0 +1,284 @@
+###############################################################################
+# TRAEFIK V3 — DYNAMIC CONFIGURATION
+# ======================================
+# Middleware chains, TLS configuration, and cluster-wide policies.
+#
+# This file is loaded by the file provider and defines policies that apply
+# across ALL routes.  It is the central control point for:
+#   - Security headers (HSTS, CSP, X-Frame-Options, etc.)
+#   - Rate limiting
+#   - Compression
+#   - CrowdSec bouncer integration
+#   - TLS configuration
+#
+# THESE MIDDLEWARES ARE REFERENCED BY routers.yml.
+# Every router should use the appropriate security chain.
+###############################################################################
+
+# =============================================================================
+# TLS CONFIGURATION
+# =============================================================================
+tls:
+  options:
+    # Default TLS options — applied to all HTTPS routes unless overridden.
+    default:
+      # Minimum TLS 1.3 for modern browsers only.
+      # TLS 1.2 is disabled because it adds ~200KB of cipher suite negotiation
+      # overhead per connection and is not needed for public-facing services
+      # that modern browsers already support TLS 1.3.
+      minVersion: VersionTLS12
+      # Restrict to secure ciphers only — no RC4, 3DES, or export ciphers.
+      cipherSuites:
+        - TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+      # Prefer server cipher order — prevents weak client negotiation
+      serverPreferred: true
+      # Disable deprecated features
+      sniStrict: false  # Allow multiple certs on same IP
+
+  # NOTE: Certificates are requested per-router via tls.certResolver
+  # in routers.yml.  No global certificate definitions needed here —
+  # the cloudflare resolver from traefik.yml handles issuance.
+
+# =============================================================================
+# MIDDLEWARES
+# =============================================================================
+http:
+  middlewares:
+
+    # -------------------------------------------------------------------------
+    # SECURITY HEADERS CHAIN
+    # Applied to ALL public-facing routes.
+    # These headers are your first line of defense at the edge.
+    # -------------------------------------------------------------------------
+    chain-security:
+      chain:
+        middlewares:
+          - security-headers
+          - cors-headers
+          - rate-limit-edge
+
+    # -------------------------------------------------------------------------
+    # FULL SECURITY CHAIN (with CrowdSec bouncer)
+    # Use this for routes that need IP reputation filtering.
+    # Requires CrowdSec agent + bouncer to be deployed.
+    # If CrowdSec is not available, the bouncer middleware will pass through.
+    # -------------------------------------------------------------------------
+    chain-full:
+      chain:
+        middlewares:
+          - crowdsec-bouncer
+          - security-headers
+          - cors-headers
+          - rate-limit-edge
+
+    # -------------------------------------------------------------------------
+    # security-headers
+    # Every public response should include these.
+    # -------------------------------------------------------------------------
+    security-headers:
+      headers:
+        # Strict-Transport-Security: 6 months, include subdomains, preload.
+        # Cloudflare also sends HSTS, but defense-in-depth at origin matters.
+        strictTransportSecurity:
+          maxAge: 15768000  # 6 months in seconds
+          includeSubdomains: true
+          preload: true
+        # Prevent MIME type sniffing (IE/Edge legacy)
+        contentTypeNosniff: true
+        # Prevent clickjacking
+        frameDeny: true
+        # XSS filter (legacy browsers)
+        browserXssFilter: true
+        # Referrer policy: no referrer for cross-origin, full for same-origin
+        referrerPolicy: "strict-origin-when-cross-origin"
+        # Content Security Policy: restrictive by default.
+        # Services can override this if they need inline scripts.
+        contentSecurityPolicy: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'"
+        # Permissions-Policy: disable all unnecessary browser features
+        permissionsPolicy: "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+        # Custom headers
+        customFrameOptionsValue: "SAMEORIGIN"
+        # HSTS preload — tell browsers to never load over HTTP
+        # isDevelopment: false
+
+    # -------------------------------------------------------------------------
+    # CORS HEADERS
+    # Permissive CORS for API routes; individual services can override.
+    # On the edge, we want to allow known origins and block unknown ones.
+    # -------------------------------------------------------------------------
+    cors-headers:
+      headers:
+        accessControlAllowMethods:
+          - GET
+          - POST
+          - PUT
+          - PATCH
+          - DELETE
+          - OPTIONS
+        accessControlAllowHeaders:
+          - Content-Type
+          - Authorization
+          - X-Requested-With
+          - X-CSRF-Token
+          - X-API-Key
+        accessControlAllowOriginList:
+          - "https://wheeler.ai"
+          - "https://*.wheeler.ai"
+        accessControlMaxAge: 86400  # 24 hours — preflight cache
+        accessControlAllowCredentials: true
+        addVaryHeader: true
+
+    # -------------------------------------------------------------------------
+    # RATE LIMITING
+    # CRITICAL: This is the PUBLIC EDGE — aggressive rate limiting protects
+    # against DoS, credential stuffing, and web scraping.
+    #
+    # 50 requests per second per IP with a burst of 100.
+    # This is conservative for a 4-8 vCPU VPS with ~15 backends.
+    # If you see legitimate traffic being blocked, increase to 100/200.
+    # If you see CPU pegging above 80%, decrease to 30/60.
+    # -------------------------------------------------------------------------
+    rate-limit-edge:
+      rateLimit:
+        period: 1s
+        average: 50
+        burst: 100
+        sourceCriterion:
+          # Rate limit by client IP (respects X-Forwarded-For from Cloudflare)
+          ipStrategy:
+            depth: 1
+
+    # -------------------------------------------------------------------------
+    # STRICT RATE LIMITING (for auth endpoints / login pages)
+    # 10 requests per second — prevents brute-force attacks.
+    # -------------------------------------------------------------------------
+    rate-limit-strict:
+      rateLimit:
+        period: 1s
+        average: 10
+        burst: 20
+        sourceCriterion:
+          ipStrategy:
+            depth: 1
+
+    # -------------------------------------------------------------------------
+    # CROWDsec BOUNCER (forward auth mode)
+    # Requires: CrowdSec agent + bouncer container running on the same network.
+    # If the bouncer is unavailable, this middleware passes through gracefully.
+    #
+    # To deploy CrowdSec:
+    #   docker run -d --name crowdsec-agent \
+    #     -v crowdsec-db:/var/lib/crowdsec/data \
+    #     crowdsecurity/crowdsec
+    #
+    #   docker run -d --name crowdsec-bouncer-traefik \
+    #     -e API_KEY=${CROWDSEC_BOUNCER_API_KEY} \
+    #     -e CROWDSEC_AGENT_HOST=crowdsec-agent:8080 \
+    #     crowdsecurity/traefik-bouncer
+    #
+    # The bouncer listens on :8080 and Traefik forwards auth requests to it.
+    # -------------------------------------------------------------------------
+    crowdsec-bouncer:
+      forwardAuth:
+        # Address of the CrowdSec Traefik bouncer
+        address: "http://crowdsec-bouncer:8080/api/v1/forwardAuth"
+        # Trust X-Forwarded-For headers from Cloudflare
+        trustForwardHeader: true
+        # Connection timeout — don't let a slow bouncer block requests
+        authResponseHeaders:
+          - X-CrowdSec-Remediation
+        # Timeout: 2s — CrowdSec decisions should be near-instant
+        # If bouncer is slow, fail open (let request through)
+        tls:
+          insecureSkipVerify: true
+
+    # -------------------------------------------------------------------------
+    # COMPRESSION (gzip)
+    # Enable compression for text-based responses (HTML, JSON, CSS, JS).
+    # Saves bandwidth but costs CPU — on a constrained VPS, this trade-off
+    # is worth it for API responses but may not be for static assets served
+    # through Cloudflare (which compresses at their edge).
+    # -------------------------------------------------------------------------
+    compress:
+      compress:
+        # Minimum response size to compress (1KB — smaller responses aren't
+        # worth the CPU cycles)
+        minResponseBodyBytes: 1024
+        # Excluded content types (images, video, archives — already compressed)
+        excludedContentTypes:
+          - image/png
+          - image/jpeg
+          - image/gif
+          - image/webp
+          - video/mp4
+          - application/zip
+          - application/gzip
+
+    # -------------------------------------------------------------------------
+    # CIRCUIT BREAKER — HETZNER BACKENDS
+    # Protects the edge server from cascading failures when Hetzner backends
+    # are slow or unreachable.
+    #
+    # Strategy: NetworkErrorRatio
+    #   If > 50% of requests to a Hetzner backend fail (timeout, 5xx, connection refused),
+    #   open the circuit for 30 seconds.  After 30s, half-open: allow one request
+    #   through.  If it succeeds, close the circuit.  If it fails, back to open.
+    #
+    # This prevents:
+    #   - Connection queue buildup on the edge server
+    #   - Tailscale bandwidth waste on failing requests
+    #   - Resource exhaustion from retries
+    #
+    # NOTE: The circuit breaker is configured at the SERVICE level in routers.yml.
+    # -------------------------------------------------------------------------
+    circuit-breaker-hetzner:
+      circuitBreaker:
+        # Check every 10 requests;  if >50% fail, open the circuit
+        expression: "NetworkErrorRatio() > 0.50"
+        # How long to wait before trying again (half-open)
+        recoveryDuration: "30s"
+        # When circuit opens: return 503 immediately instead of timing out
+        # This is "fail open" at the edge — the request still reaches the client
+        # with a clear error rather than hanging indefinitely.
+        checkPeriod: "10s"
+        fallbackDuration: "30s"
+
+    # -------------------------------------------------------------------------
+    # RETRY MIDDLEWARE (Hetzner backends)
+    # One retry for transient Tailscale network blips.
+    # More retries would amplify load on the edge server during failures.
+    # -------------------------------------------------------------------------
+    retry-hetzner:
+      retry:
+        attempts: 1
+        # Don't retry if the request was already written to the response body
+        # (prevents duplicate responses for non-idempotent requests)
+
+    # -------------------------------------------------------------------------
+    # ERROR HANDLER — FRIENDLY 5XX PAGES
+    # When a Hetzner backend is down, return a user-friendly error page
+    # instead of the raw Traefik 502/503 page.
+    # This is optional but improves UX during Hetzner maintenance.
+    # -------------------------------------------------------------------------
+    error-handler-hetzner:
+      errors:
+        status:
+          - "502"
+          - "503"
+        service: error-service@file
+        query: "/{status}.html"
+
+    # -------------------------------------------------------------------------
+    # CHAIN: INTERNAL-ONLY (Dashboard, Admin)
+    # Whitelists only Tailscale and Docker internal IP ranges.
+    # -------------------------------------------------------------------------
+    internal-whitelist:
+      ipAllowList:
+        sourceRange:
+          - "100.64.0.0/10"    # Tailscale subnet
+          - "10.0.0.0/8"       # Docker host / private
+          - "172.16.0.0/12"    # Docker internal networks
+          - "192.168.0.0/16"   # Local LAN

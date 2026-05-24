@@ -1,0 +1,335 @@
+# API Optimization Recommendations
+# Generated: 2026-05-23 for AIOPS (5.78.140.118)
+# Phase 6: API Performance Optimization Plan
+
+# ============================================================================
+# RECOMMENDATION TIER 1 - CRITICAL (Implement within 1 week)
+# ============================================================================
+
+## R1: FIX HARDCODED CREDENTIALS (SECURITY CRITICAL)
+# Multiple ecosystem.config.js files contain hardcoded API keys and DB passwords.
+# Move to .env files with chmod 600 or a secrets manager.
+# Affected: design, horizon, frgcrm, paperless, prediction-radar, ravyn,
+#            surplusai-scraper, voice, insforge agent-svc configs.
+
+## R2: ADD EXPRESS TIMEOUT MIDDLEWARE
+# All 9 agent-svc processes lack HTTP timeout configuration.
+# Node.js default server.timeout = 0 means connections never timeout.
+
+RECOMMENDED_EXPRESS_TIMEOUT_CONFIG = """
+// Add to each agent-svc src/server.ts createServer() function:
+export function createServer(svcName, agentRunners) {
+  const app = express();
+  app.use(express.json());
+
+  // ── REQUEST TIMEOUT MIDDLEWARE ──
+  const REQUEST_TIMEOUT_MS = parseInt(process.env.REQUEST_TIMEOUT_MS || '60000', 10);
+  app.use((req, res, next) => {
+    const timer = setTimeout(() => {
+      if (!res.headersSent) {
+        res.status(504).json({ error: 'Request timeout', timeout_ms: REQUEST_TIMEOUT_MS });
+      }
+    }, REQUEST_TIMEOUT_MS);
+    res.on('finish', () => clearTimeout(timer));
+    res.on('close', () => clearTimeout(timer));
+    next();
+  });
+
+  // ── BODY SIZE LIMIT ──
+  app.use(express.json({ limit: '10mb' }));
+
+  // ... rest of routes ...
+
+  return app;
+}
+
+// And in index.ts listen():
+const server = app.listen(config.port, () => {
+  console.log(`[${svcName}] on :${config.port}`);
+});
+server.timeout = 30_000;           // 30s idle socket timeout
+server.keepAliveTimeout = 65_000;  // Slightly above common LB timeout
+server.headersTimeout = 66_000;    // Must be > keepAliveTimeout
+server.maxConnections = 200;       // Prevent connection flood
+server.requestTimeout = 60_000;    // Node 18+; max request duration
+"""
+
+## R3: STAGGER PM2 RESTART DELAYS
+# All agent-svc use restart_delay=5000. If LiteLLM fails, all 9 restart
+# simultaneously every 5 seconds, creating a thundering herd.
+
+RECOMMENDED_RESTART_DELAYS = {
+    "frgcrm-agent-svc":             5000,   # Baseline
+    "surplusai-scraper-agent-svc":  8000,   # +3s
+    "voice-agent-svc":             11000,   # +6s
+    "insforge-agent-svc":          14000,   # +9s
+    "design-agent-svc":            17000,   # +12s
+    "horizon-agent-svc":            6000,   # +1s
+    "paperless-agent-svc":          9000,   # +4s
+    "prediction-radar-agent-svc":  12000,   # +7s
+    "ravyn-agent-svc":             15000,   # +10s
+}
+
+## R4: REDUCE FRG CRM API CONNECTION POOL
+# Current: pool_size=30, max_overflow=50, 2 workers = 160 max connections
+# Target:  pool_size=10, max_overflow=20, 4 workers = 120 max connections
+
+RECOMMENDED_DB_POOL_CONFIG = """
+# /opt/wheeler/apps/frgcrm/api/database.py
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,
+    pool_size=10,              # Down from 30
+    max_overflow=20,           # Down from 50
+    pool_recycle=3600,         # Up from 600
+    pool_timeout=10,           # ADD: fail fast on pool exhaustion
+    connect_args={
+        "connect_timeout": 5,
+        "options": "-c statement_timeout=10000"
+    }
+)
+"""
+
+## R5: ADD UVICORN PRODUCTION FLAGS
+# Current: uvicorn main:app --host 0.0.0.0 --port 8082 --workers 2
+
+RECOMMENDED_PM2_UVICORN_CMD = """
+python3 -m uvicorn main:app \\
+  --host 0.0.0.0 \\
+  --port 8082 \\
+  --workers 4 \\
+  --limit-concurrency 200 \\
+  --limit-max-requests 10000 \\
+  --timeout-keep-alive 30 \\
+  --backlog 128 \\
+  --log-level warning
+"""
+
+# ============================================================================
+# RECOMMENDATION TIER 2 - HIGH (Implement within 2-3 weeks)
+# ============================================================================
+
+## R6: LITELLM REDUNDANCY
+# LiteLLM on port 4049 is a SPOF for all 9 agent-svc + frgcrm-api.
+# Two-phase approach:
+
+PHASE_1_DIRECT_FALLBACK = """
+// In agent-svc src/index.ts or model.ts:
+const LLM_ENDPOINTS = [
+  process.env.OPENAI_BASE_URL || 'http://localhost:4049/v1',  // Primary
+  process.env.OPENAI_FALLBACK_URL || 'https://api.deepseek.com/v1',  // Direct
+];
+
+function getActiveEndpoint() {
+  // Check LiteLLM health; fall back if down
+  return LLM_ENDPOINTS[0]; // With health-check logic
+}
+"""
+
+PHASE_2_SECONDARY_INSTANCE = """
+# Run a second LiteLLM on port 4050:
+pm2 start litellm -- --port 4050 --config /opt/apps/litellm/config.yaml
+# Load balance: odd agent-svc use 4049, even use 4050
+"""
+
+## R7: REDIS RESPONSE CACHE
+# Cache expensive read endpoints using existing Redis
+
+CACHE_TARGETS = [
+    ("GET /api/dashboard/stats",     300, "Dashboard stats aggregation"),
+    ("GET /api/pipeline/stats",      300, "Pipeline funnel aggregation"),
+    ("GET /api/cases",                30, "Heavily polled case list"),
+    ("GET /api/attorney/prospects",  120, "Prospect queries"),
+    ("Agent run results",            600, "LLM inference results"),
+]
+
+CACHE_IMPLEMENTATION = """
+# Python FastAPI example (add to frgcrm-api):
+import redis.asyncio as aioredis
+import hashlib, json
+from functools import wraps
+
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+
+def redis_cache(ttl_seconds: int = 60):
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            try:
+                r = aioredis.from_url(REDIS_URL)
+                key = f"cache:{func.__module__}.{func.__name__}:{hashlib.sha256(json.dumps(kwargs,sort_keys=True).encode()).hexdigest()[:16]}"
+                cached = await r.get(key)
+                if cached:
+                    return json.loads(cached)
+                result = await func(*args, **kwargs)
+                await r.setex(key, ttl_seconds, json.dumps(result, default=str))
+                return result
+            except Exception:
+                return await func(*args, **kwargs)  # Fail open
+        return wrapper
+    return decorator
+"""
+
+## R8: EVENT-DRIVEN AGENT ACTIVATION
+# Replace 5-minute polling with event subscriptions
+
+EVENT_DRIVEN_PATTERN = """
+// Instead of:
+setInterval(() => agent.run(), 300_000);
+
+// Use:
+import { bus } from '@wheeler/event-bus';
+
+bus.subscribe('case.created', async (event) => {
+  const agent = new CaseScorerAgent();
+  await agent.run({ caseId: event.data.id });
+});
+
+bus.subscribe('case.stage_changed', async (event) => {
+  if (event.data.new_stage === 'qualified') {
+    // Trigger attorney matching, document generation, etc.
+  }
+});
+"""
+
+EVENT_TYPES_TO_PUBLISH = [
+    "case.created",
+    "case.updated",
+    "case.stage_changed",
+    "document.uploaded",
+    "document.ocr_complete",
+    "surplusai.pipeline.updated",
+    "contact.created",
+    "attorney.onboarded",
+    "claimant.verified",
+]
+
+## R9: JOB QUEUE FOR LONG-RUNNING OPERATIONS
+# Introduce BullMQ on existing Redis for background work
+
+QUEUE_DEFINITIONS = {
+    "ocr-processing": {
+        "concurrency": 2,
+        "timeout_ms": 120_000,
+        "attempts": 3,
+        "backoff": {"type": "exponential", "delay": 5_000},
+    },
+    "ai-inference": {
+        "concurrency": 5,
+        "timeout_ms": 60_000,
+        "attempts": 2,
+        "backoff": {"type": "exponential", "delay": 2_000},
+    },
+    "county-scrape": {
+        "concurrency": 3,
+        "timeout_ms": 90_000,
+        "attempts": 3,
+        "backoff": {"type": "fixed", "delay": 30_000},
+    },
+    "email-notification": {
+        "concurrency": 10,
+        "timeout_ms": 30_000,
+        "attempts": 5,
+        "backoff": {"type": "exponential", "delay": 1_000},
+    },
+    "pdf-generation": {
+        "concurrency": 2,
+        "timeout_ms": 60_000,
+        "attempts": 2,
+        "backoff": {"type": "exponential", "delay": 3_000},
+    },
+}
+
+# ============================================================================
+# RECOMMENDATION TIER 3 - MEDIUM (Implement within 4-6 weeks)
+# ============================================================================
+
+## R10: ASYNC DATABASE MIGRATION
+# Convert frgcrm-api from synchronous SQLAlchemy to async (asyncpg + SQLAlchemy 2.0 async)
+
+ASYNC_DB_EXAMPLE = """
+# database_async.py
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+
+DATABASE_URL_ASYNC = os.getenv(
+    "DATABASE_URL_ASYNC",
+    "postgresql+asyncpg://frgops@127.0.0.1:5433/frgcrm"
+)
+
+async_engine = create_async_engine(
+    DATABASE_URL_ASYNC,
+    pool_size=10,
+    max_overflow=20,
+    pool_recycle=3600,
+    pool_pre_ping=True,
+    pool_timeout=10,
+)
+
+AsyncSessionLocal = async_sessionmaker(
+    async_engine, class_=AsyncSession, expire_on_commit=False
+)
+
+async def get_async_db():
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+"""
+
+## R11: PM2 CLUSTER MODE FOR AGENT SERVICES
+
+PM2_CLUSTER_CONFIG = """
+// ecosystem.config.js
+module.exports = {
+  apps: [{
+    name: "frgcrm-agent-svc",
+    script: "./dist/index.js",
+    exec_mode: "cluster",
+    instances: 2,
+    max_memory_restart: "500M",
+    // ...
+  }],
+};
+"""
+
+## R12: CONNECTION POOL TUNING - ALL SERVICES
+
+POOL_TUNING_TABLE = """
+Service                  | pool_size | max_overflow | pool_recycle | pool_timeout
+-------------------------|-----------|--------------|--------------|-------------
+frgcrm-api (per worker)  | 10        | 20           | 3600         | 10
+agent-svc (per service)  | 5         | 10           | 1800         | 5
+litellm (DB if used)     | 5         | 10           | 3600         | 5
+
+PostgreSQL server max_connections: 200 (up from default 100)
+"""
+
+# ============================================================================
+# MONITORING RECOMMENDATIONS
+# ============================================================================
+
+MONITORING_METRICS = """
+# Add to ecosystem-guardian health checks:
+
+1. API response time percentiles (p50, p95, p99)
+2. Database connection pool utilization %
+3. Redis cache hit rate %
+4. Queue depth (waiting jobs per queue)
+5. Agent-svc event loop lag (Node.js event loop utilization)
+6. LiteLLM request latency and error rate
+7. PM2 restart count per service (24h window)
+8. Express pending request count (server._connections)
+"""
+
+ALERT_THRESHOLDS = {
+    "api_p95_latency": {"warn": "> 2000ms", "critical": "> 5000ms"},
+    "db_pool_utilization": {"warn": "> 70%", "critical": "> 90%"},
+    "redis_cache_hit_rate": {"warn": "< 60%", "critical": "< 30%"},
+    "queue_depth": {"warn": "> 50", "critical": "> 200"},
+    "pm2_restarts_24h": {"warn": "> 3", "critical": "> 10"},
+    "litellm_error_rate": {"warn": "> 5%", "critical": "> 20%"},
+    "event_loop_lag": {"warn": "> 100ms", "critical": "> 500ms"},
+}

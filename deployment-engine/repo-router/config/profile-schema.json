@@ -1,0 +1,357 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://wheeler.internal/repo-router/profile-schema.json",
+  "title": "Wheeler Repo Profile Schema",
+  "description": "JSON Schema defining the structure and validation rules for Wheeler repository profiles used by the Repo Router pipeline.",
+  "type": "object",
+  "definitions": {
+    "node_type": {
+      "type": "string",
+      "enum": ["aiops", "hostinger", "coredb"],
+      "description": "The deployment node for this repository."
+    },
+    "repo_type": {
+      "type": "string",
+      "enum": ["frontend", "backend", "fullstack", "static", "agent", "library", "cli", "infrastructure"],
+      "description": "The type of repository."
+    },
+    "language": {
+      "type": "string",
+      "enum": ["typescript", "javascript", "python", "go", "rust", "java", "ruby", "php", "haskell", "shell", "yaml"],
+      "description": "Primary programming language."
+    },
+    "deployment_strategy": {
+      "type": "string",
+      "enum": ["docker", "pm2", "native", "serverless"],
+      "description": "How this repo is deployed."
+    },
+    "port_allocation": {
+      "type": "object",
+      "properties": {
+        "port": { "type": "integer", "minimum": 1024, "maximum": 65535 },
+        "bind_address": { "type": "string", "default": "127.0.0.1", "pattern": "^127\\.0\\.0\\.1|0\\.0\\.0\\.0|\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$" },
+        "protocol": { "type": "string", "enum": ["tcp", "udp"], "default": "tcp" }
+      },
+      "required": ["port"],
+      "additionalProperties": false
+    },
+    "health_check": {
+      "type": "object",
+      "properties": {
+        "endpoint": { "type": "string", "pattern": "^/", "default": "/health" },
+        "interval_seconds": { "type": "integer", "minimum": 5, "maximum": 300, "default": 30 },
+        "timeout_seconds": { "type": "integer", "minimum": 1, "maximum": 30, "default": 10 },
+        "retries": { "type": "integer", "minimum": 1, "maximum": 10, "default": 3 },
+        "type": { "type": "string", "enum": ["http", "tcp", "command"], "default": "http" }
+      },
+      "required": ["endpoint"],
+      "additionalProperties": false
+    },
+    "resource_limits": {
+      "type": "object",
+      "properties": {
+        "cpu_limit": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?$", "default": "2.0" },
+        "memory_limit": { "type": "string", "pattern": "^[0-9]+[MG]i?$", "default": "1G" },
+        "cpu_reserve": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?$", "default": "0.5" },
+        "memory_reserve": { "type": "string", "pattern": "^[0-9]+[MG]i?$", "default": "256M" },
+        "gpu_required": { "type": "boolean", "default": false },
+        "gpu_count": { "type": "integer", "minimum": 0, "maximum": 8, "default": 0 }
+      },
+      "additionalProperties": false
+    },
+    "docker_config": {
+      "type": "object",
+      "properties": {
+        "compose_file": { "type": "string", "description": "Path to docker-compose.yml" },
+        "build_context": { "type": "string", "default": "." },
+        "dockerfile": { "type": "string", "default": "Dockerfile" },
+        "image_name": { "type": "string", "pattern": "^[a-z0-9]+([-_][a-z0-9]+)*(/[a-z0-9]+([-_][a-z0-9]+)*)*$" },
+        "image_tag": { "type": "string", "default": "latest" },
+        "container_name": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "pm2_config": {
+      "type": "object",
+      "properties": {
+        "ecosystem_file": { "type": "string", "description": "Path to PM2 ecosystem.config.js" },
+        "app_name": { "type": "string" },
+        "script": { "type": "string" },
+        "interpreter": { "type": "string", "default": "node" },
+        "instances": { "type": "integer", "minimum": 1, "maximum": 16, "default": 1 },
+        "exec_mode": { "type": "string", "enum": ["fork", "cluster"], "default": "fork" },
+        "max_memory": { "type": "string", "pattern": "^[0-9]+[MG]i?$", "default": "512M" },
+        "env_file": { "type": "string", "default": ".env" }
+      },
+      "additionalProperties": false
+    },
+    "nginx_config": {
+      "type": "object",
+      "properties": {
+        "route_template": { "type": "string", "description": "Path to nginx route template" },
+        "domain": { "type": "string", "format": "hostname" },
+        "path_prefix": { "type": "string", "default": "/" },
+        "upstream_port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "rate_limit_zone": { "type": "string" },
+        "rate_limit_rpm": { "type": "integer", "minimum": 1, "default": 30 },
+        "auth_required": { "type": "boolean", "default": false },
+        "tls_required": { "type": "boolean", "default": false }
+      },
+      "required": ["domain", "upstream_port"],
+      "additionalProperties": false
+    },
+    "monitoring_config": {
+      "type": "object",
+      "properties": {
+        "prometheus_job": { "type": "string" },
+        "metrics_path": { "type": "string", "default": "/metrics" },
+        "scrape_interval": { "type": "string", "default": "15s" },
+        "log_enabled": { "type": "boolean", "default": true },
+        "grafana_dashboard_uid": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "name",
+    "repo_type",
+    "language",
+    "framework",
+    "node",
+    "port"
+  ],
+  "optional": [
+    "dependencies",
+    "consumers",
+    "docker_compose",
+    "pm2_config",
+    "nginx_route",
+    "health_endpoint",
+    "resource_limits",
+    "monitoring",
+    "environment_variables",
+    "secrets",
+    "tags",
+    "description",
+    "repository_url",
+    "branch",
+    "version"
+  ],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Repository name (unique identifier)",
+      "pattern": "^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$",
+      "minLength": 3,
+      "maxLength": 50
+    },
+    "repo_type": {
+      "$ref": "#/definitions/repo_type",
+      "description": "The type/category of the repository."
+    },
+    "language": {
+      "$ref": "#/definitions/language",
+      "description": "Primary programming language."
+    },
+    "framework": {
+      "type": "string",
+      "description": "Primary framework (e.g., nextjs, fastapi, express, react, django)",
+      "minLength": 2,
+      "maxLength": 50
+    },
+    "node": {
+      "$ref": "#/definitions/node_type",
+      "description": "Target deployment node."
+    },
+    "port": {
+      "type": "integer",
+      "description": "Primary service port (must be unique per node, allocated from port-allocation-table)",
+      "minimum": 1024,
+      "maximum": 65535
+    },
+    "deployment_strategy": {
+      "$ref": "#/definitions/deployment_strategy",
+      "description": "Primary deployment strategy.",
+      "default": "docker"
+    },
+    "repository_url": {
+      "type": "string",
+      "description": "Git repository URL",
+      "format": "uri"
+    },
+    "branch": {
+      "type": "string",
+      "description": "Default branch to deploy",
+      "default": "main"
+    },
+    "version": {
+      "type": "string",
+      "description": "Current version of the repository",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "default": "1.0.0"
+    },
+    "description": {
+      "type": "string",
+      "description": "Human-readable description of the repository",
+      "maxLength": 500
+    },
+    "tags": {
+      "type": "array",
+      "description": "Tags for categorization and search",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 30
+      },
+      "minItems": 0,
+      "maxItems": 20,
+      "uniqueItems": true
+    },
+    "health_endpoint": {
+      "$ref": "#/definitions/health_check",
+      "description": "Health check configuration."
+    },
+    "resource_limits": {
+      "$ref": "#/definitions/resource_limits",
+      "description": "CPU and memory resource limits."
+    },
+    "port_allocation": {
+      "$ref": "#/definitions/port_allocation",
+      "description": "Port binding configuration."
+    },
+    "docker_compose": {
+      "$ref": "#/definitions/docker_config",
+      "description": "Docker Compose configuration."
+    },
+    "pm2_config": {
+      "$ref": "#/definitions/pm2_config",
+      "description": "PM2 process manager configuration."
+    },
+    "nginx_route": {
+      "$ref": "#/definitions/nginx_config",
+      "description": "Nginx reverse proxy route configuration."
+    },
+    "monitoring": {
+      "$ref": "#/definitions/monitoring_config",
+      "description": "Monitoring and observability configuration."
+    },
+    "dependencies": {
+      "type": "array",
+      "description": "List of other repos this repo depends on (must be deployed first)",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$"
+      },
+      "uniqueItems": true
+    },
+    "consumers": {
+      "type": "array",
+      "description": "List of other repos that consume this repo's API/services",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$"
+      },
+      "uniqueItems": true
+    },
+    "environment_variables": {
+      "type": "object",
+      "description": "Required environment variables (values should be set in deploy-time config, not committed)",
+      "patternProperties": {
+        "^[A-Z_][A-Z0-9_]*$": {
+          "type": "string",
+          "description": "Environment variable with a template value or description"
+        }
+      },
+      "additionalProperties": false
+    },
+    "secrets": {
+      "type": "array",
+      "description": "List of secret names required by this repo (resolved at deploy time)",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Z_][A-Z0-9_]*$"
+      },
+      "uniqueItems": true
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "repo_type": { "const": "agent" } }
+      },
+      "then": {
+        "required": ["resource_limits"],
+        "properties": {
+          "resource_limits": {
+            "required": ["gpu_required"],
+            "properties": {
+              "gpu_required": { "const": true }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "deployment_strategy": { "const": "docker" } }
+      },
+      "then": {
+        "required": ["docker_compose"]
+      }
+    },
+    {
+      "if": {
+        "properties": { "deployment_strategy": { "const": "pm2" } }
+      },
+      "then": {
+        "required": ["pm2_config"]
+      }
+    }
+  ],
+  "additionalProperties": false,
+  "examples": [
+    {
+      "name": "surplusai-portal",
+      "repo_type": "fullstack",
+      "language": "typescript",
+      "framework": "nextjs",
+      "node": "aiops",
+      "port": 3600,
+      "deployment_strategy": "pm2",
+      "health_endpoint": {
+        "endpoint": "/health",
+        "interval_seconds": 30,
+        "timeout_seconds": 10,
+        "retries": 3,
+        "type": "http"
+      },
+      "resource_limits": {
+        "cpu_limit": "2.0",
+        "memory_limit": "1G",
+        "cpu_reserve": "0.5",
+        "memory_reserve": "256M"
+      },
+      "dependencies": ["postgres-coredb", "redis-coredb"],
+      "consumers": ["surplusai-api"]
+    },
+    {
+      "name": "private-ai-gateway",
+      "repo_type": "agent",
+      "language": "python",
+      "framework": "fastapi",
+      "node": "aiops",
+      "port": 3700,
+      "deployment_strategy": "docker",
+      "docker_compose": {
+        "compose_file": "docker-compose.yml",
+        "container_name": "private-ai"
+      },
+      "resource_limits": {
+        "cpu_limit": "8.0",
+        "memory_limit": "32G",
+        "gpu_required": true,
+        "gpu_count": 1
+      }
+    }
+  ]
+}

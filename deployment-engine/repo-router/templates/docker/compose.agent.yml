@@ -1,0 +1,168 @@
+# =============================================================================
+# Repo Router - AI Agent Docker Compose Template
+# Source: templates/docker/compose.agent.yml
+# Description: AI agent service with GPU passthrough, model mounts, API keys,
+#              and inference engine configuration.
+# =============================================================================
+
+version: "3.8"
+
+x-logging:
+  &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  agent:
+    image: ${AGENT_IMAGE:-nvidia/cuda:12.2-runtime-ubuntu22.04}
+    container_name: ${CONTAINER_NAME:-ai-agent}
+    build:
+      context: ${BUILD_CONTEXT:-.}
+      dockerfile: ${DOCKERFILE:-Dockerfile.agent}
+      args:
+        AGENT_TYPE: ${AGENT_TYPE:-generic}
+    restart: unless-stopped
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${AGENT_PORT:-8000}:${AGENT_PORT:-8000}"
+      - "${BIND_ADDRESS:-127.0.0.1}:${METRICS_PORT:-9091}:${METRICS_PORT:-9091}"
+    environment:
+      AGENT_TYPE: ${AGENT_TYPE:-generic}
+      AGENT_NAME: ${AGENT_NAME:-wheeler-agent}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      PORT: ${AGENT_PORT:-8000}
+      MODEL_PATH: /models/${MODEL_NAME:-default}
+      MODEL_NAME: ${MODEL_NAME:-deepseek-v4}
+      INFERENCE_ENGINE: ${INFERENCE_ENGINE:-vllm}
+      MAX_TOKENS: ${MAX_TOKENS:-8192}
+      TEMPERATURE: ${TEMPERATURE:-0.7}
+      TOP_P: ${TOP_P:-0.9}
+      GPU_DEVICES: ${GPU_DEVICES:-all}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      MEMORY_BACKEND: ${MEMORY_BACKEND:-redis}
+      MAX_CONCURRENT_REQUESTS: ${MAX_CONCURRENT_REQUESTS:-8}
+    volumes:
+      - model_cache:/models
+      - agent_data:/app/data
+      - agent_logs:/app/logs
+      - ./config/agent:/app/config:ro
+      - ./prompts:/app/prompts:ro
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: ${GPU_COUNT:-1}
+              capabilities: [gpu]
+        limits:
+          cpus: "${CPU_LIMIT:-8.0}"
+          memory: "${MEM_LIMIT:-16G}"
+        reservations:
+          cpus: "${CPU_RESERVE:-2.0}"
+          memory: "${MEM_RESERVE:-4G}"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:${AGENT_PORT:-8000}/v1/health"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 60s
+    networks:
+      - agent_net
+      - monitoring
+    logging: *default-logging
+    security_opt:
+      - no-new-privileges:true
+    group_add:
+      - "${NVIDIA_GID:-440}"
+    ipc: host
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      stack:
+        soft: 67108864
+        hard: 67108864
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+      - SYS_PTRACE
+
+  redis:
+    image: redis:7-alpine
+    container_name: ${CONTAINER_NAME:-ai-agent}-redis
+    restart: unless-stopped
+    expose:
+      - "6379"
+    volumes:
+      - redis_data:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    command: redis-server /usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: "${REDIS_MEM_LIMIT:-512M}"
+    networks:
+      - agent_net
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETGID
+      - SETUID
+      - DAC_OVERRIDE
+
+  vector_store:
+    image: qdrant/qdrant:v1.10
+    container_name: ${CONTAINER_NAME:-ai-agent}-vectorstore
+    restart: unless-stopped
+    expose:
+      - "6333"
+      - "6334"
+    volumes:
+      - vector_data:/qdrant/storage
+      - ./qdrant/config.yaml:/qdrant/config.yaml:ro
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:6333/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "${VECTORDB_CPU_LIMIT:-2.0}"
+          memory: "${VECTORDB_MEM_LIMIT:-2G}"
+    networks:
+      - agent_net
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+
+volumes:
+  model_cache:
+    driver: local
+  agent_data:
+    driver: local
+  agent_logs:
+    driver: local
+  redis_data:
+    driver: local
+  vector_data:
+    driver: local
+
+networks:
+  agent_net:
+    driver: bridge
+  monitoring:
+    driver: bridge
+    external: false

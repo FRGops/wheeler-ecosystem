@@ -1,0 +1,112 @@
+# =============================================================================
+# Repo Router - Common Compose Header Fragment
+# Source: templates/fragments/header.yml
+# Description: Shared Docker Compose header with version, network definitions,
+#              and cross-service common settings.
+# Usage: Include via "docker compose -f compose.yml -f fragments/header.yml"
+#        or merge into compose files with yq.
+# =============================================================================
+
+version: "3.8"
+
+# ---------------------------------------------------------------------------
+# Common network definitions
+# ---------------------------------------------------------------------------
+networks:
+  # Internal network - no external access (backend-only services)
+  internal:
+    driver: bridge
+    internal: true
+    driver_opts:
+      com.docker.network.bridge.name: "wheeler-int"
+
+  # Frontend network - HTTP-accessible services
+  frontend:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: "wheeler-web"
+
+  # Monitoring network - metrics and logging
+  monitoring:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: "wheeler-mon"
+
+  # AI Agent network - GPU and model-serving traffic
+  agent_net:
+    driver: bridge
+    internal: true
+    driver_opts:
+      com.docker.network.bridge.name: "wheeler-ai"
+
+  # Database network - isolated DB traffic
+  db_net:
+    driver: bridge
+    internal: true
+    driver_opts:
+      com.docker.network.bridge.name: "wheeler-db"
+
+# ---------------------------------------------------------------------------
+# Common logging configuration
+# ---------------------------------------------------------------------------
+x-logging:
+  &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+    labels: "compose_project,compose_service,container_name"
+
+# ---------------------------------------------------------------------------
+# Common restart policy
+# ---------------------------------------------------------------------------
+x-restart-policy:
+  &restart-unless-stopped
+  restart: unless-stopped
+
+# ---------------------------------------------------------------------------
+# Common security defaults
+# ---------------------------------------------------------------------------
+x-security:
+  &default-security
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  read_only: true
+
+# ---------------------------------------------------------------------------
+# Common healthcheck defaults
+# ---------------------------------------------------------------------------
+x-healthcheck:
+  &default-healthcheck
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 15s
+
+# ---------------------------------------------------------------------------
+# Common environment anchors for reuse
+# ---------------------------------------------------------------------------
+x-env-node:
+  &env-node
+  NODE_ENV: production
+  LOG_LEVEL: info
+
+x-env-python:
+  &env-python
+  PYTHON_ENV: production
+  LOG_LEVEL: info
+
+x-env-db:
+  &env-db
+  POSTGRES_USER: ${DB_USER:-app}
+  POSTGRES_PASSWORD: ${DB_PASSWORD:-}
+  POSTGRES_DB: ${DB_NAME:-app}
+
+# ---------------------------------------------------------------------------
+# Bind address helper - all services bind to 127.0.0.1 by default
+# Use this anchor in port mappings to ensure internal-only binding.
+# Override with BIND_ADDRESS env var for debugging.
+# ---------------------------------------------------------------------------
+x-bind-address: &bind-address ${BIND_ADDRESS:-127.0.0.1}

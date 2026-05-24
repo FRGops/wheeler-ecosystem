@@ -1,0 +1,658 @@
+{
+  "metadata": {
+    "schema_version": "1.0.0",
+    "last_updated": "2026-05-24",
+    "description": "Complete port allocation table for all Wheeler ecosystem services across AI Ops, Hostinger, and Core DB nodes.",
+    "total_entries": 67,
+    "enforcement": "strict",
+    "conflict_check": "pre-deploy"
+  },
+  "services": {
+    "frgcrm-frontend": {
+      "port": 3300,
+      "protocol": "tcp",
+      "bind_address": "0.0.0.0",
+      "description": "FRGCRM web frontend (React/Next.js)",
+      "node": "hostinger",
+      "service_type": "web",
+      "tls": false
+    },
+    "frgcrm-api": {
+      "port": 3301,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "FRGCRM REST API backend",
+      "node": "hostinger",
+      "service_type": "api",
+      "tls": false
+    },
+    "frgcrm-websocket": {
+      "port": 3302,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "FRGCRM WebSocket for real-time updates",
+      "node": "hostinger",
+      "service_type": "ws",
+      "tls": false
+    },
+    "frgcrm-worker": {
+      "port": 3303,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "FRGCRM background task worker",
+      "node": "hostinger",
+      "service_type": "worker",
+      "tls": false
+    },
+    "openclaw-dashboard": {
+      "port": 3400,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "OpenClaw dashboard UI",
+      "node": "hostinger",
+      "service_type": "web",
+      "tls": false
+    },
+    "openclaw-api": {
+      "port": 3401,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "OpenClaw API backend",
+      "node": "hostinger",
+      "service_type": "api",
+      "tls": false
+    },
+    "wheeler-revenue-automation": {
+      "port": 3500,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "Wheeler Revenue Automation main API",
+      "node": "hostinger",
+      "service_type": "api",
+      "tls": false
+    },
+    "wheeler-revenue-automation-webhook": {
+      "port": 3501,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "Revenue automation webhook receiver",
+      "node": "hostinger",
+      "service_type": "webhook",
+      "tls": false
+    },
+    "wheeler-revenue-automation-cron": {
+      "port": 3502,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "Revenue automation cron trigger endpoint",
+      "node": "hostinger",
+      "service_type": "cron",
+      "tls": false
+    },
+    "wheeler-revenue-automation-metrics": {
+      "port": 3503,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "Revenue automation Prometheus metrics",
+      "node": "hostinger",
+      "service_type": "metrics",
+      "tls": false
+    },
+    "wheeler-revenue-automation-celery": {
+      "port": 3504,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "Revenue automation Celery flower dashboard",
+      "node": "hostinger",
+      "service_type": "monitoring",
+      "tls": false
+    },
+    "wheeler-revenue-automation-redis": {
+      "port": 3505,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "Revenue automation Redis for task queue",
+      "node": "hostinger",
+      "service_type": "cache",
+      "tls": false
+    },
+    "surplusai-portal": {
+      "port": 3600,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "Surplus AI Portal main application",
+      "node": "aiops",
+      "service_type": "web",
+      "tls": false
+    },
+    "surplusai-api": {
+      "port": 3601,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "Surplus AI REST API",
+      "node": "aiops",
+      "service_type": "api",
+      "tls": false
+    },
+    "surplusai-socket": {
+      "port": 3602,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "Surplus AI WebSocket server",
+      "node": "aiops",
+      "service_type": "ws",
+      "tls": false
+    },
+    "private-ai-gateway": {
+      "port": 3700,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "Private AI LLM gateway API",
+      "node": "aiops",
+      "service_type": "api",
+      "tls": true
+    },
+    "private-ai-admin": {
+      "port": 3701,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "Private AI admin dashboard",
+      "node": "aiops",
+      "service_type": "web",
+      "tls": true
+    },
+    "private-ai-model-api": {
+      "port": 3702,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "Private AI model inference endpoint",
+      "node": "aiops",
+      "service_type": "api",
+      "tls": true
+    },
+    "prediction-radar-api": {
+      "port": 3800,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "Prediction Radar main API",
+      "node": "aiops",
+      "service_type": "api",
+      "tls": false
+    },
+    "prediction-radar-ui": {
+      "port": 3801,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "Prediction Radar web UI",
+      "node": "aiops",
+      "service_type": "web",
+      "tls": false
+    },
+    "prediction-radar-worker": {
+      "port": 3802,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "Prediction Radar background worker",
+      "node": "aiops",
+      "service_type": "worker",
+      "tls": false
+    },
+    "healthchecks-dashboard": {
+      "port": 3900,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "Healthchecks.io dashboard on AI Ops",
+      "node": "aiops",
+      "service_type": "web",
+      "tls": false
+    },
+    "healthchecks-api": {
+      "port": 3901,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "Healthchecks.io API backend",
+      "node": "aiops",
+      "service_type": "api",
+      "tls": false
+    },
+    "changedetection": {
+      "port": 4000,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "Changedetection.io web monitoring",
+      "node": "aiops",
+      "service_type": "web",
+      "tls": false
+    },
+    "langflow": {
+      "port": 4100,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "Langflow AI workflow builder",
+      "node": "aiops",
+      "service_type": "web",
+      "tls": false
+    },
+    "langflow-api": {
+      "port": 4101,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "Langflow API backend",
+      "node": "aiops",
+      "service_type": "api",
+      "tls": false
+    },
+    "n8n": {
+      "port": 4200,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "n8n workflow automation",
+      "node": "aiops",
+      "service_type": "web",
+      "tls": false
+    },
+    "n8n-editor": {
+      "port": 4201,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "n8n workflow editor UI",
+      "node": "aiops",
+      "service_type": "web",
+      "tls": false
+    },
+    "grafana": {
+      "port": 3000,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "Grafana dashboards",
+      "node": "aiops",
+      "service_type": "monitoring",
+      "tls": true
+    },
+    "prometheus": {
+      "port": 9090,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "Prometheus metrics server",
+      "node": "aiops",
+      "service_type": "monitoring",
+      "tls": false
+    },
+    "alertmanager": {
+      "port": 9093,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "Prometheus Alertmanager",
+      "node": "aiops",
+      "service_type": "monitoring",
+      "tls": false
+    },
+    "loki": {
+      "port": 3100,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "Loki log aggregation",
+      "node": "aiops",
+      "service_type": "monitoring",
+      "tls": false
+    },
+    "node-exporter-aiops": {
+      "port": 9100,
+      "protocol": "tcp",
+      "bind_address": "0.0.0.0",
+      "description": "Node exporter (AI Ops node system metrics)",
+      "node": "aiops",
+      "service_type": "monitoring",
+      "tls": false
+    },
+    "node-exporter-hostinger": {
+      "port": 9101,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "Node exporter (Hostinger node system metrics)",
+      "node": "hostinger",
+      "service_type": "monitoring",
+      "tls": false
+    },
+    "cadvisor": {
+      "port": 8080,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "cAdvisor container metrics",
+      "node": "aiops",
+      "service_type": "monitoring",
+      "tls": false
+    },
+    "pm2-metrics": {
+      "port": 9200,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "PM2 process metrics exporter",
+      "node": "aiops",
+      "service_type": "monitoring",
+      "tls": false
+    },
+    "postgres-coredb": {
+      "port": 5432,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "PostgreSQL primary database (Core DB)",
+      "node": "coredb",
+      "service_type": "database",
+      "tls": true
+    },
+    "postgres-aiops": {
+      "port": 5433,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "PostgreSQL auxiliary (AI Ops node)",
+      "node": "aiops",
+      "service_type": "database",
+      "tls": true
+    },
+    "postgres-hostinger": {
+      "port": 5434,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "PostgreSQL auxiliary (Hostinger node)",
+      "node": "hostinger",
+      "service_type": "database",
+      "tls": true
+    },
+    "redis-coredb": {
+      "port": 6379,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "Redis primary (Core DB)",
+      "node": "coredb",
+      "service_type": "cache",
+      "tls": true
+    },
+    "redis-aiops": {
+      "port": 6380,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "Redis (AI Ops node)",
+      "node": "aiops",
+      "service_type": "cache",
+      "tls": false
+    },
+    "redis-hostinger": {
+      "port": 6381,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "Redis (Hostinger node)",
+      "node": "hostinger",
+      "service_type": "cache",
+      "tls": false
+    },
+    "minio-api": {
+      "port": 9000,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "MinIO object storage API",
+      "node": "coredb",
+      "service_type": "storage",
+      "tls": true
+    },
+    "minio-console": {
+      "port": 9001,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "MinIO web console",
+      "node": "coredb",
+      "service_type": "web",
+      "tls": true
+    },
+    "elasticsearch": {
+      "port": 9200,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "Elasticsearch search engine",
+      "node": "aiops",
+      "service_type": "database",
+      "tls": false
+    },
+    "kibana": {
+      "port": 5601,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "Kibana visualization",
+      "node": "aiops",
+      "service_type": "web",
+      "tls": false
+    },
+    "rabbitmq": {
+      "port": 5672,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "RabbitMQ message broker",
+      "node": "coredb",
+      "service_type": "messaging",
+      "tls": true
+    },
+    "rabbitmq-mgmt": {
+      "port": 15672,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "RabbitMQ management UI",
+      "node": "coredb",
+      "service_type": "web",
+      "tls": true
+    },
+    "nginx-aiops": {
+      "port": 80,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "Nginx reverse proxy (AI Ops)",
+      "node": "aiops",
+      "service_type": "proxy",
+      "tls": false
+    },
+    "nginx-aiops-ssl": {
+      "port": 443,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "Nginx HTTPS (AI Ops)",
+      "node": "aiops",
+      "service_type": "proxy",
+      "tls": true
+    },
+    "nginx-hostinger": {
+      "port": 8080,
+      "protocol": "tcp",
+      "bind_address": "0.0.0.0",
+      "description": "Nginx reverse proxy (Hostinger)",
+      "node": "hostinger",
+      "service_type": "proxy",
+      "tls": false
+    },
+    "nginx-hostinger-ssl": {
+      "port": 8443,
+      "protocol": "tcp",
+      "bind_address": "0.0.0.0",
+      "description": "Nginx HTTPS (Hostinger)",
+      "node": "hostinger",
+      "service_type": "proxy",
+      "tls": true
+    },
+    "tailscale-relay": {
+      "port": 443,
+      "protocol": "udp",
+      "bind_address": "0.0.0.0",
+      "description": "Tailscale relay node traffic",
+      "node": "aiops",
+      "service_type": "network",
+      "tls": true
+    },
+    "tailscale-ssh": {
+      "port": 22,
+      "protocol": "tcp",
+      "bind_address": "100.64.0.0",
+      "description": "Tailscale SSH access",
+      "node": "aiops",
+      "service_type": "network",
+      "tls": true
+    },
+    "pgbouncer-coredb": {
+      "port": 6432,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "PgBouncer connection pool (Core DB)",
+      "node": "coredb",
+      "service_type": "database",
+      "tls": true
+    },
+    "pgbouncer-aiops": {
+      "port": 6433,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "PgBouncer connection pool (AI Ops)",
+      "node": "aiops",
+      "service_type": "database",
+      "tls": false
+    },
+    "redis-sentinel-coredb": {
+      "port": 26379,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "Redis Sentinel (Core DB HA)",
+      "node": "coredb",
+      "service_type": "database",
+      "tls": false
+    },
+    "docker-registry": {
+      "port": 5000,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "Private Docker registry",
+      "node": "aiops",
+      "service_type": "storage",
+      "tls": false
+    },
+    "portainer": {
+      "port": 9443,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "Portainer container management",
+      "node": "aiops",
+      "service_type": "web",
+      "tls": true
+    },
+    "dozzle": {
+      "port": 9999,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "Dozzle real-time Docker logs",
+      "node": "aiops",
+      "service_type": "web",
+      "tls": false
+    },
+    "netdata": {
+      "port": 19999,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "Netdata real-time monitoring",
+      "node": "aiops",
+      "service_type": "monitoring",
+      "tls": false
+    },
+    "ssh-hostinger": {
+      "port": 22,
+      "protocol": "tcp",
+      "bind_address": "0.0.0.0",
+      "description": "SSH access (Hostinger node)",
+      "node": "hostinger",
+      "service_type": "network",
+      "tls": false
+    },
+    "ssh-aiops": {
+      "port": 22,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "SSH access (AI Ops node, tailscale-only)",
+      "node": "aiops",
+      "service_type": "network",
+      "tls": false
+    },
+    "ssh-coredb": {
+      "port": 22,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "SSH access (Core DB node, tailscale-only)",
+      "node": "coredb",
+      "service_type": "network",
+      "tls": false
+    },
+    "ufw-admin-aiops": {
+      "port": 51820,
+      "protocol": "udp",
+      "bind_address": "0.0.0.0",
+      "description": "WireGuard VPN (AI Ops node)",
+      "node": "aiops",
+      "service_type": "network",
+      "tls": true
+    },
+    "wheeler-state-api": {
+      "port": 17777,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "Wheeler State API - deployment engine health",
+      "node": "aiops",
+      "service_type": "api",
+      "tls": false
+    },
+    "repo-router-health": {
+      "port": 17778,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "Repo Router health endpoint",
+      "node": "aiops",
+      "service_type": "api",
+      "tls": false
+    },
+    "vaultwarden": {
+      "port": 8222,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "Vaultwarden password manager",
+      "node": "aiops",
+      "service_type": "web",
+      "tls": true
+    },
+    "speedtest-tracker": {
+      "port": 8765,
+      "protocol": "tcp",
+      "bind_address": "0.0.0.0",
+      "description": "Speedtest Tracker (Hostinger public facing)",
+      "node": "hostinger",
+      "service_type": "web",
+      "tls": false
+    },
+    "uptime-kuma": {
+      "port": 3001,
+      "protocol": "tcp",
+      "bind_address": "127.0.0.1",
+      "description": "Uptime Kuma status monitoring",
+      "node": "aiops",
+      "service_type": "web",
+      "tls": false
+    }
+  },
+  "reserved_ranges": [
+    { "start": 3000, "end": 3999, "purpose": "Application services (web + API)" },
+    { "start": 4000, "end": 4999, "purpose": "AIOps tools (langflow, n8n, changedetection)" },
+    { "start": 5000, "end": 5999, "purpose": "Infrastructure (registry, DNS, etc.)" },
+    { "start": 6379, "end": 6381, "purpose": "Redis instances" },
+    { "start": 9000, "end": 9999, "purpose": "Storage and management consoles" },
+    { "start": 9090, "end": 9199, "purpose": "Monitoring (Prometheus, Alertmanager, exporters)" },
+    { "start": 5432, "end": 5434, "purpose": "PostgreSQL instances" },
+    { "start": 10000, "end": 19999, "purpose": "System and utility services" }
+  ],
+  "conflicts": [],
+  "enforcement_rules": [
+    { "rule": "no_duplicate_ports", "severity": "blocker" },
+    { "rule": "internal_binding_default", "severity": "warning" },
+    { "rule": "reserved_range_protection", "severity": "blocker" }
+  ]
+}

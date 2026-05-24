@@ -1,0 +1,597 @@
+# ============================================================================
+# Wheeler Enterprise AI Infrastructure — LiteLLM Proxy Configuration
+# ============================================================================
+# Environment:  Ubuntu 24.04, Docker, Traefik reverse proxy
+# Topology:     3-server Tailscale mesh (coredb, litellm, gpu-worker)
+# Purpose:      Billionaire-scale multi-model AI routing platform
+#
+# Routing Strategy Overview:
+#   Cost-optimized path:  DeepSeek → OpenAI → Anthropic (lowest cost first)
+#   Quality path:         Anthropic → OpenAI → DeepSeek (highest quality first)
+#   Latency path:         latency-based-routing (fastest responder wins)
+#
+# Model Tier Summary:
+#   TIER 1 (Primary):    deepseek-chat       — $0.14/$0.28 per M tokens (I/O)
+#   TIER 2 (Fallback 1): gpt-4o / gpt-4o-mini — $2.50/$10.00 per M tokens (I/O)
+#   TIER 3 (Fallback 2): claude-opus/sonnet  — $15.00/$75.00 per M tokens (I/O)
+#
+# Every env var referenced below is injected via Docker secrets or
+# the Traefik-attached .env file at container startup. No secrets in this file.
+# ============================================================================
+
+# ---------------------------------------------------------------------------
+# GENERAL SETTINGS
+# ---------------------------------------------------------------------------
+general_settings:
+  # Master key authenticates admin-level requests to the LiteLLM proxy.
+  # All other keys (user, team, read-only) are derived/hashed from this.
+  master_key: ${LITELLM_MASTER_KEY}
+
+  # PostgreSQL stores API key hashes, spend logs, budget state, and user/team
+  # metadata. The hostname "coredb" resolves via Tailscale MagicDNS.
+  database_url: postgresql://${DB_USER}:${DB_PASS}@coredb:5432/litellm
+
+  # OpenTelemetry tracing exports to the OTel Collector (otlp-grpc on port 4317)
+  # so every LLM call appears as a span in Grafana Tempo / Jaeger.
+  otel: true
+
+  # Alerting: LiteLLM can push alerts (budget exceeded, provider down) to
+  # Slack, email, or a webhook. Uncomment and configure in production.
+  # alerting:
+  #   - slack
+  # alerting_args:
+  #   slack_webhook_url: ${SLACK_ALERTS_WEBHOOK}
+
+# ---------------------------------------------------------------------------
+# MODEL LIST — all available models across three providers
+# ---------------------------------------------------------------------------
+# Each entry defines the friendly "model_name" exposed to clients and maps it
+# to the underlying LiteLLM router string. Rate limits (rpm/tpm) are per-key
+# defaults; they can be tightened per-team in team_settings below.
+model_list:
+  # =========================================================================
+  # DEEPSEEK — Tier 1 (Primary / Cost Leader)
+  #   deepseek-chat:  $0.14/M input, $0.28/M output
+  #   deepseek-reasoner: $0.55/M input, $2.19/M output (chain-of-thought)
+  #   Why first: cheapest per-token cost, very fast inference, good general quality.
+  #   Caveat: lower ceiling on reasoning complexity vs Claude/OpenAI.
+  # =========================================================================
+  - model_name: deepseek-v4-pro
+    litellm_params:
+      model: deepseek/deepseek-chat
+      api_key: ${DEEPSEEK_API_KEY}
+      api_base: https://api.deepseek.com/v1
+      rpm: 1000            # requests per minute — generous headroom
+      tpm: 500000          # tokens per minute — ~$0.14/min at full throttle
+
+  - model_name: deepseek-reasoner
+    litellm_params:
+      model: deepseek/deepseek-reasoner
+      api_key: ${DEEPSEEK_API_KEY}
+      api_base: https://api.deepseek.com/v1
+      rpm: 300             # reasoner is slower/expensive; tighter cap
+      tpm: 150000
+
+  # =========================================================================
+  # OPENAI — Tier 2 (Fallback 1 / Balanced)
+  #   gpt-4o:         $2.50/M input, $10.00/M output
+  #   gpt-4o-mini:    $0.15/M input, $0.60/M output
+  #   Why second: strong ecosystem, multimodal, good latency.
+  #   Used when DeepSeek is down, rate-limited, or for multimodal tasks.
+  # =========================================================================
+  - model_name: gpt-4o
+    litellm_params:
+      model: openai/gpt-4o
+      api_key: ${OPENAI_API_KEY}
+      rpm: 500
+      tpm: 300000
+
+  - model_name: gpt-4o-mini
+    litellm_params:
+      model: openai/gpt-4o-mini
+      api_key: ${OPENAI_API_KEY}
+      rpm: 3000
+      tpm: 1000000
+
+  # =========================================================================
+  # ANTHROPIC — Tier 3 (Fallback 2 / Quality Leader)
+  #   claude-opus-4-7:  $15.00/M input, $75.00/M output
+  #   claude-sonnet-4-6: $3.00/M input, $15.00/M output
+  #   Why third: highest quality for complex reasoning, but most expensive.
+  #   Used as last resort in cost-optimized path, or first choice in quality path.
+  # =========================================================================
+  - model_name: claude-opus-4-7
+    litellm_params:
+      model: anthropic/claude-opus-4-7
+      api_key: ${ANTHROPIC_API_KEY}
+      rpm: 200
+      tpm: 100000
+
+  - model_name: claude-sonnet-4-6
+    litellm_params:
+      model: anthropic/claude-sonnet-4-6
+      api_key: ${ANTHROPIC_API_KEY}
+      rpm: 500
+      tpm: 250000
+
+# ---------------------------------------------------------------------------
+# MODEL GROUPS — logical bundles for different use-case profiles
+# ---------------------------------------------------------------------------
+# Clients can target a group name instead of a specific model, and LiteLLM
+# will pick the best available model within that group per the routing strategy.
+#
+# Usage from client code:
+#   "model": "cheap"       → picks cheapest available
+#   "model": "quality"     → picks highest-quality available
+#   "model": "balanced"    → picks the middle-ground option
+#
+# This indirection lets operators swap the underlying models without
+# changing any application code (e.g., when a new cheaper model launches,
+# just add it to the "cheap" group and it gets picked up automatically).
+litellm_settings:
+  model_group_info:
+    # CHEAP group — used for high-volume, low-stakes tasks:
+    # summarization, classification, bulk extraction, embedding prep.
+    cheap:
+      - deepseek-v4-pro          # 1st choice: $0.28/M output
+      - gpt-4o-mini              # fallback: $0.60/M output
+      - claude-sonnet-4-6        # last resort: $15.00/M output
+
+    # QUALITY group — used for high-stakes reasoning, legal analysis,
+    # architecture decisions, final-draft generation.
+    quality:
+      - claude-opus-4-7          # 1st choice: best reasoning
+      - gpt-4o                   # fallback: strong multimodal
+      - deepseek-reasoner        # last resort: chain-of-thought
+
+    # BALANCED group — general-purpose chat, code gen, RAG pipelines.
+    balanced:
+      - deepseek-v4-pro          # cheapest that's "good enough"
+      - gpt-4o                   # solid fallback
+      - claude-sonnet-4-6        # quality fallback
+
+# ---------------------------------------------------------------------------
+# LITELLM SETTINGS — operational parameters
+# ---------------------------------------------------------------------------
+litellm_settings:
+  # Timeout: 120 seconds for long completions. Most requests complete <30s.
+  request_timeout: 120
+
+  # Suppress verbose debug logs in production (set true in dev).
+  set_verbose: false
+
+  # Structured JSON logs for Fluentd / Loki ingestion.
+  json_logs: true
+
+  # -----------------------------------------------------------------------
+  # REDIS CACHE — eliminates duplicate API calls for identical prompts
+  # -----------------------------------------------------------------------
+  # Semantic caching: if two requests have the same prompt within the TTL,
+  # LiteLLM returns the cached response without calling the upstream model.
+  # This saves significant cost for high-traffic RAG apps.
+  #
+  # Redis runs on the same Docker network; hostname resolves via Tailscale.
+  cache: true
+  cache_params:
+    type: redis
+    host: ${REDIS_HOST}
+    port: 6379
+    password: ${REDIS_PASSWORD}
+    ttl: 3600              # 1 hour — balance freshness vs cost savings
+    # Cache namespace to avoid collisions with other apps on Redis
+    namespace: "litellm_cache"
+    # Only cache responses >0.9 similarity (semantic dedup threshold)
+    similarity_threshold: 0.9
+
+  # -----------------------------------------------------------------------
+  # CALLBACKS — metrics and logging hooks
+  # -----------------------------------------------------------------------
+  # success_callback fires on every 2xx upstream response.
+  # failure_callback fires on every 4xx/5xx upstream response.
+  # prometheus: emits metrics to :4000/metrics (scraped by Grafana Agent)
+  #   Metrics include: token count, cost, latency, model, user, team
+  success_callback: ["prometheus"]
+  failure_callback: ["prometheus"]
+
+  # Optional: log to a data warehouse for long-term analytics
+  # success_callback: ["prometheus", "langfuse"]
+
+# ---------------------------------------------------------------------------
+# ROUTER SETTINGS — routing strategy, fallbacks, retries, cooldown
+# ---------------------------------------------------------------------------
+router_settings:
+  # -----------------------------------------------------------------------
+  # ROUTING STRATEGY
+  # -----------------------------------------------------------------------
+  # "latency-based-routing" — LiteLLM maintains a rolling latency average
+  # for each model/deployment and routes requests to the fastest instance.
+  # Other options: "usage-based-routing" (least-busy), "cost-based-routing".
+  routing_strategy: "latency-based-routing"
+
+  # Number of allowed consecutive failures before marking a deployment as down.
+  # After this threshold, the cooldown timer starts.
+  allowed_fails: 3
+
+  # Number of automatic retries on transient failures (network, 5xx).
+  # Exponential backoff: 1s, 2s, 4s between retries.
+  num_retries: 3
+
+  # -----------------------------------------------------------------------
+  # FALLBACK CHAINS
+  # -----------------------------------------------------------------------
+  # When a model fails (after retries exhausted), LiteLLM walks the
+  # fallback list in order. This is the heart of our multi-provider
+  # resilience strategy.
+  #
+  # COST-OPTIMIZED PATH (primary use case):
+  #   DeepSeek → GPT-4o-mini → Claude Sonnet
+  #   Always tries cheapest first, escalates only on failure.
+  #
+  # QUALITY PATH:
+  #   GPT-4o → Claude Opus → DeepSeek
+  #   Always tries highest-quality, falls back with reduced quality.
+  #
+  # CATCH-ALL for Anthropic:
+  #   Claude Opus → GPT-4o → DeepSeek
+  #   Quality-first path when Claude is explicitly requested.
+  fallbacks:
+    # --- Cost-optimized fallback chains ---
+    - deepseek/deepseek-chat: ["openai/gpt-4o-mini", "anthropic/claude-sonnet-4-6"]
+    - deepseek/deepseek-reasoner: ["openai/gpt-4o", "anthropic/claude-sonnet-4-6"]
+
+    # --- Quality fallback chains ---
+    - openai/gpt-4o: ["anthropic/claude-opus-4-7", "deepseek/deepseek-chat"]
+    - openai/gpt-4o-mini: ["deepseek/deepseek-chat", "anthropic/claude-sonnet-4-6"]
+
+    # --- Anthropic fallback chains ---
+    - anthropic/claude-opus-4-7: ["openai/gpt-4o", "deepseek/deepseek-chat"]
+    - anthropic/claude-sonnet-4-6: ["deepseek/deepseek-chat", "openai/gpt-4o-mini"]
+
+  # -----------------------------------------------------------------------
+  # LOAD BALANCING & PREVIEW ROUTING
+  # -----------------------------------------------------------------------
+  # enable_loadbalancing: when multiple deployments of the same model exist,
+  # distribute requests across them (round-robin by default, or weighted).
+  enable_loadbalancing: true
+
+  # enable_preview_routing: LiteLLM tests each upstream before sending the
+  # real request to ensure it's alive. Adds ~50ms overhead but prevents
+  # sending payloads to dead backends.
+  enable_preview_routing: true
+
+  # enable_tag_filtering: allow routing rules based on metadata tags
+  # (e.g., route all "legal-team" requests to the quality group).
+  enable_tag_filtering: true
+
+  # -----------------------------------------------------------------------
+  # COOLDOWN — circuit breaker for failing deployments
+  # -----------------------------------------------------------------------
+  # When a model/deployment hits allowed_fails consecutive failures,
+  # it enters cooldown for this many seconds. During cooldown, no requests
+  # are routed to it. This implements a circuit breaker pattern.
+  #
+  # After cooldown expires, a single probe request is sent. If it succeeds,
+  # the deployment rejoins the pool. If it fails, cooldown restarts.
+  cooldown_time: 30
+
+  # Maximum parallel requests before queuing. Protects upstream APIs from
+  # being overwhelmed and enforces rate limits at the proxy level.
+  default_max_parallel_requests: 100
+
+# ---------------------------------------------------------------------------
+# REQUEST QUEUEING — Redis-backed priority queues
+# ---------------------------------------------------------------------------
+# When max_parallel_requests is exceeded, incoming requests are enqueued
+# in Redis rather than rejected outright. This smooths traffic spikes
+# and prevents 429 responses during load peaks.
+#
+# THREE PRIORITY TIERS:
+#   realtime:  High priority, FIFO, dequeued within 1s (interactive chat, UI)
+#   batch:     Medium priority, dequeued within 30s (bulk processing, ETL)
+#   background: Low priority, dequeued when idle (data enrichment, backfills)
+#
+# Clients select the queue via the "X-LiteLLM-Priority" HTTP header:
+#   X-LiteLLM-Priority: realtime | batch | background
+routing_settings:
+  queueing:
+    enabled: true
+    backend: redis
+    redis_url: redis://:${REDIS_PASSWORD}@${REDIS_HOST}:6379/1
+    # Queue lease time: if a worker picks up a request but crashes before
+    # completing it, another worker claims it after this many seconds.
+    queue_lease_time: 30
+    # Max items per queue before rejecting (backpressure)
+    max_queue_depth:
+      realtime: 500
+      batch: 2000
+      background: 10000
+    # Default TTL for queued items before they are discarded
+    queue_ttl: 120
+
+# ---------------------------------------------------------------------------
+# BUDGET TRACKING — organization-wide spend controls
+# ---------------------------------------------------------------------------
+budget_settings:
+  enabled: true
+
+  # max_budget: hard cap in USD per budget_duration. When exceeded, ALL
+  # requests across ALL users are rejected with 402 Payment Required.
+  # Defaults to $10,000/month if LITELLM_MAX_BUDGET is not set.
+  max_budget: ${LITELLM_MAX_BUDGET:-10000}
+
+  # soft_budget: when exceeded, alerts fire (Slack, email, webhook) but
+  # requests are NOT blocked. This gives teams time to adjust before
+  # the hard limit kicks in. Defaults to $8,000/month.
+  soft_budget: ${LITELLM_SOFT_BUDGET:-8000}
+
+  # Duration for budget reset. "1mo" = calendar month.
+  # Other options: "1d", "7d", "30d" (rolling windows).
+  budget_duration: "1mo"
+
+  # Optional: per-team budget overrides (see team_settings below).
+  # If a team exceeds its team budget, only that team is blocked;
+  # other teams continue unaffected.
+
+# ---------------------------------------------------------------------------
+# TEAM SETTINGS — per-team access controls, budgets, rate limits
+# ---------------------------------------------------------------------------
+# Teams are logical groups of API keys. Each team gets:
+#   - A list of allowed models (model whitelist)
+#   - A monthly budget cap
+#   - Per-model rate limits (tighter than global defaults)
+#   - Optional: max parallel requests
+#
+# Teams are managed via the LiteLLM admin API (/team/new, /team/update).
+# The config below provides defaults; actual values are populated from
+# the database at startup.
+#
+# Example team definitions (managed dynamically):
+#
+#   Engineering Team — high volume, cost-conscious:
+#     models: [deepseek-v4-pro, gpt-4o-mini, claude-sonnet-4-6]
+#     budget: $2000/month
+#     tpm_limit: deepseek-v4-pro=200000, gpt-4o-mini=500000
+#
+#   Legal Team — quality-first, lower volume:
+#     models: [claude-opus-4-7, gpt-4o, deepseek-reasoner]
+#     budget: $5000/month
+#     tpm_limit: claude-opus-4-7=50000, gpt-4o=100000
+#
+#   Data Science Team — balanced, high tokens:
+#     models: [deepseek-v4-pro, gpt-4o, claude-sonnet-4-6]
+#     budget: $3000/month
+#     tpm_limit: deepseek-v4-pro=300000, gpt-4o=200000
+
+# ---------------------------------------------------------------------------
+# RATE LIMITING — token bucket per user per model
+# ---------------------------------------------------------------------------
+# Token bucket algorithm:
+#   Each (key, model) pair gets a bucket that refills at `rate` tokens/second
+#   up to `capacity` tokens. Requests consume tokens equal to their
+#   estimated token count. If bucket is empty, the request is either:
+#     - Rejected with 429 (hard limit)
+#     - Queued with Retry-After header (soft limit, see queueing above)
+#
+# These are DEFAULT limits; per-key overrides via the admin API take
+# precedence.
+router_settings:
+  rate_limits:
+    # Per-model default rate limits
+    default_limits:
+      max_requests_per_minute: 1000
+      max_tokens_per_minute: 500000
+
+    # Tighter per-model overrides (applied unless per-key override exists)
+    per_model_limits:
+      deepseek-v4-pro:
+        max_requests_per_minute: 1000
+        max_tokens_per_minute: 500000
+      gpt-4o:
+        max_requests_per_minute: 500
+        max_tokens_per_minute: 300000
+      gpt-4o-mini:
+        max_requests_per_minute: 3000
+        max_tokens_per_minute: 1000000
+      claude-opus-4-7:
+        max_requests_per_minute: 200
+        max_tokens_per_minute: 100000
+      claude-sonnet-4-6:
+        max_requests_per_minute: 500
+        max_tokens_per_minute: 250000
+
+  # Rate limit response headers sent to clients:
+  #   X-RateLimit-Limit-Requests:       max RPM for this key/model
+  #   X-RateLimit-Remaining-Requests:   RPM remaining in window
+  #   X-RateLimit-Limit-Tokens:         max TPM for this key/model
+  #   X-RateLimit-Remaining-Tokens:     TPM remaining in window
+  #   X-RateLimit-Reset:                Unix timestamp when limits reset
+  enable_rate_limit_headers: true
+
+# ---------------------------------------------------------------------------
+# SPEND TRACKING — Grafana integration
+# ---------------------------------------------------------------------------
+# LiteLLM emits the following Prometheus-compatible metrics on :4000/metrics:
+#
+#   litellm_requests_total{model, user, team, status}
+#     Counter: total requests, segmented by model/user/team/status code
+#
+#   litellm_tokens_total{model, direction, user, team}
+#     Counter: total tokens, direction=input|output, per model/user/team
+#
+#   litellm_cost_total{model, user, team, currency}
+#     Counter: total cost in USD, per model/user/team
+#
+#   litellm_latency_seconds{model, quantile}
+#     Histogram: request latency distribution per model
+#
+# Grafana Agent scrapes :4000/metrics every 15s and pushes to Mimir.
+# Pre-built dashboards are available in the Grafana dashboard library.
+#
+# Key Grafana dashboard queries (PromQL):
+#
+#   Cost by model (last 24h):
+#     sum(rate(litellm_cost_total[24h])) by (model)
+#
+#   Cost by user (last 7d):
+#     sum(rate(litellm_cost_total[7d])) by (user)
+#
+#   Cost by team (current month):
+#     sum(increase(litellm_cost_total[30d])) by (team)
+#
+#   Budget utilization %:
+#     (sum(litellm_cost_total) / ${LITELLM_MAX_BUDGET}) * 100
+#
+#   Token efficiency (output/input ratio):
+#     sum(rate(litellm_tokens_total{direction="output"}[1h]))
+#     /
+#     sum(rate(litellm_tokens_total{direction="input"}[1h]))
+#
+#   Provider failure rate:
+#     sum(rate(litellm_requests_total{status=~"5.."}[5m])) by (model)
+#     /
+#     sum(rate(litellm_requests_total[5m])) by (model)
+
+# ---------------------------------------------------------------------------
+# GPU-READY ARCHITECTURE — vLLM / TGI future integration
+# ---------------------------------------------------------------------------
+# When the GPU server (gpu-worker) is provisioned with NVIDIA A100/H100,
+# LiteLLM will route to a local vLLM or TGI instance as the PRIMARY, with
+# cloud APIs as overflow.
+#
+# Planned configuration (commented out until GPU is online):
+#
+#   - model_name: llama-3-70b-local
+#     litellm_params:
+#       model: openai/llama-3-70b             # vLLM exposes OpenAI-compatible API
+#       api_base: http://gpu-worker:8000/v1    # Tailscale mesh address
+#       api_key: ${VLLM_API_KEY}               # set in vLLM launch args
+#       rpm: 5000                              # much higher — no per-token cost
+#       tpm: 10000000
+#
+# Overflow strategy:
+#   router_settings:
+#     fallbacks:
+#       - openai/llama-3-70b: ["deepseek/deepseek-chat", "openai/gpt-4o-mini"]
+#
+# Pre-warming:
+#   On GPU server boot, pre-load the top 3 models into VRAM to avoid
+#   cold-start latency. vLLM supports --model-prefix-caching for this.
+#
+# Auto-scaling:
+#   Monitor queue depth via Prometheus. When litellm_queue_depth > 100 for
+#   >60s, trigger a Nomad/K8s job to spin up an additional vLLM replica on
+#   the GPU server (or a spot GPU instance if cloud-bursting).
+
+# ---------------------------------------------------------------------------
+# PROVIDER HEALTH CHECKS
+# ---------------------------------------------------------------------------
+# LiteLLM exposes a /health endpoint that reports status for each upstream
+# provider. The response payload looks like:
+#
+#   {
+#     "deepseek/deepseek-chat": "healthy",
+#     "openai/gpt-4o": "healthy",
+#     "anthropic/claude-opus-4-7": "unhealthy"
+#   }
+#
+# Additionally, each provider is probed every 30s via a lightweight
+# model-list or tokenizer call (not a full completion — just confirms
+# the API key is valid and the endpoint is reachable).
+#
+# Circuit breaker:
+#   After 5 consecutive probe failures (configurable via allowed_fails),
+#   the provider is marked "unhealthy" and all traffic is routed to
+#   fallbacks. The provider is re-tested every 60s. On first successful
+#   probe, it rejoins the pool.
+#
+#   This is implemented via router_settings.cooldown_time and
+#   router_settings.allowed_fails above.
+#
+# Alert rules (Prometheus alertmanager):
+#   - alert: ProviderDown
+#     expr: litellm_health_status == 0
+#     for: 2m
+#     annotations:
+#       summary: "{{ $labels.model }} is unhealthy"
+#
+#   - alert: HighFailureRate
+#     expr: rate(litellm_requests_total{status=~"5.."}[5m]) > 0.1
+#     for: 5m
+#     annotations:
+#       summary: "{{ $labels.model }} failure rate > 10%"
+
+# ---------------------------------------------------------------------------
+# SECURITY SETTINGS
+# ---------------------------------------------------------------------------
+# API key management:
+#   - Master key: ${LITELLM_MASTER_KEY} — set via Docker secret or .env
+#   - Provider keys: ${OPENAI_API_KEY}, ${ANTHROPIC_API_KEY}, ${DEEPSEEK_API_KEY}
+#     — injected at runtime, NEVER committed to version control
+#   - User/team keys: hashed with bcrypt, stored in PostgreSQL litellm.keys table
+#     — generated via /key/generate admin endpoint
+#
+# Request logging:
+#   - litellm.spend_logs table captures: model, tokens_in, tokens_out,
+#     cost, user, team, timestamp, request_id
+#   - PROMPT CONTENT IS NEVER LOGGED (PII/security risk)
+#   - Set store_prompts: false below to enforce this
+#
+# Prompt injection detection:
+#   - LiteLLM supports guardrails via callbacks. Integrate with:
+#     - Lakera Guard (lakera.ai) for prompt injection detection
+#     - Microsoft Presidio for PII redaction
+#   - Configure as: success_callback: ["prometheus", "lakera_guard"]
+#
+# IP-based rate limiting:
+#   - Traefik middleware (on the reverse proxy layer) enforces per-IP rate
+#     limits: 100 requests/minute per IP for /v1/chat/completions
+#   - LiteLLM enforces per-key rate limits (see router_settings.rate_limits)
+#
+# TLS:
+#   - All traffic between services is encrypted via Tailscale WireGuard mesh
+#   - External clients hit Traefik over HTTPS (Let's Encrypt via Traefik)
+#   - Internal service-to-service is over HTTP on the Tailscale network
+#     (encrypted at the WireGuard layer)
+general_settings:
+  store_prompts: false      # NEVER log prompt content
+  store_responses: false    # NEVER log response content
+
+# ---------------------------------------------------------------------------
+# OBSERVABILITY — metrics, traces, logs
+# ---------------------------------------------------------------------------
+# Metrics:          Prometheus at :4000/metrics (see spend tracking above)
+# Traces:           OpenTelemetry → OTel Collector → Grafana Tempo
+# Logs:             JSON structured → stdout → Docker log driver → Loki
+# Dashboards:       Grafana (see ai-infra-standards.md for panel specs)
+#
+# Key alert rules to configure in Grafana Alerting or Prometheus Alertmanager:
+#
+#   1. ProviderOutage:
+#      - Trigger: no successful requests to a model for >2 minutes
+#      - Severity: critical
+#      - Action: page on-call via PagerDuty
+#
+#   2. BudgetNearLimit:
+#      - Trigger: spend > soft_budget (80% of monthly cap)
+#      - Severity: warning
+#      - Action: Slack notification to #ai-infra-alerts
+#
+#   3. BudgetExceeded:
+#      - Trigger: spend > max_budget (100% of monthly cap)
+#      - Severity: critical
+#      - Action: auto-disable all keys until manual review
+#
+#   4. LatencySpike:
+#      - Trigger: p95 latency > 10x baseline for >5 minutes
+#      - Severity: warning
+#      - Action: Slack notification with model name and current p95
+#
+#   5. RateLimitHit:
+#      - Trigger: rate of 429 responses > 10% for any model
+#      - Severity: warning
+#      - Action: Slack notification, consider bumping limits
+#
+#   6. CostAnomaly:
+#      - Trigger: hourly cost > 2x the 7-day rolling average hourly cost
+#      - Severity: warning
+#      - Action: Slack notification with user/team breakdown

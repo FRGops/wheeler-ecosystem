@@ -1,0 +1,464 @@
+# Caching Strategy for High-Traffic Endpoints
+# Generated: 2026-05-23
+# Target: Wheeler Ecosystem API services
+
+# ============================================================================
+# CACHE ARCHITECTURE OVERVIEW
+# ============================================================================
+#
+# Layer 1: Application Memory (LRU Cache)
+#   - Backend: lru_cache (Python) / node-lru-cache (TypeScript)
+#   - Use: Config, reference data, user session tokens
+#   - TTL: 5-300 seconds
+#   - Size: Small (~1000 entries)
+#
+# Layer 2: Redis (Distributed Cache)
+#   - Backend: Existing Redis at 100.118.166.117:6379
+#   - Use: Dashboard stats, pipeline aggregations, agent results
+#   - TTL: 30-900 seconds
+#   - Size: Up to 256 MB
+#
+# Layer 3: PostgreSQL Materialized Views
+#   - Use: Complex analytics (daily/weekly aggregations)
+#   - Refresh: CONCURRENTLY every 5-15 minutes
+#
+# ============================================================================
+
+# ============================================================================
+# CACHE KEY DESIGN
+# ============================================================================
+
+CACHE_KEY_NAMING = """
+# Format: {domain}:{entity}:{operation}:{hash_of_params}
+# Examples:
+#   crm:dashboard:stats:user_42
+#   crm:pipeline:summary:stage_qualified
+#   crm:cases:list:abc123def
+#   agent:frigcrm:scorer:result:def456abc
+#   litellm:embed:text:hash_of_input_text
+"""
+
+# ============================================================================
+# ENDPOINT CACHING RECOMMENDATIONS
+# ============================================================================
+
+FRGCRM_API_CACHE_TARGETS = [
+    # (endpoint, TTL seconds, cache layer, invalidation trigger, rationale)
+    {
+        "endpoint": "GET /api/dashboard/stats",
+        "ttl_seconds": 300,
+        "layer": "redis",
+        "invalidation": "case.created, case.updated, case.deleted",
+        "rationale": "Aggregated stats; 5-min staleness acceptable for dashboard",
+        "estimated_hit_rate": "85%",
+    },
+    {
+        "endpoint": "GET /api/pipeline/stats",
+        "ttl_seconds": 300,
+        "layer": "redis",
+        "invalidation": "case.stage_changed, pipeline.promoted",
+        "rationale": "Pipeline overview changes slowly",
+        "estimated_hit_rate": "80%",
+    },
+    {
+        "endpoint": "GET /api/cases",
+        "ttl_seconds": 30,
+        "layer": "redis",
+        "invalidation": "case.updated, case.created (per case_id)",
+        "rationale": "Heavily polled by agent-svc every 5 min; 30s freshness OK",
+        "estimated_hit_rate": "70%",
+    },
+    {
+        "endpoint": "GET /api/cases/{id}",
+        "ttl_seconds": 60,
+        "layer": "redis",
+        "invalidation": "case.updated:{id}",
+        "rationale": "Individual case views; cache reduces repeated loads",
+        "estimated_hit_rate": "40%",
+    },
+    {
+        "endpoint": "GET /api/attorney/prospects",
+        "ttl_seconds": 120,
+        "layer": "redis",
+        "invalidation": "attorney.onboarded, case.attorney_changed",
+        "rationale": "Attorney matching results; daily batch updates",
+        "estimated_hit_rate": "75%",
+    },
+    {
+        "endpoint": "GET /api/contacts",
+        "ttl_seconds": 60,
+        "layer": "redis",
+        "invalidation": "contact.updated, contact.created",
+        "rationale": "Contact lists change infrequently",
+        "estimated_hit_rate": "50%",
+    },
+    {
+        "endpoint": "GET /api/reports/summary",
+        "ttl_seconds": 600,
+        "layer": "redis",
+        "invalidation": "manual_refresh or time-based only",
+        "rationale": "Report data; daily generation, 10-min cache",
+        "estimated_hit_rate": "95%",
+    },
+]
+
+AGENT_SVC_CACHE_TARGETS = [
+    {
+        "endpoint": "Agent run results (all agent-svc)",
+        "ttl_seconds": 600,
+        "layer": "redis",
+        "invalidation": "Configurable per agent type",
+        "rationale": "LLM inference results are expensive; 10-min cache on identical inputs",
+        "key_pattern": "agent:{service}:{agent_name}:{hash(input_params)}",
+        "estimated_hit_rate": "60%",
+    },
+    {
+        "endpoint": "LiteLLM embeddings",
+        "ttl_seconds": 86400,
+        "layer": "redis",
+        "invalidation": "None (content-addressed by hash)",
+        "rationale": "Embeddings for same text never change; cache 24h",
+        "key_pattern": "embed:{model}:{hash(text)}",
+        "estimated_hit_rate": "40%",
+    },
+    {
+        "endpoint": "County adapter configs",
+        "ttl_seconds": 3600,
+        "layer": "in-memory",
+        "invalidation": "Admin config update",
+        "rationale": "County adapter selectors, URL patterns; change rarely",
+        "estimated_hit_rate": "99%",
+    },
+]
+
+# ============================================================================
+# REDIS CACHE IMPLEMENTATION (FASTAPI)
+# ============================================================================
+
+FASTAPI_REDIS_CACHE_DECORATOR = """
+# file: /opt/wheeler/apps/frgcrm/api/services/cache_decorator.py
+
+import json
+import hashlib
+import logging
+import os
+from functools import wraps
+from typing import Any, Callable, Optional
+
+import redis.asyncio as aioredis
+
+logger = logging.getLogger(__name__)
+
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+
+class CacheManager:
+    \"\"\"Async Redis cache manager with stats.\"\"\"
+    def __init__(self):
+        self._redis: Optional[aioredis.Redis] = None
+        self.hits = 0
+        self.misses = 0
+
+    async def _get_redis(self) -> aioredis.Redis:
+        if self._redis is None:
+            self._redis = aioredis.from_url(
+                REDIS_URL,
+                socket_timeout=2,
+                socket_connect_timeout=2,
+                decode_responses=True,
+            )
+        return self._redis
+
+    async def get(self, key: str) -> Optional[Any]:
+        try:
+            r = await self._get_redis()
+            value = await r.get(key)
+            if value:
+                self.hits += 1
+                return json.loads(value)
+            self.misses += 1
+            return None
+        except Exception as e:
+            logger.warning(f"Cache read failed: {e}")
+            self.misses += 1
+            return None
+
+    async def set(self, key: str, value: Any, ttl: int = 60) -> None:
+        try:
+            r = await self._get_redis()
+            await r.setex(key, ttl, json.dumps(value, default=str))
+        except Exception as e:
+            logger.warning(f"Cache write failed: {e}")
+
+    async def invalidate_pattern(self, pattern: str) -> int:
+        \"\"\"Delete all keys matching pattern. Returns count deleted.\"\"\"
+        try:
+            r = await self._get_redis()
+            keys = []
+            async for key in r.scan_iter(match=pattern):
+                keys.append(key)
+            if keys:
+                return await r.delete(*keys)
+            return 0
+        except Exception as e:
+            logger.warning(f"Cache invalidation failed: {e}")
+            return 0
+
+    def hit_rate(self) -> float:
+        total = self.hits + self.misses
+        return self.hits / total if total > 0 else 0.0
+
+cache = CacheManager()
+
+
+def redis_cached(ttl_seconds: int = 60, key_prefix: str = ""):
+    \"\"\"Decorator: cache FastAPI endpoint results in Redis.
+
+    The cache key is built from: {key_prefix}:{func_name}:{hash(kwargs)}
+    Falls open (calls function) if Redis is unavailable.
+    \"\"\"
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        async def wrapper(*args: Any, **kwargs: Any) -> Any:
+            # Build deterministic cache key from function arguments
+            cache_params = {k: v for k, v in kwargs.items() if k not in ('db', 'request', 'background_tasks')}
+            params_json = json.dumps(cache_params, sort_keys=True, default=str)
+            params_hash = hashlib.sha256(params_json.encode()).hexdigest()[:16]
+            cache_key = f"{key_prefix}:{func.__module__}.{func.__name__}:{params_hash}"
+
+            # Try cache
+            cached = await cache.get(cache_key)
+            if cached is not None:
+                return cached
+
+            # Execute function
+            result = await func(*args, **kwargs)
+
+            # Store in cache
+            await cache.set(cache_key, result, ttl_seconds)
+            return result
+        return wrapper
+    return decorator
+
+
+# Usage:
+# @router.get("/api/dashboard/stats")
+# @redis_cached(ttl_seconds=300, key_prefix="crm")
+# async def get_dashboard_stats(db: AsyncSession = Depends(get_async_db)):
+#     ...
+"""
+
+# ============================================================================
+# REDIS CACHE IMPLEMENTATION (EXPRESS/TYPESCRIPT)
+# ============================================================================
+
+EXPRESS_REDIS_CACHE_MIDDLEWARE = """
+// file: src/middleware/cache.ts
+
+import { createClient } from 'redis';
+import { createHash } from 'crypto';
+
+const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+
+let redisClient: ReturnType<typeof createClient> | null = null;
+
+async function getRedis() {
+  if (!redisClient) {
+    redisClient = createClient({
+      url: REDIS_URL,
+      socket: { connectTimeout: 2000, timeout: 2000 },
+    });
+    redisClient.on('error', (err) => console.warn('[cache] Redis error:', err.message));
+    await redisClient.connect();
+  }
+  return redisClient;
+}
+
+interface CacheOptions {
+  ttlSeconds?: number;
+  keyPrefix?: string;
+  cacheable?: (req: any) => boolean;
+}
+
+export function cacheMiddleware(options: CacheOptions = {}) {
+  const { ttlSeconds = 60, keyPrefix = 'api', cacheable } = options;
+
+  return async (req: any, res: any, next: any) => {
+    // Only cache GET requests
+    if (req.method !== 'GET') return next();
+
+    // Optional filter
+    if (cacheable && !cacheable(req)) return next();
+
+    try {
+      const redis = await getRedis();
+      const cacheKey = buildKey(keyPrefix, req);
+
+      const cached = await redis.get(cacheKey);
+      if (cached) {
+        res.setHeader('X-Cache', 'HIT');
+        const parsed = JSON.parse(cached);
+        return res.json(parsed);
+      }
+
+      // Intercept response
+      const originalJson = res.json.bind(res);
+      res.json = (body: any) => {
+        res.setHeader('X-Cache', 'MISS');
+        // Don't cache errors
+        if (res.statusCode < 400) {
+          redis.setEx(cacheKey, ttlSeconds, JSON.stringify(body)).catch(() => {});
+        }
+        return originalJson(body);
+      };
+
+      next();
+    } catch {
+      // Fail open — don't block requests if Redis is down
+      res.setHeader('X-Cache', 'BYPASS');
+      next();
+    }
+  };
+}
+
+function buildKey(prefix: string, req: any): string {
+  const normalized = JSON.stringify({
+    path: req.path,
+    query: req.query,
+    // Include user ID if available for per-user caching
+    user: req.user?.id || 'anonymous',
+  });
+  const hash = createHash('sha256').update(normalized).digest('hex').slice(0, 16);
+  return `cache:${prefix}:${hash}`;
+}
+
+// Invalidation helper:
+export async function invalidateCache(pattern: string): Promise<number> {
+  try {
+    const redis = await getRedis();
+    let deleted = 0;
+    for await (const key of redis.scanIterator({ MATCH: pattern, COUNT: 100 })) {
+      await redis.del(key);
+      deleted++;
+    }
+    return deleted;
+  } catch {
+    return 0;
+  }
+}
+
+// Usage in routes:
+// app.get('/api/cases', cacheMiddleware({ ttlSeconds: 30, keyPrefix: 'crm' }), handler);
+"""
+
+# ============================================================================
+# CACHE INVALIDATION STRATEGY
+# ============================================================================
+
+INVALIDATION_PATTERNS = """
+# 1. Write-Through Invalidation (REST mutations)
+#    On POST/PUT/DELETE, invalidate related cache keys.
+#    Example (Python):
+#    @router.post("/api/cases")
+#    async def create_case(...):
+#        result = await create_case_logic(...)
+#        await cache.invalidate_pattern("crm:*cases*")  # Invalidate case lists
+#        await cache.invalidate_pattern("crm:*dashboard*")  # Invalidate stats
+#        return result
+
+# 2. Event-Driven Invalidation (via event-bus-relay)
+#    event-bus-relay publishes events like 'case.stage_changed'.
+#    A cache-invalidator subscriber listens and clears relevant keys.
+#    This decouples cache invalidation from API logic.
+
+# 3. TTL-Based (safety net)
+#    All cached entries have a TTL. If write-through misses,
+#    stale data is auto-cleaned after TTL expires.
+
+# 4. Bulk Invalidation on Admin Actions
+#    When running migrations, data imports, or admin config changes,
+#    flush entire cache namespaces:
+#    await cache.invalidate_pattern("crm:*")
+"""
+
+# ============================================================================
+# CACHE MONITORING
+# ============================================================================
+
+CACHE_MONITORING = """
+# Add to ecosystem-guardian or a dedicated /api/admin/cache endpoint:
+
+METRICS_TO_TRACK = [
+    "cache_hits_total",
+    "cache_misses_total",
+    "cache_hit_rate_pct",
+    "cache_bypass_total",       # Redis unavailable
+    "cache_invalidation_total",
+    "cache_memory_used_bytes",  # From Redis INFO memory
+    "cache_keys_total",         # From Redis DBSIZE
+]
+
+ALERT_THRESHOLDS = {
+    "cache_hit_rate_pct":       {"warn": "< 60", "critical": "< 30"},
+    "cache_memory_used_bytes":  {"warn": "> 200MB", "critical": "> 250MB"},
+    "cache_bypass_per_minute":  {"warn": "> 10", "critical": "> 50"},
+}
+
+# Redis config for caching (redis.conf or CONFIG SET):
+REDIS_CACHE_CONFIG = """
+maxmemory 256mb
+maxmemory-policy allkeys-lru
+save ""                         # Disable RDB snapshots for cache
+appendonly no                   # Disable AOF for cache
+"""
+"""
+
+# ============================================================================
+# POSTGRESQL MATERIALIZED VIEWS
+# ============================================================================
+
+MATERIALIZED_VIEW_RECOMMENDATIONS = """
+-- Create materialized views for expensive aggregation queries
+-- that don't need real-time freshness.
+
+-- 1. Dashboard Stats View
+CREATE MATERIALIZED VIEW mv_dashboard_stats AS
+SELECT
+    date_trunc('day', created_at) AS day,
+    COUNT(*) FILTER (WHERE stage = 'qualified') AS qualified_count,
+    COUNT(*) FILTER (WHERE stage = 'docs_received') AS docs_received_count,
+    COUNT(*) FILTER (WHERE stage = 'closed_won') AS closed_won_count,
+    SUM(surplus_amount) FILTER (WHERE stage = 'closed_won') AS total_revenue
+FROM cases
+WHERE created_at > CURRENT_DATE - INTERVAL '90 days'
+GROUP BY date_trunc('day', created_at)
+ORDER BY day DESC;
+
+CREATE UNIQUE INDEX ON mv_dashboard_stats (day);
+
+-- 2. Pipeline Summary View
+CREATE MATERIALIZED VIEW mv_pipeline_summary AS
+SELECT
+    stage,
+    COUNT(*) AS case_count,
+    SUM(surplus_amount) AS total_surplus,
+    AVG(surplus_amount) AS avg_surplus,
+    COUNT(*) FILTER (WHERE attorney_id IS NOT NULL) AS attorney_assigned_count
+FROM cases
+WHERE deleted_at IS NULL
+GROUP BY stage;
+
+CREATE UNIQUE INDEX ON mv_pipeline_summary (stage);
+
+-- 3. Refresh function (run on schedule or on-demand)
+CREATE OR REPLACE FUNCTION refresh_materialized_views()
+RETURNS void AS $$
+BEGIN
+    REFRESH MATERIALIZED VIEW CONCURRENTLY mv_dashboard_stats;
+    REFRESH MATERIALIZED VIEW CONCURRENTLY mv_pipeline_summary;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 4. Schedule refresh (via pg_cron or APScheduler)
+-- Every 5 minutes:
+-- SELECT cron.schedule('refresh-mv', '*/5 * * * *', 'SELECT refresh_materialized_views()');
+"""

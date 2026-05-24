@@ -1,0 +1,108 @@
+# =============================================================================
+# Wheeler Enterprise — Docker Daemon Optimization
+# Deploy to: /etc/docker/daemon.json
+# =============================================================================
+# This config applies to ALL three servers with per-role overrides noted.
+# Docker 24+ with overlay2 storage driver.
+# =============================================================================
+
+{
+  # ── Storage ────────────────────────────────────────────────────────────
+  "storage-driver": "overlay2",
+
+  # ── Logging ────────────────────────────────────────────────────────────
+  # JSON-file with rotation — prevents disk exhaustion from container logs.
+  # Loki/Promtail will ship these, so we keep 3 rotated files max.
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "50m",
+    "max-file": "3",
+    "labels": "com.wheeler.service,com.wheeler.role",
+    "mode": "non-blocking",
+    "max-buffer-size": "4m"
+  },
+
+  # ── Exec Options ───────────────────────────────────────────────────────
+  # Native cgroupfs driver on cgroup v2 (Ubuntu 24.04 default)
+  # Uses systemd cgroup driver for better systemd integration
+  "exec-opts": ["native.cgroupdriver=systemd"],
+
+  # ── Bridge Networking ─────────────────────────────────────────────────
+  # Custom bip to avoid conflicts with Tailscale (100.64.0.0/10) and UFW
+  "bip": "172.26.0.1/16",
+  "fixed-cidr": "172.26.0.0/16",
+  "default-address-pools": [
+    {
+      "base": "172.27.0.0/16",
+      "size": 24
+    },
+    {
+      "base": "172.28.0.0/16",
+      "size": 24
+    }
+  ],
+
+  # ── DNS ────────────────────────────────────────────────────────────────
+  "dns": ["100.100.100.100", "1.1.1.1", "8.8.8.8"],
+  "dns-opts": ["ndots:1", "timeout:2", "attempts:3"],
+
+  # ── Experimental Features ─────────────────────────────────────────────
+  # BuildKit for better builds
+  "features": {
+    "buildkit": true
+  },
+
+  # ── Metrics ────────────────────────────────────────────────────────────
+  # Expose Docker daemon metrics for Prometheus
+  "metrics-addr": "127.0.0.1:9323",
+
+  # ── Container Restart Policy ──────────────────────────────────────────
+  # Maximum restart count before giving up (prevents restart loops)
+  # autoheal.sh monitors containers that hit this limit
+  "max-restarts": 10,
+
+  # ── Resource Limits (Default per-container guardrails) ────────────────
+  # These are cluster defaults; per-service overrides happen in compose files
+  "default-ulimits": {
+    "nofile": {
+      "Name": "nofile",
+      "Hard": 65536,
+      "Soft": 32768
+    },
+    "nproc": {
+      "Name": "nproc",
+      "Hard": 8192,
+      "Soft": 4096
+    }
+  },
+
+  # ── Live Restore ──────────────────────────────────────────────────────
+  # Keep containers running during Docker daemon restart/upgrade
+  "live-restore": true,
+
+  # ── Userland Proxy ────────────────────────────────────────────────────
+  # Disable userland proxy for better performance (kernel handles port mapping)
+  "userland-proxy": false,
+
+  # ── IPv6 ──────────────────────────────────────────────────────────────
+  # Enable IPv6 on Docker bridge (prepares for dual-stack)
+  "ipv6": false,
+  "fixed-cidr-v6": "",
+
+  # ── Shutdown ──────────────────────────────────────────────────────────
+  # Grace period for containers to stop before SIGKILL
+  "shutdown-timeout": 30,
+
+  # ── Registry Mirrors ──────────────────────────────────────────────────
+  # Pull-through cache for Docker Hub (reduces bandwidth, speeds up pulls)
+  # COREDB server: may omit this to save RAM
+  "registry-mirrors": [],
+
+  # ── Insecure Registries ────────────────────────────────────────────────
+  # Only for local development registries
+  "insecure-registries": [],
+
+  # ── SELinux ────────────────────────────────────────────────────────────
+  # Not enabled on Ubuntu (AppArmor is used), set true if using SELinux
+  "selinux-enabled": false
+}

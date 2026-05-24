@@ -1,0 +1,123 @@
+###############################################################################
+# TRAEFIK V3 — STATIC CONFIGURATION
+# ======================================
+# Hostinger VPS — Public Edge Router
+# Resource-constrained environment: 4-8 vCPU, 8-16 GB RAM
+# Every KB of config and MB of RAM must justify itself.
+#
+# Architectural decisions:
+# - Cloudflare DNS challenge (port 80 stays closed for ACME — no need for
+#   HTTP-01 since Cloudflare proxies all traffic and would break it)
+# - Docker provider with exposedByDefault=false — services opt in via labels
+# - File provider for Hetzner-proxied services (defines explicit upstreams)
+# - Plugins declared here but only loaded if configured — zero overhead when unused
+###############################################################################
+
+log:
+  # Structured JSON logging — easier to grep in resource-constrained env than
+  # mixed-format text logs.  Keep at ERROR in production to conserve I/O.
+  level: INFO
+  format: json
+
+api:
+  # Dashboard — only accessible via internal networks.
+  # Never expose this to the public internet.
+  dashboard: true
+  debug: false
+
+entryPoints:
+  web:
+    address: ":80"
+    # HTTP → HTTPS redirect;  Cloudflare can also do this at their edge, but
+    # having it at Traefik is defense-in-depth for direct-IP access attempts.
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+  websecure:
+    address: ":443"
+    # HSTS headers are set in dynamic middleware;  see dynamic.yml
+
+providers:
+  docker:
+    # Only route to containers that explicitly set Traefik labels.
+    # Critical for resource-constrained edge: prevents accidental exposure
+    # of containers that shouldn't be public.
+    exposedByDefault: false
+    # Use the Docker socket — Traefik watches for container events and
+    # updates routing in real-time without a restart.
+    endpoint: "unix:///var/run/docker.sock"
+    # Watch for changes every 5s (default).  No need to poll faster on edge.
+    watch: true
+    # Default network for all Docker-discovered services
+    defaultRule: "Host(`{{ .Name }}.wheeler.ai`)"
+    # Only include containers on the traefik-public network
+    network: traefik-public
+    # Don't expose swarm services (we're not running swarm)
+    swarmModeRefreshSeconds: 0
+
+  file:
+    directory: /etc/traefik/dynamic
+    watch: true
+
+certificatesResolvers:
+  cloudflare:
+    acme:
+      # Production Let's Encrypt CA
+      caServer: "https://acme-v02.api.letsencrypt.org/directory"
+      email: "admin@wheeler.ai"
+      storage: /etc/traefik/acme/acme.json
+      # DNS-01 challenge via Cloudflare — works behind Cloudflare proxy,
+      # doesn't require port 80 to be publicly reachable, and supports
+      # wildcard certificates.
+      dnsChallenge:
+        provider: cloudflare
+        # Use Cloudflare's own DNS for propagation checking — fastest
+        # resolution when Cloudflare is both DNS provider and proxy.
+        resolvers:
+          - "1.1.1.1:53"
+          - "1.0.0.1:53"
+      # Auto-renew 30 days before expiry
+      preferredChain: "ISRG Root X1"
+
+# CrowdSec bouncer plugin — Traefik v3 plugin middleware.
+# Uncomment the experimental block below and deploy CrowdSec agent + bouncer
+# to enable IP reputation-based blocking.  The middleware is referenced in
+# dynamic.yml as `crowdsec-bouncer` but gracefully no-ops if the plugin
+# isn't loaded.
+#
+# experimental:
+#   plugins:
+#     crowdsec-bouncer:
+#       moduleName: github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+#       version: v1.4.0
+
+# Disable telemetry — every byte counts on a constrained VPS
+telemetry: {}
+
+# Global timeout configuration for a resource-constrained edge.
+# Shorter timeouts prevent connection buildup when backends are slow.
+serversTransport:
+  # Maximum time to wait for a backend connection (Hetzner via Tailscale
+  # adds ~1-5ms latency;  no need to wait longer than 30s for a connection).
+  maxIdleConnsPerHost: 20
+  # Disable HTTP/2 for backend connections to Hetzner — HTTP/1.1 is simpler
+  # and has lower memory overhead per connection.
+  insecureSkipVerify: false
+
+# Resource conservation: disable access logs when not debugging.
+# They consume significant I/O on a constrained VPS especially under load.
+# Uncomment below for debugging:
+# accessLog:
+#   filePath: ""
+#   bufferingSize: 0
+accessLog: {}
+
+# Host resolver — use the host's /etc/hosts for any custom DNS overrides.
+# Not typically needed but included for Tailscale hostname resolution.
+hostResolver:
+  resolvers:
+    - "127.0.0.11:53"  # Docker internal DNS
+    - "100.100.100.100:53"  # Tailscale MagicDNS

@@ -1,0 +1,222 @@
+{
+  "metadata": {
+    "schema_version": "1.0.0",
+    "last_updated": "2026-05-24T12:00:00Z",
+    "description": "Current state of the Wheeler Repo Router pipeline system. Tracks active and completed pipeline runs, blocked repos, and system health."
+  },
+  "system": {
+    "status": "operational",
+    "uptime_seconds": 0,
+    "version": "1.0.0",
+    "node": "aiops",
+    "mode": "active",
+    "last_drift_check": null,
+    "last_dashboard_update": null
+  },
+  "active_runs": {
+    "total_active": 0,
+    "runs": []
+  },
+  "completed_runs": {
+    "total_completed": 0,
+    "last_10": []
+  },
+  "blocked_repos": {
+    "total_blocked": 0,
+    "entries": []
+  },
+  "phases": {
+    "01_intake": {
+      "label": "Repository Intake",
+      "description": "Clone or verify repo, detect repo type",
+      "non_bypassable": false
+    },
+    "02_validate": {
+      "label": "Validation",
+      "description": "Validate repo structure, required files, conventions",
+      "non_bypassable": false
+    },
+    "03_scan": {
+      "label": "Security Scan",
+      "description": "Run security scans (trivy, semgrep, secrets scan)",
+      "non_bypassable": true
+    },
+    "04_profile": {
+      "label": "Profiling",
+      "description": "Generate repo profile (type, language, framework, dependencies)",
+      "non_bypassable": false
+    },
+    "05_allocate": {
+      "label": "Port Allocation",
+      "description": "Allocate ports from port-allocation-table, check conflicts",
+      "non_bypassable": true
+    },
+    "06_generate": {
+      "label": "Template Generation",
+      "description": "Generate compose/pm2/nginx templates from profile",
+      "non_bypassable": false
+    },
+    "07_configure": {
+      "label": "Configuration",
+      "description": "Apply runtime config, environment variables, secrets",
+      "non_bypassable": false
+    },
+    "08_build": {
+      "label": "Build",
+      "description": "Build Docker images, install dependencies",
+      "non_bypassable": false
+    },
+    "09_deploy": {
+      "label": "Deploy",
+      "description": "Deploy containers/processes, activate nginx routes",
+      "non_bypassable": false
+    },
+    "10_zt_validate": {
+      "label": "Zero-Trust Validation",
+      "description": "Non-bypassable: validate all services bind to 127.0.0.1, no exposed ports",
+      "non_bypassable": true
+    },
+    "11_health_check": {
+      "label": "Health Check",
+      "description": "Verify service health endpoints return 200, check logs",
+      "non_bypassable": false
+    },
+    "12_qa_gate": {
+      "label": "QA Gate",
+      "description": "Non-bypassable: run QA scorecard, must score >= 80",
+      "non_bypassable": true
+    },
+    "13_register": {
+      "label": "Route Registration",
+      "description": "Register in route-registry, update enforcement tables",
+      "non_bypassable": false
+    },
+    "14_finalize": {
+      "label": "Finalize",
+      "description": "Verify all phases passed, generate report, notify",
+      "non_bypassable": false
+    }
+  },
+  "repo_profiles": {
+    "frgcrm": {
+      "repo_type": "fullstack",
+      "language": "typescript",
+      "framework": "react-express",
+      "node": "hostinger",
+      "port": 3300,
+      "status": "deployed",
+      "last_deployed": "2026-05-24T10:30:00Z",
+      "current_phase": 14
+    },
+    "surplusai": {
+      "repo_type": "fullstack",
+      "language": "typescript",
+      "framework": "nextjs",
+      "node": "aiops",
+      "port": 3600,
+      "status": "deployed",
+      "last_deployed": "2026-05-24T09:15:00Z",
+      "current_phase": 14
+    },
+    "private-ai": {
+      "repo_type": "agent",
+      "language": "python",
+      "framework": "fastapi",
+      "node": "aiops",
+      "port": 3700,
+      "status": "deployed",
+      "last_deployed": "2026-05-23T18:00:00Z",
+      "current_phase": 14
+    },
+    "prediction-radar": {
+      "repo_type": "backend",
+      "language": "python",
+      "framework": "fastapi",
+      "node": "aiops",
+      "port": 3800,
+      "status": "deployed",
+      "last_deployed": "2026-05-23T16:45:00Z",
+      "current_phase": 14
+    },
+    "openclaw": {
+      "repo_type": "frontend",
+      "language": "typescript",
+      "framework": "react",
+      "node": "hostinger",
+      "port": 3400,
+      "status": "deployed",
+      "last_deployed": "2026-05-20T14:00:00Z",
+      "current_phase": 14
+    },
+    "revenue-automation": {
+      "repo_type": "backend",
+      "language": "python",
+      "framework": "fastapi",
+      "node": "hostinger",
+      "port": 3500,
+      "status": "deployed",
+      "last_deployed": "2026-05-22T11:00:00Z",
+      "current_phase": 14
+    },
+    "healthchecks": {
+      "repo_type": "backend",
+      "language": "python",
+      "framework": "django",
+      "node": "aiops",
+      "port": 3900,
+      "status": "deployed",
+      "last_deployed": "2026-05-21T08:30:00Z",
+      "current_phase": 14
+    },
+    "changedetection": {
+      "repo_type": "backend",
+      "language": "python",
+      "framework": "flask",
+      "node": "aiops",
+      "port": 4000,
+      "status": "pending_deploy",
+      "last_deployed": null,
+      "current_phase": 8
+    },
+    "langflow": {
+      "repo_type": "backend",
+      "language": "python",
+      "framework": "fastapi",
+      "node": "aiops",
+      "port": 4100,
+      "status": "deployed",
+      "last_deployed": "2026-05-22T15:00:00Z",
+      "current_phase": 14
+    },
+    "n8n": {
+      "repo_type": "backend",
+      "language": "typescript",
+      "framework": "vue-express",
+      "node": "aiops",
+      "port": 4200,
+      "status": "deployed",
+      "last_deployed": "2026-05-24T08:00:00Z",
+      "current_phase": 14
+    }
+  },
+  "registered_repos": [
+    "frgcrm",
+    "surplusai",
+    "private-ai",
+    "prediction-radar",
+    "openclaw",
+    "revenue-automation",
+    "healthchecks",
+    "changedetection",
+    "langflow",
+    "n8n"
+  ],
+  "metrics": {
+    "total_deployments": 42,
+    "successful_deployments": 40,
+    "failed_deployments": 2,
+    "total_rollbacks": 3,
+    "average_deploy_time_seconds": 145,
+    "average_qa_score": 94
+  }
+}

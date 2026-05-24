@@ -1,0 +1,528 @@
+# =============================================================================
+# AIOPS (5.78.140.118) -- OPTIMIZED DOCKER COMPOSE MASTER TEMPLATE
+# Generated: 2026-05-23
+# This is a REFERENCE TEMPLATE -- merge into existing per-app compose files.
+# Each service block shows the optimized configuration that should replace
+# or augment the current compose definition.
+# =============================================================================
+
+# Shared logging configuration used across all services
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-logging-extended: &extended-logging
+  driver: json-file
+  options:
+    max-size: "25m"
+    max-file: "5"
+
+# --- Monitoring Stack (Loki + Promtail) ---
+# Current: /opt/apps/monitoring/docker-compose.yml (grafana, prometheus, health-exporter)
+# loki and promtail are started separately; integrate them here.
+
+services:
+  # ── Loki (log aggregator) ──────────────────────────────────────────
+  loki:
+    image: grafana/loki:main-2e3da9a
+    container_name: loki
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3100:3100"       # was 0.0.0.0 -- bind to localhost
+    mem_limit: 256m
+    cpus: "0.5"
+    logging: *default-logging
+    volumes:
+      - loki_data:/loki
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3100/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── Promtail (log collector) ───────────────────────────────────────
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9080:9080"       # was 0.0.0.0 -- bind to localhost
+    mem_limit: 128m
+    cpus: "0.5"
+    logging: *default-logging
+    volumes:
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - ./promtail-config.yml:/etc/promtail/config.yml:ro
+
+  # ── Grafana ────────────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:latest
+    container_name: aiops-grafana
+    restart: unless-stopped
+    ports:
+      - "3002:3000"                  # keep current public binding; consider 127.0.0.1
+    mem_limit: 512m
+    cpus: "1.0"
+    logging: *default-logging
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-ChangeMeNow123!}
+    volumes:
+      - grafana-data:/var/lib/grafana
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── Prometheus ─────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: aiops-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"                  # consider 127.0.0.1 binding
+    mem_limit: 512m
+    cpus: "0.5"
+    logging: *default-logging
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9090/-/healthy"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── Hostinger Health Exporter ──────────────────────────────────────
+  hostinger-health-exporter:
+    image: python:3.12-alpine
+    container_name: hostinger-health-exporter
+    restart: unless-stopped
+    ports:
+      - "9091:9091"
+    mem_limit: 64m
+    cpus: "0.25"
+    logging: *default-logging
+    volumes:
+      - ./hostinger-health-exporter.py:/exporter.py:ro
+    command: ["python3", "/exporter.py"]
+
+  # ── DocuSeal ───────────────────────────────────────────────────────
+  docuseal:
+    image: docuseal/docuseal:latest
+    container_name: docuseal
+    restart: unless-stopped
+    ports:
+      - "3010:3000"
+    mem_limit: 512m
+    cpus: "0.5"
+    logging: *default-logging
+    environment:
+      - SECRET_KEY_BASE=${DOCUSEAL_SECRET_KEY}
+      - REDIS_URL=redis://docuseal-redis:6379/0
+      - DOCUSEAL_API_TOKEN=${DOCUSEAL_API_TOKEN}
+    volumes:
+      - ./data:/data
+    depends_on:
+      - docuseal-redis
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  docuseal-redis:
+    image: redis:7-alpine
+    container_name: docuseal-redis
+    restart: unless-stopped
+    mem_limit: 128m
+    cpus: "0.25"
+    logging: *default-logging
+    volumes:
+      - ./redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # ── LangFlow ───────────────────────────────────────────────────────
+  langflow:
+    image: langflowai/langflow:1.0.19
+    container_name: langflow
+    restart: unless-stopped
+    ports:
+      - "7860:7860"
+    mem_limit: 2g
+    cpus: "2.0"
+    logging: *default-logging
+    volumes:
+      - ./data:/app/data
+    environment:
+      - LANGFLOW_DATABASE_URL=sqlite:////app/data/langflow.db
+      - LANGFLOW_HOST=0.0.0.0
+      - LANGFLOW_PORT=7860
+      - LANGFLOW_AUTO_LOGIN=true
+    user: "0:0"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:7860/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ── FRG Ops Standby (Postgres) ─────────────────────────────────────
+  frgops-standby:
+    image: postgres:16
+    container_name: frgops-standby
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5433:5432"       # BIND TO LOCALHOST -- was 0.0.0.0
+    mem_limit: 1g
+    cpus: "1.0"
+    logging: *default-logging
+    environment:
+      - POSTGRES_PASSWORD=${FRGOPS_DB_PASSWORD}
+    volumes:
+      - frgops_standby_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  # ── Prediction Radar Suite ──────────────────────────────────────
+  prediction-radar-app-db:
+    image: postgres:16
+    container_name: prediction-radar-app-db
+    restart: unless-stopped
+    mem_limit: 2g               # existing limit -- keep
+    cpus: "1.0"                 # ADDED
+    logging: *default-logging
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  prediction-radar-app-redis:
+    image: redis:7
+    container_name: prediction-radar-app-redis
+    restart: unless-stopped
+    mem_limit: 512m             # existing limit -- keep
+    cpus: "0.5"                 # ADDED
+    logging: *default-logging
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --save
+      - "60"
+      - "1000"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  prediction-radar-app-api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    container_name: prediction-radar-app-api
+    restart: on-failure:5        # keep existing policy
+    stop_grace_period: 30s
+    mem_limit: 1g               # existing
+    cpus: "1.0"                 # existing
+    logging: *default-logging
+    # ... env vars unchanged from current compose ...
+    env_file:
+      - .env
+    depends_on:
+      prediction-radar-app-db:
+        condition: service_healthy
+      prediction-radar-app-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import socket; s=socket.create_connection(('127.0.0.1',8000),2); s.close()\""]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 180s
+    # ... volume mounts unchanged from current ...
+
+  prediction-radar-app-web:
+    build: ./web
+    container_name: prediction-radar-app-web
+    restart: unless-stopped
+    mem_limit: 128m             # ADDED (currently uses ~13 MiB)
+    cpus: "0.25"                # ADDED
+    logging: *default-logging
+    ports:
+      - "8098:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:80"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  prediction-radar-dashboard-v2:
+    build:
+      context: ./dashboard-v2
+      dockerfile: Dockerfile
+    container_name: prediction-radar-dashboard-v2
+    restart: unless-stopped
+    mem_limit: 256m             # ADDED (currently uses ~38 MiB)
+    cpus: "0.5"                 # ADDED
+    logging: *default-logging
+    environment:
+      NODE_ENV: production
+      INTERNAL_API_BASE: "http://api:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/healthz > /dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ── RavynAI ────────────────────────────────────────────────────────
+  aiops-ravynai-postgres:
+    image: postgis/postgis:16-3.4
+    container_name: aiops-ravynai-postgres
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5434:5432"     # BIND TO LOCALHOST -- was 0.0.0.0
+    mem_limit: 512m               # ADDED
+    cpus: "0.5"                   # ADDED
+    logging: *default-logging
+    environment:
+      POSTGRES_USER: ravynai
+      POSTGRES_PASSWORD: ${RAVYNAI_DB_PASSWORD:-ravynai}
+      POSTGRES_DB: ravynai
+    volumes:
+      - ravynai-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ravynai"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  aiops-ravynai-app:
+    build: .
+    container_name: aiops-ravynai-app
+    restart: unless-stopped
+    ports:
+      - "8007:8007"
+    mem_limit: 1g                # existing
+    cpus: "1.0"                  # existing
+    logging: *default-logging
+    environment:
+      DATABASE_URL: "postgresql://ravynai:${RAVYNAI_DB_PASSWORD:-ravynai}@postgres:5432/ravynai"
+      NODE_ENV: production
+      PORT: "8007"
+    depends_on:
+      aiops-ravynai-postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8007/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── Superset + ClickHouse ──────────────────────────────────────────
+  aiops-clickhouse:
+    image: clickhouse/clickhouse-server:24.3
+    container_name: aiops-clickhouse
+    restart: unless-stopped
+    ports:
+      - "8123:8123"                # consider 127.0.0.1
+    mem_limit: 3g                  # ADDED (currently 873 MiB, with headroom)
+    cpus: "4.0"                    # ADDED
+    logging: *default-logging
+    volumes:
+      - ./clickhouse:/var/lib/clickhouse
+    environment:
+      - CLICKHOUSE_DB=aiops
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8123/ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  aiops-superset:
+    image: apache/superset:4.1.1
+    container_name: aiops-superset
+    restart: unless-stopped
+    ports:
+      - "8088:8088"
+    mem_limit: 1g                  # ADDED
+    cpus: "1.0"                    # ADDED
+    logging: *default-logging
+    environment:
+      - SUPERSET_SECRET_KEY=${SUPERSET_SECRET_KEY}
+      - SUPERSET_CONFIG_PATH=/app/pythonpath/superset_config.py
+    volumes:
+      - ./superset_home:/app/superset_home
+      - ./superset_config:/app/pythonpath
+    depends_on:
+      aiops-clickhouse:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8088/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  # ── Healthchecks ───────────────────────────────────────────────────
+  aiops-healthchecks:
+    image: lscr.io/linuxserver/healthchecks:latest
+    container_name: aiops-healthchecks
+    restart: unless-stopped
+    ports:
+      - "3130:8000"
+    mem_limit: 512m                # ADDED
+    cpus: "0.5"                    # ADDED
+    logging: *default-logging
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Los_Angeles
+      - SITE_ROOT=http://5.78.140.118:3130
+      - SITE_NAME=Wheeler AIOps Healthchecks
+    volumes:
+      - ./config:/config
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8000"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── ChangeDetection ────────────────────────────────────────────────
+  aiops-changedetection:
+    image: ghcr.io/dgtlmoon/changedetection.io:latest
+    container_name: aiops-changedetection
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    mem_limit: 512m                # ADDED
+    cpus: "0.5"                    # ADDED
+    logging: *default-logging
+    volumes:
+      - ./datastore:/datastore
+    environment:
+      - TZ=America/Los_Angeles
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:5000"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── Netdata ────────────────────────────────────────────────────────
+  netdata:
+    image: netdata/netdata:latest
+    container_name: netdata
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:19999:19999"   # BIND TO LOCALHOST -- was 0.0.0.0
+    mem_limit: 256m                # ADDED
+    cpus: "1.0"                    # ADDED
+    logging: *extended-logging     # keep existing 25m/5 rotation
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/rootfs:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:19999/api/v1/info"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── Portainer ──────────────────────────────────────────────────────
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9000:9000"     # BIND TO LOCALHOST -- was 0.0.0.0
+    mem_limit: 256m                # ADDED
+    cpus: "0.5"                    # ADDED
+    logging: *default-logging      # WAS WITHOUT LIMITS -- ADDED
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9000"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── Dockge ─────────────────────────────────────────────────────────
+  dockge:
+    image: louislam/dockge:1
+    container_name: dockge
+    restart: unless-stopped
+    ports:
+      - "5001:5001"
+    mem_limit: 256m                # ADDED
+    cpus: "0.5"                    # ADDED
+    logging: *default-logging      # WAS WITHOUT LIMITS -- ADDED
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - dockge_data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:5001"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── Uptime Kuma ────────────────────────────────────────────────────
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    container_name: uptime-kuma
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    mem_limit: 256m                # ADDED
+    cpus: "0.5"                    # ADDED
+    logging: *default-logging      # WAS WITHOUT LIMITS -- ADDED
+    volumes:
+      - uptime_kuma_data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3001"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  loki_data:
+  prometheus-data:
+  grafana-data:
+  frgops_standby_data:
+  postgres_data:
+  ravynai-pgdata:
+  portainer_data:
+  dockge_data:
+  uptime_kuma_data:

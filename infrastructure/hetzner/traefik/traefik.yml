@@ -1,0 +1,176 @@
+# =============================================================================
+# Traefik Static Configuration — traefik.yml
+# =============================================================================
+# This file is loaded at Traefik startup and defines core operational
+# parameters: entrypoints, certificate resolvers, providers, and global
+# settings. Changes here require a Traefik restart.
+#
+# WHY static vs dynamic config:
+#   - Static: Cannot be changed at runtime (entrypoints, providers, API).
+#   - Dynamic: Can be hot-reloaded (routers, middlewares, services).
+#   We split them for operational safety: critical infra settings are
+#   protected from accidental hot-reload changes.
+# =============================================================================
+
+# =============================================================================
+# ENTRYPOINTS
+# =============================================================================
+# Port 80 (web) exists ONLY for HTTP-01 ACME challenges and to redirect to
+# HTTPS. No application traffic should ever flow unencrypted.
+entryPoints:
+  web:
+    address: ":80"
+    # Rate limit at the entrypoint level as a first line of defense.
+    # This catches DDoS before it reaches routers/middlewares.
+    # Per-IP rate limit: 100 requests/s with a burst of 50.
+    rateLimit:
+      average: 100
+      burst: 50
+      sourceStrategy: "IP"
+
+    # Only respond to ACME challenge paths on port 80; everything else
+    # gets redirected to HTTPS. This keeps port 80 minimal and secure.
+    http:
+      redirections:
+        entrypoint:
+          to: websecure
+          scheme: https
+          permanent: true
+
+  websecure:
+    address: ":443"
+    # No rate limit here — that's handled at the middleware level per-route,
+    # which gives us finer control (e.g., API endpoints get stricter limits
+    # than static assets).
+
+  # Internal management port for metrics, health checks, and dashboard.
+  # Not exposed to the host — accessed via Docker network + Tailscale.
+  traefik:
+    address: ":8080"
+
+# =============================================================================
+# PROVIDERS
+# =============================================================================
+providers:
+  # Docker provider discovers containers and reads Traefik labels to
+  # dynamically configure routing. This is the primary routing mechanism.
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false   # CRITICAL: Only containers with traefik.enable=true
+    network: traefik-public    # Default network for all discovered containers
+    watch: true                # Hot-reload on container start/stop
+
+  # File provider for shared middlewares and TLS config that apply globally.
+  # These are defined in separate files for organizational clarity.
+  file:
+    directory: /etc/traefik/dynamic
+    watch: true
+
+# =============================================================================
+# LET'S ENCRYPT CERTIFICATE RESOLVERS
+# =============================================================================
+# Two resolvers are defined: staging and production.
+# WHY: Let's Encrypt has strict rate limits (50 certs/week/domain).
+# Staging has much higher limits, so we validate config with staging first,
+# then switch to production once everything works.
+#
+# Migration: To enable production, change the certresolver in container
+# labels from "letsencrypt-staging" to "letsencrypt-production".
+certificatesResolvers:
+  letsencrypt-staging:
+    acme:
+      # Staging CA — NO real certs issued. Used for testing.
+      caServer: "https://acme-staging-v02.api.letsencrypt.org/directory"
+      email: "${LETSENCRYPT_EMAIL}"
+      storage: /etc/traefik/acme/acme-staging.json
+      httpChallenge:
+        entryPoint: web
+
+  letsencrypt-production:
+    acme:
+      caServer: "https://acme-v02.api.letsencrypt.org/directory"
+      email: "${LETSENCRYPT_EMAIL}"
+      storage: /etc/traefik/acme/acme-production.json
+      httpChallenge:
+        entryPoint: web
+      # Auto-renew when 30 days from expiry
+      certificatesDuration: 90
+
+# =============================================================================
+# API & DASHBOARD
+# =============================================================================
+api:
+  dashboard: true
+  insecure: false  # NEVER enable insecure mode — always route through TLS
+
+# =============================================================================
+# METRICS
+# =============================================================================
+metrics:
+  prometheus:
+    addEntryPointsLabels: true
+    addServicesLabels: true
+    # Exposed on the management entrypoint — scraped by Prometheus
+    entryPoint: traefik
+
+# =============================================================================
+# LOGGING
+# =============================================================================
+# Structured JSON logging for machine parsing (Loki, Datadog, etc.)
+# Debug level only when troubleshooting — produces a LOT of output.
+log:
+  level: "INFO"           # DEBUG, INFO, WARN, ERROR
+  format: "json"
+  filePath: ""            # Empty = stdout
+
+# Access logs capture every request hitting Traefik. Essential for:
+#   - Debugging routing issues
+#   - Security auditing
+#   - Traffic analysis
+# Note: Generates ~50GB/month on busy servers. Rotate via Docker logging.
+accessLog:
+  format: "json"
+  filters:
+    # Don't log healthcheck noise
+    statusCodes:
+      - "200-499"
+    retries: true
+    minDuration: "100ms"  # Only log requests slower than 100ms
+  fields:
+    defaultMode: keep
+    names:
+      ClientHost: keep
+      ClientUsername: keep
+      RequestAddr: keep
+      RequestHost: keep
+      RequestPort: keep
+      RequestMethod: keep
+      RequestPath: keep
+      RequestProtocol: keep
+      RequestScheme: keep
+      RetryAttempts: drop
+      DownstreamStatus: keep
+      DownstreamContentSize: keep
+      DownstreamStatusLine: drop
+      UpstreamAddr: keep
+      UpstreamContentSize: keep
+      UpstreamStatusLine: drop
+      StartUTC: drop
+      Duration: keep
+      OriginDuration: drop
+      TLSVersion: keep
+      TLSCipher: keep
+    headers:
+      defaultMode: drop      # Don't log headers by default (privacy)
+      names:
+        Authorization: drop  # NEVER log auth headers
+        Cookie: drop
+        X-Forwarded-For: keep
+        User-Agent: keep
+        Referer: keep
+
+# =============================================================================
+# PING / HEALTHCHECK
+# =============================================================================
+ping:
+  entryPoint: traefik
