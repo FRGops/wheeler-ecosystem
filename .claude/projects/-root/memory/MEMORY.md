@@ -1,5 +1,6 @@
 # Memory Index
 
+- [Wheeler Financial OS Deployment](wheeler-financial-os-deployment.md) — 39 new financial agents + 10 docs + 4 commands deployed 2026-05-25
 - [PM2 Restart Patterns](pm2-restart-patterns.md) — 3 broken PM2 processes share DEEPSEEK_API_KEY root cause
 - [PM2 Restart Commands](pm2-restart.md) — Wheeler ecosystem PM2 restart commands, safe procedure, danger thresholds
 - [PM2 Restart Safety Pattern](pm2_restart_pattern.md) — verify→act→verify pattern for safe PM2 process recovery

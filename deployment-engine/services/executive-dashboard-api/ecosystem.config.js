@@ -5,7 +5,10 @@ module.exports = {
     interpreter: "python3",
     cwd: "/opt/apps/executive-dashboard-api",
     env: {
-      PORT: "8180"
+      PORT: "8180",
+      NEO4J_URI: "bolt://127.0.0.1:7687",
+      NEO4J_USER: "neo4j",
+      NEO4J_PASSWORD: "WheelerBrainOS-Graph-2026!-Neo4j-Root"
     },
     listen_timeout: 10000,
     kill_timeout: 5000,

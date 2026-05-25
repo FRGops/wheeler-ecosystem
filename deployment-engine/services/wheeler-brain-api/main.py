@@ -205,5 +205,206 @@ async def graph_summary():
     }
     return graph
 
+# ── PostgreSQL Memory Integration ─────────────────────────────────────────────
+
+def _pg_query(query: str):
+    """Execute a query against PostgreSQL :5433 memory layer."""
+    try:
+        result = subprocess.run(
+            ["docker", "exec", "frgops-standby", "psql", "-U", "frgops", "-d", "frgcrm",
+             "-t", "-A", "-c", query],
+            capture_output=True, text=True, timeout=15
+        )
+        if result.returncode != 0:
+            return {"error": result.stderr.strip()}
+        return [line for line in result.stdout.strip().split('\n') if line]
+    except Exception as e:
+        return {"error": str(e)}
+
+def _pg_query_json(query: str):
+    """Execute a query and return results as list of dicts."""
+    try:
+        result = subprocess.run(
+            ["docker", "exec", "frgops-standby", "psql", "-U", "frgops", "-d", "frgcrm",
+             "-t", "-A", "-F", "|", "-c", query],
+            capture_output=True, text=True, timeout=15
+        )
+        if result.returncode != 0:
+            return []
+        lines = [l for l in result.stdout.strip().split('\n') if l]
+        return lines
+    except Exception:
+        return []
+
+# ── Intelligence Memory Endpoints ─────────────────────────────────────────────
+
+class MemoryQuery(BaseModel):
+    query: str
+    limit: int = 10
+
+@app.get("/api/v1/memory/recent")
+async def memory_recent(limit: int = 20, event_type: str = None):
+    """Get recent episodic memories with optional type filter."""
+    type_clause = f"WHERE event_type = '{event_type}'" if event_type else ""
+    rows = _pg_query_json(
+        f"SELECT id, event_type, source_agent, summary, importance, created_at "
+        f"FROM episodic_memory {type_clause} ORDER BY created_at DESC LIMIT {limit}"
+    )
+    return {"memories": rows, "count": len(rows), "timestamp": datetime.now(timezone.utc).isoformat()}
+
+@app.get("/api/v1/memory/stats")
+async def memory_stats():
+    """Statistics across all memory tables."""
+    stats = {}
+    for table in ["episodic_memory", "semantic_memory", "deployment_memory", "operational_memory"]:
+        rows = _pg_query(f"SELECT count(*) FROM {table}")
+        stats[table] = int(rows[0]) if rows and not isinstance(rows, dict) else 0
+
+    # Event type breakdown
+    breakdown = _pg_query_json(
+        "SELECT event_type, count(*) FROM episodic_memory GROUP BY event_type ORDER BY count(*) DESC"
+    )
+    return {
+        "tables": stats,
+        "event_breakdown": breakdown,
+        "total_memories": sum(stats.values()),
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+@app.post("/api/v1/memory/query")
+async def memory_query(req: MemoryQuery):
+    """Execute a parameterized query against the memory layer. For complex agent queries."""
+    safe_keywords = ["SELECT", "COUNT", "FROM", "WHERE", "GROUP", "ORDER", "LIMIT", "AND", "OR", "BY", "DESC", "ASC"]
+    query_upper = req.query.upper()
+    if not any(kw in query_upper for kw in safe_keywords[:3]):
+        raise HTTPException(status_code=400, detail="Query must be a SELECT statement")
+
+    if any(dangerous in query_upper for dangerous in ["DROP", "DELETE", "UPDATE", "INSERT", "ALTER", "CREATE"]):
+        raise HTTPException(status_code=400, detail="Write operations not allowed via query endpoint")
+
+    rows = _pg_query_json(f"{req.query} LIMIT {req.limit}")
+    return {"results": rows, "count": len(rows), "timestamp": datetime.now(timezone.utc).isoformat()}
+
+# ── Intelligence Graph Endpoints ──────────────────────────────────────────────
+
+class GraphQuery(BaseModel):
+    cypher: str
+    limit: int = 50
+
+@app.post("/api/v1/graph/query")
+async def graph_query(req: GraphQuery):
+    """Execute a Cypher query against Neo4j knowledge graph."""
+    try:
+        from neo4j import GraphDatabase
+        driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+        results = []
+        with driver.session() as session:
+            r = session.run(req.cypher)
+            for record in r:
+                results.append(dict(record))
+        driver.close()
+        return {"results": results[:req.limit], "count": len(results[:req.limit]),
+                "timestamp": datetime.now(timezone.utc).isoformat()}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Graph query failed: {str(e)}")
+
+@app.get("/api/v1/graph/agents")
+async def graph_agents(domain: str = None):
+    """List registered agents from Neo4j, optionally filtered by domain."""
+    if domain:
+        cypher = f"""
+        MATCH (a:ClaudeAgent)-[:BELONGS_TO]->(d:Domain {{name: '{domain}'}})
+        RETURN a.name AS name, d.name AS domain, a.status AS status
+        """
+    else:
+        cypher = """
+        MATCH (a:ClaudeAgent)
+        OPTIONAL MATCH (a)-[:BELONGS_TO]->(d:Domain)
+        RETURN a.name AS name, d.name AS domain, a.status AS status
+        ORDER BY domain, name
+        """
+    try:
+        from neo4j import GraphDatabase
+        driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+        results = []
+        with driver.session() as session:
+            for record in session.run(cypher):
+                results.append({"name": record.get("name"), "domain": record.get("domain"),
+                                "status": record.get("status")})
+        driver.close()
+
+        domains = list(set(r["domain"] for r in results if r["domain"]))
+        return {"agents": results, "total": len(results), "domains": domains,
+                "timestamp": datetime.now(timezone.utc).isoformat()}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Agent query failed: {str(e)}")
+
+@app.get("/api/v1/graph/domains")
+async def graph_domains():
+    """List all intelligence domains and their agent counts."""
+    cypher = """
+    MATCH (d:Domain)<-[:BELONGS_TO]-(a:ClaudeAgent)
+    RETURN d.name AS domain, count(a) AS agent_count
+    ORDER BY agent_count DESC
+    """
+    try:
+        from neo4j import GraphDatabase
+        driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+        results = []
+        with driver.session() as session:
+            for record in session.run(cypher):
+                results.append({"domain": record.get("domain"), "agent_count": record.get("agent_count")})
+        driver.close()
+        return {"domains": results, "total_domains": len(results),
+                "timestamp": datetime.now(timezone.utc).isoformat()}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Domain query failed: {str(e)}")
+
+# ── Hybrid Intelligence Search ────────────────────────────────────────────────
+
+class SearchQuery(BaseModel):
+    q: str
+    limit: int = 10
+
+@app.post("/api/v1/intelligence/search")
+async def intelligence_search(req: SearchQuery):
+    """Hybrid search across graph + memory + PM2 for the given query string."""
+    results = {"graph": [], "memory": [], "pm2": [], "query": req.q}
+
+    # Graph search: find agents matching name
+    try:
+        from neo4j import GraphDatabase
+        driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+        with driver.session() as session:
+            r = session.run(
+                "MATCH (a:ClaudeAgent) WHERE a.name CONTAINS $q "
+                "RETURN a.name AS name, labels(a) AS type LIMIT $limit",
+                {"q": req.q, "limit": req.limit}
+            )
+            results["graph"] = [dict(record) for record in r]
+        driver.close()
+    except Exception:
+        pass
+
+    # Memory search: search summaries
+    rows = _pg_query_json(
+        f"SELECT id, event_type, source_agent, summary FROM episodic_memory "
+        f"WHERE summary ILIKE '%{req.q}%' ORDER BY created_at DESC LIMIT {req.limit}"
+    )
+    results["memory"] = [{"id": r.split("|")[0], "event_type": r.split("|")[1] if "|" in r else "",
+                          "agent": r.split("|")[2] if len(r.split("|")) > 1 else "",
+                          "summary": "|".join(r.split("|")[3:]) if r.count("|") >= 3 else r}
+                         for r in rows] if rows else []
+
+    # PM2 search: find running processes matching name
+    agents = _pm2_jlist()
+    results["pm2"] = [{"name": p.get("name"), "status": p.get("pm2_env", {}).get("status")}
+                      for p in agents if req.q.lower() in p.get("name", "").lower()][:req.limit]
+
+    results["total_hits"] = len(results["graph"]) + len(results["memory"]) + len(results["pm2"])
+    results["timestamp"] = datetime.now(timezone.utc).isoformat()
+    return results
+
+
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8160, log_level="info")
