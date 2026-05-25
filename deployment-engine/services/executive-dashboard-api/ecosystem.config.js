@@ -1,10 +1,12 @@
 module.exports = {
   apps: [{
     name: "executive-dashboard-api",
-    script: "main.py",
-    interpreter: "python3",
+    script: "run.sh",
+    interpreter: "none",
     cwd: "/opt/apps/executive-dashboard-api",
     env: {
+      PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+      PYTHONUNBUFFERED: "1",
       PORT: "8180"
     },
     listen_timeout: 10000,

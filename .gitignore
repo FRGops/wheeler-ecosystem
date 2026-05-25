@@ -1,0 +1,26 @@
+# Secrets — never commit .env files
+.env
+*.env
+.env.*
+
+# Shell state
+.bash_history
+.bashrc
+
+# Cache dirs
+.cache/
+.claude/cache/
+.claude/paste-cache/
+.claude/plugins/cache/
+
+# Session transcripts (large, ephemeral)
+.claude/projects/-root/*.jsonl
+.claude/projects/-root/[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a-f]*/
+.claude/projects/-root/[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a-f]*.jsonl
+
+# Backups
+.claude/backups/
+
+# File history
+.claude/file-history/
+.claude/history.jsonl
