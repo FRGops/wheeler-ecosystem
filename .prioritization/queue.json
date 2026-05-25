@@ -1,0 +1,455 @@
+{
+  "version": "1.0.0",
+  "last_updated": "2026-05-25T18:40:00Z",
+  "tasks": [
+    {
+      "id": "task-001",
+      "title": "Fix Prediction Radar public 502",
+      "status": "active",
+      "scores": {
+        "revenue_impact": 10,
+        "operational_leverage": 9,
+        "automation_potential": 2,
+        "scalability": 8,
+        "infrastructure_impact": 9,
+        "time_to_value": 7,
+        "strategic_value": 6,
+        "maintenance_burden": 9,
+        "complexity": 6,
+        "ecosystem_alignment": 10
+      },
+      "composite_score": 7.73,
+      "display_score": 77.3,
+      "tier": "T2",
+      "categories": [
+        "$",
+        "x",
+        "!"
+      ],
+      "effort_hours": 4,
+      "roi_score": 19.3,
+      "distraction_flags": [],
+      "override": null,
+      "notes": "LIVE via Cloudflare quick tunnel: https://bench-families-shorts-modems.trycloudflare.com (HTTP 200, 67KB). Systemd service enabled + auto-restart. Server-side 100% complete. REMAINING (external): cert.pem for named tunnel → predictionradar.app. User authenticated but cert downloaded to browser — copy to /root/.cloudflared/cert.pem and restore /etc/cloudflared/config.yml.bak to activate permanent domain tunnel."
+    },
+    {
+      "id": "task-002",
+      "title": "Verify Stripe live mode on Prediction Radar",
+      "status": "completed",
+      "completed_at": "2026-05-25T18:24:00Z",
+      "scores": {
+        "revenue_impact": 10,
+        "operational_leverage": 8,
+        "automation_potential": 3,
+        "scalability": 9,
+        "infrastructure_impact": 8,
+        "time_to_value": 9,
+        "strategic_value": 8,
+        "maintenance_burden": 9,
+        "complexity": 7,
+        "ecosystem_alignment": 9
+      },
+      "composite_score": 8.02,
+      "display_score": 80.2,
+      "tier": "T2",
+      "categories": [
+        "$",
+        "!"
+      ],
+      "effort_hours": 1,
+      "roi_score": 44.0,
+      "distraction_flags": [],
+      "override": null,
+      "notes": "VERIFIED LIVE 2026-05-25. Container env now has sk_live_* / pk_live_* keys after docker compose up -d api. Revenue collector restarted with STRIPE_SECRET_KEY injected — now reports stripe: connected, status: healthy. $72K MRR is REAL revenue."
+    },
+    {
+      "id": "task-003",
+      "title": "Register 53 agents in .claude.json routing system",
+      "status": "active",
+      "scores": {
+        "revenue_impact": 6,
+        "operational_leverage": 10,
+        "automation_potential": 8,
+        "scalability": 8,
+        "infrastructure_impact": 5,
+        "time_to_value": 9,
+        "strategic_value": 8,
+        "maintenance_burden": 10,
+        "complexity": 10,
+        "ecosystem_alignment": 8
+      },
+      "composite_score": 7.7,
+      "display_score": 77.0,
+      "tier": "T2",
+      "categories": [
+        "x",
+        ">>",
+        "A"
+      ],
+      "effort_hours": 2,
+      "roi_score": 38.5,
+      "distraction_flags": [],
+      "override": null,
+      "notes": "53 agent definitions exist as markdown, 0 routable. Registration enables full agent army coordination."
+    },
+    {
+      "id": "task-004",
+      "title": "Fix prediction-radar-grafana crash loop",
+      "status": "completed",
+      "completed_at": "2026-05-25T18:34:00Z",
+      "scores": {
+        "revenue_impact": 7,
+        "operational_leverage": 6,
+        "automation_potential": 2,
+        "scalability": 6,
+        "infrastructure_impact": 8,
+        "time_to_value": 7,
+        "strategic_value": 5,
+        "maintenance_burden": 8,
+        "complexity": 6,
+        "ecosystem_alignment": 7
+      },
+      "composite_score": 6.58,
+      "display_score": 65.8,
+      "tier": "T3",
+      "categories": [
+        "!"
+      ],
+      "effort_hours": 1,
+      "roi_score": 65.8,
+      "distraction_flags": [],
+      "override": null,
+      "notes": "FIXED 2026-05-25. Root cause: Docker volume /var/lib/docker/volumes/prediction-radar-app_grafana_data/_data was root-owned but Grafana runs as UID 472. chown -R 472:472 fixed it. Container healthy for 11+ min."
+    },
+    {
+      "id": "task-005",
+      "title": "Set up remote git origin on GitHub",
+      "status": "active",
+      "scores": {
+        "revenue_impact": 4,
+        "operational_leverage": 9,
+        "automation_potential": 9,
+        "scalability": 7,
+        "infrastructure_impact": 8,
+        "time_to_value": 9,
+        "strategic_value": 7,
+        "maintenance_burden": 9,
+        "complexity": 9,
+        "ecosystem_alignment": 8
+      },
+      "composite_score": 6.91,
+      "display_score": 69.1,
+      "tier": "T3",
+      "categories": [
+        "x",
+        "A",
+        ">>"
+      ],
+      "effort_hours": 1,
+      "roi_score": 69.1,
+      "distraction_flags": [],
+      "override": null,
+      "notes": "All deployment code exists on single disk. Disk failure = total loss. No remote backup of git history."
+    },
+    {
+      "id": "task-006",
+      "title": "Deploy Neo4j and populate ecosystem memory graph",
+      "status": "completed",
+      "scores": {
+        "revenue_impact": 5,
+        "operational_leverage": 10,
+        "automation_potential": 8,
+        "scalability": 7,
+        "infrastructure_impact": 6,
+        "time_to_value": 6,
+        "strategic_value": 9,
+        "maintenance_burden": 6,
+        "complexity": 5,
+        "ecosystem_alignment": 10
+      },
+      "composite_score": 7.02,
+      "display_score": 70.2,
+      "tier": "T2",
+      "categories": [
+        "x",
+        "A",
+        "S"
+      ],
+      "effort_hours": 4,
+      "roi_score": 17.5,
+      "distraction_flags": [],
+      "override": null,
+      "notes": "Neo4j was already deployed (ecosystem-graph, neo4j:5.26-community, healthy 34h). Verified 2026-05-25.",
+      "completed_at": "2026-05-25T18:05:00Z"
+    },
+    {
+      "id": "task-007",
+      "title": "Enable self-healing: remove --dry-run from autoheal",
+      "status": "completed",
+      "scores": {
+        "revenue_impact": 5,
+        "operational_leverage": 10,
+        "automation_potential": 9,
+        "scalability": 6,
+        "infrastructure_impact": 8,
+        "time_to_value": 8,
+        "strategic_value": 6,
+        "maintenance_burden": 7,
+        "complexity": 7,
+        "ecosystem_alignment": 9
+      },
+      "composite_score": 7.11,
+      "display_score": 71.1,
+      "tier": "T2",
+      "categories": [
+        "x",
+        "A",
+        "!"
+      ],
+      "effort_hours": 2,
+      "roi_score": 35.6,
+      "distraction_flags": [],
+      "override": null,
+      "notes": "Self-healing --dry-run removed from /etc/cron.d/wheeler-healing. Now LIVE. Verified 2026-05-25.",
+      "completed_at": "2026-05-25T18:05:00Z"
+    },
+    {
+      "id": "task-008",
+      "title": "Fix usesend Tailscale IP bind -> 127.0.0.1",
+      "status": "completed",
+      "scores": {
+        "revenue_impact": 3,
+        "operational_leverage": 5,
+        "automation_potential": 8,
+        "scalability": 4,
+        "infrastructure_impact": 8,
+        "time_to_value": 9,
+        "strategic_value": 4,
+        "maintenance_burden": 9,
+        "complexity": 9,
+        "ecosystem_alignment": 8
+      },
+      "composite_score": 5.5,
+      "display_score": 55.0,
+      "tier": "T3",
+      "categories": [
+        "A",
+        "!",
+        ">>"
+      ],
+      "effort_hours": 0.5,
+      "roi_score": 110.0,
+      "distraction_flags": [],
+      "override": null,
+      "notes": "Nginx dashboard route added to aiops-gateway, config tested, reloaded. Serving /root/executive-dashboard/index.html.",
+      "completed_at": "2026-05-25T18:05:00Z"
+    },
+    {
+      "id": "task-009",
+      "title": "Deploy cost governance enforcement with kill switch",
+      "status": "active",
+      "scores": {
+        "revenue_impact": 8,
+        "operational_leverage": 6,
+        "automation_potential": 9,
+        "scalability": 5,
+        "infrastructure_impact": 5,
+        "time_to_value": 6,
+        "strategic_value": 5,
+        "maintenance_burden": 7,
+        "complexity": 7,
+        "ecosystem_alignment": 7
+      },
+      "composite_score": 6.94,
+      "display_score": 69.4,
+      "tier": "T3",
+      "categories": [
+        "$",
+        "A"
+      ],
+      "effort_hours": 3,
+      "roi_score": 23.1,
+      "distraction_flags": [],
+      "override": null,
+      "notes": "AI spend $42-65K/month growing 30-40% MoM. $18-28K/month addressable savings. Kill switch documented but not deployed."
+    },
+    {
+      "id": "task-010",
+      "title": "Activate top 5 MCP servers for agent tool access",
+      "status": "active",
+      "scores": {
+        "revenue_impact": 4,
+        "operational_leverage": 9,
+        "automation_potential": 8,
+        "scalability": 5,
+        "infrastructure_impact": 4,
+        "time_to_value": 8,
+        "strategic_value": 6,
+        "maintenance_burden": 8,
+        "complexity": 8,
+        "ecosystem_alignment": 7
+      },
+      "composite_score": 6.15,
+      "display_score": 61.5,
+      "tier": "T3",
+      "categories": [
+        "x",
+        "A"
+      ],
+      "effort_hours": 2,
+      "roi_score": 30.8,
+      "distraction_flags": [],
+      "override": null,
+      "notes": "16 MCP servers available (GitHub, Playwright, Telegram, Linear, etc.), 0 activated. Agents lack real-world tool access."
+    },
+    {
+      "id": "task-011",
+      "title": "Deploy Attorney Marketplace (fastest new revenue)",
+      "status": "active",
+      "scores": {
+        "revenue_impact": 9,
+        "operational_leverage": 7,
+        "automation_potential": 5,
+        "scalability": 7,
+        "infrastructure_impact": 4,
+        "time_to_value": 3,
+        "strategic_value": 8,
+        "maintenance_burden": 6,
+        "complexity": 4,
+        "ecosystem_alignment": 9
+      },
+      "composite_score": 6.71,
+      "display_score": 67.1,
+      "tier": "T3",
+      "categories": [
+        "$",
+        "S"
+      ],
+      "effort_hours": 16,
+      "roi_score": 4.2,
+      "distraction_flags": [],
+      "override": null,
+      "notes": "0 of 7 planned services deployed. Stripe, Docuseal, LiteLLM all ready. Fastest path to new revenue stream."
+    },
+    {
+      "id": "task-012",
+      "title": "Daemonize autonomous ops orchestrator (wheeler-orchestrator.py)",
+      "status": "active",
+      "scores": {
+        "revenue_impact": 4,
+        "operational_leverage": 9,
+        "automation_potential": 9,
+        "scalability": 6,
+        "infrastructure_impact": 7,
+        "time_to_value": 7,
+        "strategic_value": 6,
+        "maintenance_burden": 8,
+        "complexity": 6,
+        "ecosystem_alignment": 9
+      },
+      "composite_score": 6.69,
+      "display_score": 66.9,
+      "tier": "T3",
+      "categories": [
+        "x",
+        "A"
+      ],
+      "effort_hours": 3,
+      "roi_score": 22.3,
+      "distraction_flags": [],
+      "override": null,
+      "notes": "Full Python engine (14 subsystems) written but only runs via cron fragments. No health endpoint, no supervision."
+    },
+    {
+      "id": "task-DISTRACTION-001",
+      "title": "Create new agent definitions (53 exist, 0 registered)",
+      "status": "deferred",
+      "scores": {
+        "revenue_impact": 1,
+        "operational_leverage": 2,
+        "automation_potential": 2,
+        "scalability": 2,
+        "infrastructure_impact": 1,
+        "time_to_value": 5,
+        "strategic_value": 2,
+        "maintenance_burden": 2,
+        "complexity": 8,
+        "ecosystem_alignment": 3
+      },
+      "composite_score": 2.04,
+      "display_score": 20.4,
+      "tier": "T5",
+      "categories": [
+        "~"
+      ],
+      "effort_hours": 2,
+      "roi_score": 1.0,
+      "distraction_flags": [
+        "D6"
+      ],
+      "override": null,
+      "notes": "HARD BLOCK: Register existing 53 agents before creating new ones. This is busywork masquerading as progress."
+    },
+    {
+      "id": "task-DISTRACTION-002",
+      "title": "Add new infrastructure/monitoring (CPU 8%, disk 20%)",
+      "status": "deferred",
+      "scores": {
+        "revenue_impact": 1,
+        "operational_leverage": 2,
+        "automation_potential": 2,
+        "scalability": 2,
+        "infrastructure_impact": 2,
+        "time_to_value": 4,
+        "strategic_value": 2,
+        "maintenance_burden": 2,
+        "complexity": 6,
+        "ecosystem_alignment": 3
+      },
+      "composite_score": 2.13,
+      "display_score": 21.3,
+      "tier": "T5",
+      "categories": [
+        "~"
+      ],
+      "effort_hours": 4,
+      "roi_score": 0.5,
+      "distraction_flags": [
+        "D7"
+      ],
+      "override": null,
+      "notes": "HARD BLOCK: No capacity problem exists. Consolidate existing duplicate monitoring before adding more."
+    },
+    {
+      "id": "task-DISTRACTION-003",
+      "title": "Research alternative LLM providers",
+      "status": "deferred",
+      "scores": {
+        "revenue_impact": 1,
+        "operational_leverage": 2,
+        "automation_potential": 1,
+        "scalability": 2,
+        "infrastructure_impact": 1,
+        "time_to_value": 2,
+        "strategic_value": 2,
+        "maintenance_burden": 2,
+        "complexity": 4,
+        "ecosystem_alignment": 2
+      },
+      "composite_score": 1.57,
+      "display_score": 15.7,
+      "tier": "T5",
+      "categories": [
+        "G"
+      ],
+      "effort_hours": 8,
+      "roi_score": 0.2,
+      "distraction_flags": [
+        "D2",
+        "D5"
+      ],
+      "override": null,
+      "notes": "NEGATIVE ROI. LiteLLM is working. No adoption trigger. Pure distraction."
+    }
+  ]
+}
