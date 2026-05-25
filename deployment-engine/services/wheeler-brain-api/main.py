@@ -406,5 +406,83 @@ async def intelligence_search(req: SearchQuery):
     return results
 
 
+# ═══════════════════════════════════════════════════════════════
+# QDRANT INTEGRATION — COREDB (100.118.166.117:6333)
+# ═══════════════════════════════════════════════════════════════
+
+QDRANT_URL = os.getenv("QDRANT_URL", "http://100.118.166.117:6333")
+QDRANT_API_KEY = os.getenv("QDRANT_API_KEY", "WheelerBrainOS-Qdrant-2026!")
+QDRANT_COLLECTION = "wheeler_memory"
+
+def _qdrant(method: str, path: str, body: dict = None) -> dict:
+    """Make an API call to Qdrant on COREDB."""
+    try:
+        import urllib.request
+        url = f"{QDRANT_URL}{path}"
+        data = json.dumps(body).encode() if body else None
+        req = urllib.request.Request(url, data=data, method=method)
+        req.add_header("api-key", QDRANT_API_KEY)
+        if data:
+            req.add_header("Content-Type", "application/json")
+        resp = urllib.request.urlopen(req, timeout=10)
+        return json.loads(resp.read())
+    except Exception as e:
+        return {"error": str(e)}
+
+def _get_embedding(text: str) -> list:
+    """Get embedding from local embedding service."""
+    try:
+        import urllib.request
+        data = json.dumps({"input": text, "model": "local"}).encode()
+        req = urllib.request.Request("http://127.0.0.1:8191/v1/embeddings", data=data,
+                                     headers={"Content-Type": "application/json"})
+        resp = json.loads(urllib.request.urlopen(req, timeout=10).read())
+        return resp["data"][0]["embedding"]
+    except Exception:
+        return []
+
+class VectorSearchRequest(BaseModel):
+    query: str
+    limit: int = 10
+    collection: str = QDRANT_COLLECTION
+
+@app.post("/api/v1/intelligence/vector-search")
+async def vector_search(req: VectorSearchRequest):
+    """Semantic vector search via Qdrant on COREDB + local embeddings."""
+    embedding = _get_embedding(req.query)
+    if not embedding:
+        raise HTTPException(status_code=503, detail="Embedding service unavailable")
+
+    results = _qdrant("POST", f"/collections/{req.collection}/points/search",
+                      {"vector": embedding, "limit": req.limit, "with_payload": True})
+
+    hits = []
+    for r in results.get("result", []):
+        hits.append({
+            "id": r.get("id"),
+            "score": round(r.get("score", 0), 4),
+            "payload": r.get("payload", {})
+        })
+
+    return {
+        "query": req.query,
+        "collection": req.collection,
+        "hits": hits,
+        "total": len(hits),
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+@app.get("/api/v1/intelligence/qdrant/health")
+async def qdrant_health():
+    """Check Qdrant health on COREDB."""
+    info = _qdrant("GET", "/readyz")
+    collections = _qdrant("GET", "/collections")
+    return {
+        "qdrant": "reachable" if "ready" in str(info).lower() or info.get("result") else "degraded",
+        "collections": [c.get("name") for c in collections.get("result", {}).get("collections", [])],
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8160, log_level="info")

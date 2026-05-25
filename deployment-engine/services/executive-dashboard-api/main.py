@@ -325,5 +325,204 @@ render(); setInterval(render, 30000);
 </body>
 </html>""")
 
+@app.get("/api/v1/intelligence/full")
+async def intelligence_full():
+    """Aggregate all ecosystem intelligence — Brain API + Dashboard + live systems."""
+    brain = {}
+    try:
+        out = run("curl -s http://127.0.0.1:8160/api/v1/graph/summary 2>/dev/null")
+        brain = json.loads(out)
+    except: pass
+
+    memory = {}
+    try:
+        out = run("curl -s http://127.0.0.1:8160/api/v1/memory/stats 2>/dev/null")
+        memory = json.loads(out)
+    except: pass
+
+    domains = []
+    try:
+        out = run("curl -s http://127.0.0.1:8160/api/v1/graph/domains 2>/dev/null")
+        domains = json.loads(out).get("domains", [])
+    except: pass
+
+    pm2 = get_pm2_counts()
+    return {
+        "ecosystem": {
+            "health_score": round((pm2["online"] / max(pm2["total"], 1)) * 100, 1),
+            "pm2": pm2,
+            "docker": {"total": get_docker_count(), "healthy": get_docker_healthy(), "unhealthy": get_docker_unhealthy(), "no_healthcheck": get_docker_no_healthcheck()},
+            "system": get_system_resources(),
+            "uptime_hours": get_system_resources().get("uptime_hours", 0)
+        },
+        "knowledge_graph": brain.get("neo4j", {}),
+        "intelligence_domains": domains,
+        "memory_layer": memory,
+        "ai": {"spend_24h": get_litellm_spend(), "health": get_litellm_health()},
+        "revenue": get_revenue_summary(),
+        "alerts": (await alerts())["alerts"],
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+@app.get("/intelligence", response_class=HTMLResponse)
+async def intelligence_dashboard():
+    return HTMLResponse(content="""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>WHEELER INTELLIGENCE COMMAND</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#060606;color:#c0c0c0;font-family:'JetBrains Mono','SF Mono','Courier New',monospace;padding:12px;min-height:100vh}
+.topbar{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1a1a1a;padding:0 0 10px 0;margin-bottom:12px}
+.topbar h1{color:#00e5a0;font-size:15px;letter-spacing:2px;text-transform:uppercase}
+.topbar .meta{color:#555;font-size:10px;text-align:right}
+.topbar .meta span{color:#00e5a0}
+.status-dot{width:8px;height:8px;background:#00e5a0;border-radius:50%;display:inline-block;margin-right:6px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+.grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+.panel{background:#0a0a0a;border:1px solid #151515;border-radius:4px;padding:10px;overflow:hidden}
+.panel h3{color:#00e5a0;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;border-bottom:1px solid #111;padding-bottom:6px}
+.panel.col-1{grid-column:span 1}.panel.col-2{grid-column:span 2}.panel.col-3{grid-column:span 3}
+.stat-row{display:flex;justify-content:space-between;font-size:10px;padding:3px 0;border-bottom:1px solid #0d0d0d}
+.stat-label{color:#666}.stat-val{color:#ccc;font-weight:600}
+.stat-green{color:#00e5a0}.stat-red{color:#ff4466}.stat-amber{color:#ffaa00}.stat-blue{color:#44aaff}
+.kpi{text-align:center;padding:8px 0}
+.kpi-num{font-size:26px;font-weight:bold;color:#00e5a0}
+.kpi-label{font-size:9px;color:#555;text-transform:uppercase;letter-spacing:1px;margin-top:2px}
+.domain-bar{display:flex;align-items:center;margin:3px 0;font-size:9px}
+.domain-bar .name{width:80px;color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.domain-bar .bar-track{flex:1;height:6px;background:#111;border-radius:3px;margin:0 6px;overflow:hidden}
+.domain-bar .bar-fill{height:100%;background:#00e5a0;border-radius:3px;transition:width .5s}
+.domain-bar .count{color:#00e5a0;width:24px;text-align:right}
+.alert-p0{border-left:2px solid #ff4466;padding:4px 8px;margin:3px 0;font-size:10px;background:#140000}
+.alert-p1{border-left:2px solid #ffaa00;padding:4px 8px;margin:3px 0;font-size:10px;background:#141000}
+.alert-p2{border-left:2px solid #44aaff;padding:4px 8px;margin:3px 0;font-size:10px;background:#001014}
+.alert-sev{font-weight:bold;font-size:9px;margin-right:8px}
+.empty-state{color:#333;font-size:10px;text-align:center;padding:12px}
+.memory-event{font-size:9px;padding:2px 0;border-bottom:1px solid #0d0d0d;display:flex;justify-content:space-between}
+.memory-event .type{color:#00e5a0;width:80px;overflow:hidden;text-overflow:ellipsis}
+.memory-event .count{color:#888}
+.version-tag{font-size:9px;color:#333;text-align:center;margin-top:8px;padding-top:8px;border-top:1px solid #111}
+.spark-cell{font-size:9px;color:#666;padding:1px 0}
+.footer{text-align:center;color:#222;font-size:8px;margin-top:10px;padding-top:8px;border-top:1px solid #0d0d0d}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h1><span class="status-dot"></span>WHEELER INTELLIGENCE COMMAND</h1>
+  <div class="meta">ECOSYSTEM HEALTH <span id="health-score">--</span> &middot; <span id="clock">--</span></div>
+</div>
+<div class="grid" id="grid"></div>
+<div class="footer">WHEELER BRAIN OS &middot; INTELLIGENCE LAYER &middot; 120+ AGENTS &middot; 6-TIER MEMORY &middot; ZERO-TRUST</div>
+<script>
+var E = function(tag,cls,txt){var e=document.createElement(tag);if(cls)e.className=cls;if(txt)e.textContent=txt;return e;};
+function render(){
+  fetch('/api/v1/intelligence/full').then(function(r){return r.json()}).then(function(d){
+    var g=document.getElementById('grid');g.textContent='';
+    var eco=d.ecosystem||{}, kg=d.knowledge_graph||{}, mem=d.memory_layer||{}, rev=d.revenue||{};
+    var domains=d.intelligence_domains||[], alerts=d.alerts||[], ai=d.ai||{};
+
+    // HEALTH KPI
+    var p1=E('div','panel col-1');p1.appendChild(E('h3','','HEALTH'));
+    var score=eco.health_score||0;
+    p1.appendChild(E('div','kpi',null));p1.querySelector('.kpi').appendChild(E('div','kpi-num stat-'+(score>=95?'green':score>=80?'amber':'red'),score+'%'));
+    p1.querySelector('.kpi').appendChild(E('div','kpi-label','Ecosystem Score'));
+    p1.appendChild(E('div','stat-row',null));p1.querySelectorAll('.stat-row')[p1.querySelectorAll('.stat-row').length-1].appendChild(E('span','stat-label','PM2'));p1.querySelectorAll('.stat-row')[p1.querySelectorAll('.stat-row').length-1].appendChild(E('span','stat-val stat-green',(eco.pm2||{}).online+'/'+(eco.pm2||{}).total));
+    p1.appendChild(E('div','stat-row',null));var dr=p1.querySelectorAll('.stat-row')[p1.querySelectorAll('.stat-row').length-1];dr.appendChild(E('span','stat-label','Containers'));dr.appendChild(E('span','stat-val',''+(eco.docker||{}).total||0));
+    p1.appendChild(E('div','stat-row',null));var dh=p1.querySelectorAll('.stat-row')[p1.querySelectorAll('.stat-row').length-1];dh.appendChild(E('span','stat-label','Healthy'));dh.appendChild(E('span','stat-val stat-green',''+(eco.docker||{}).healthy||0));
+    if((eco.docker||{}).unhealthy||0>0){p1.appendChild(E('div','stat-row',null));var du=p1.querySelectorAll('.stat-row')[p1.querySelectorAll('.stat-row').length-1];du.appendChild(E('span','stat-label','Unhealthy'));du.appendChild(E('span','stat-val stat-red',''+(eco.docker||{}).unhealthy||0));}
+    p1.appendChild(E('div','stat-row',null));var ds=p1.querySelectorAll('.stat-row')[p1.querySelectorAll('.stat-row').length-1];ds.appendChild(E('span','stat-label','Uptime'));ds.appendChild(E('span','stat-val',''+eco.uptime_hours+'h'));
+    g.appendChild(p1);
+
+    // KNOWLEDGE GRAPH
+    var p2=E('div','panel col-1');p2.appendChild(E('h3','','KNOWLEDGE GRAPH'));
+    p2.appendChild(E('div','kpi',null));p2.querySelector('.kpi').appendChild(E('div','kpi-num',(kg.nodes||0).toLocaleString()));p2.querySelector('.kpi').appendChild(E('div','kpi-label','Graph Nodes'));
+    p2.appendChild(E('div','stat-row',null));var kr=p2.querySelectorAll('.stat-row')[p2.querySelectorAll('.stat-row').length-1];kr.appendChild(E('span','stat-label','Relationships'));kr.appendChild(E('span','stat-val stat-green',(kg.relationships||0).toLocaleString()));
+    p2.appendChild(E('div','stat-row',null));var kl=p2.querySelectorAll('.stat-row')[p2.querySelectorAll('.stat-row').length-1];kl.appendChild(E('span','stat-label','Label Types'));kl.appendChild(E('span','stat-val',''+(kg.labels||[]).length));
+    p2.appendChild(E('div','stat-row',null));var kd=p2.querySelectorAll('.stat-row')[p2.querySelectorAll('.stat-row').length-1];kd.appendChild(E('span','stat-label','Domains'));kd.appendChild(E('span','stat-val stat-blue',''+domains.length));
+    if(kg.labels){kg.labels.slice(0,5).forEach(function(l){p2.appendChild(E('div','spark-cell',l));});}
+    g.appendChild(p2);
+
+    // INTELLIGENCE DOMAINS
+    var p3=E('div','panel col-1');p3.appendChild(E('h3','','INTELLIGENCE DOMAINS'));
+    if(domains.length){
+      var maxAgents=Math.max.apply(null,domains.map(function(d){return d.agent_count||0;}));
+      domains.slice(0,12).forEach(function(d){
+        var row=E('div','domain-bar');row.appendChild(E('div','name',d.domain));
+        var track=E('div','bar-track'),fill=E('div','bar-fill');fill.style.width=(maxAgents>0?(d.agent_count||0)/maxAgents*100:0)+'%';track.appendChild(fill);row.appendChild(track);row.appendChild(E('div','count',''+d.agent_count));
+        p3.appendChild(row);
+      });
+    } else { p3.appendChild(E('div','empty-state','NO DOMAIN DATA')); }
+    g.appendChild(p3);
+
+    // MEMORY LAYER
+    var p4=E('div','panel col-1');p4.appendChild(E('h3','','MEMORY LAYER'));
+    p4.appendChild(E('div','kpi',null));p4.querySelector('.kpi').appendChild(E('div','kpi-num',(mem.total_memories||0).toLocaleString()));p4.querySelector('.kpi').appendChild(E('div','kpi-label','Episodic Memories'));
+    if(mem.tables){
+      Object.keys(mem.tables).forEach(function(t){
+        p4.appendChild(E('div','stat-row',null));
+        var row=p4.querySelectorAll('.stat-row')[p4.querySelectorAll('.stat-row').length-1];
+        row.appendChild(E('span','stat-label',t.replace(/_/g,' ')));
+        row.appendChild(E('span','stat-val',''+mem.tables[t]));
+      });
+    }
+    if(mem.event_breakdown){
+      mem.event_breakdown.slice(0,6).forEach(function(e){
+        var parts=e.split('|');
+        p4.appendChild(E('div','memory-event',null));
+        var me=p4.querySelectorAll('.memory-event')[p4.querySelectorAll('.memory-event').length-1];
+        me.appendChild(E('span','type',parts[0]));
+        me.appendChild(E('span','count',parts[1]));
+      });
+    }
+    g.appendChild(p4);
+
+    // REVENUE
+    var p5=E('div','panel col-1');p5.appendChild(E('h3','','REVENUE INTEL'));
+    p5.appendChild(E('div','kpi',null));p5.querySelector('.kpi').appendChild(E('div','kpi-num','$'+(rev.mrr||0).toLocaleString()));p5.querySelector('.kpi').appendChild(E('div','kpi-label','Monthly Recurring Revenue'));
+    p5.appendChild(E('div','stat-row',null));var rv1=p5.querySelectorAll('.stat-row')[p5.querySelectorAll('.stat-row').length-1];rv1.appendChild(E('span','stat-label','ARR Run Rate'));rv1.appendChild(E('span','stat-val','$'+(rev.arr_run_rate||0).toLocaleString()));
+    p5.appendChild(E('div','stat-row',null));var rv2=p5.querySelectorAll('.stat-row')[p5.querySelectorAll('.stat-row').length-1];rv2.appendChild(E('span','stat-label','Subscriptions'));rv2.appendChild(E('span','stat-val',(rev.active_subscriptions||0).toLocaleString()));
+    p5.appendChild(E('div','stat-row',null));var rv3=p5.querySelectorAll('.stat-row')[p5.querySelectorAll('.stat-row').length-1];rv3.appendChild(E('span','stat-label','Failed Payments'));rv3.appendChild(E('span','stat-val '+(rev.failed_payments_24h>0?'stat-red':'stat-green'),''+rev.failed_payments_24h));
+    p5.appendChild(E('div','stat-row',null));var rv4=p5.querySelectorAll('.stat-row')[p5.querySelectorAll('.stat-row').length-1];rv4.appendChild(E('span','stat-label','Data Source'));rv4.appendChild(E('span','stat-val stat-blue',rev.source||'fallback'));
+    g.appendChild(p5);
+
+    // AI SPEND
+    var p6=E('div','panel col-1');p6.appendChild(E('h3','','AI OPERATIONS'));
+    var spend=ai.spend_24h||{};
+    p6.appendChild(E('div','kpi',null));p6.querySelector('.kpi').appendChild(E('div','kpi-num','$'+(spend.total_spend_24h||0).toFixed(4)));p6.querySelector('.kpi').appendChild(E('div','kpi-label','AI Spend 24H'));
+    p6.appendChild(E('div','stat-row',null));var ai1=p6.querySelectorAll('.stat-row')[p6.querySelectorAll('.stat-row').length-1];ai1.appendChild(E('span','stat-label','LiteLLM'));ai1.appendChild(E('span','stat-val stat-'+(ai.health&&ai.health.status==='healthy'?'green':'red'),(ai.health||{}).status||'?'));
+    if(spend.by_model){
+      Object.keys(spend.by_model).slice(0,5).forEach(function(m){
+        p6.appendChild(E('div','stat-row',null));
+        var row=p6.querySelectorAll('.stat-row')[p6.querySelectorAll('.stat-row').length-1];
+        row.appendChild(E('span','stat-label',m.substring(0,22)));
+        row.appendChild(E('span','stat-val','$'+spend.by_model[m].toFixed(4)));
+      });
+    }
+    g.appendChild(p6);
+
+    // ALERTS
+    var pAlert=E('div','panel col-3');pAlert.appendChild(E('h3','','ACTIVE ALERTS & SIGNALS'));
+    if(alerts.length){
+      alerts.forEach(function(a){
+        var div=E('div','alert-'+a.severity.toLowerCase());div.appendChild(E('span','alert-sev',a.severity));div.appendChild(document.createTextNode(a.message));pAlert.appendChild(div);
+      });
+    } else { pAlert.appendChild(E('div','empty-state','ZERO ACTIVE ALERTS — ECOSYSTEM NOMINAL')); }
+
+    // System resources inline
+    var sys=eco.system||{};
+    var resRow=E('div','stat-row');resRow.appendChild(E('span','stat-label','CPU: '+sys.cpu_cores+' cores  |  MEM: '+sys.memory_used+'/'+sys.memory_total+'  |  DISK: '+sys.disk_use_pct));resRow.appendChild(E('span','stat-val','LOAD NOMINAL'));pAlert.appendChild(resRow);
+    g.appendChild(pAlert);
+
+    document.getElementById('health-score').textContent=(eco.health_score||0)+'%';
+    document.getElementById('clock').textContent=new Date().toISOString().replace('T',' ').substring(0,19)+' UTC';
+  });
+}
+render();setInterval(render,30000);
+</script>
+</body>
+</html>""")
+
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8180, log_level="info")

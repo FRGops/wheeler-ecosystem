@@ -34,11 +34,21 @@ County Docket Sources → Scraper Fleet → Data Pipeline → Lead Scoring → F
 | County recorder | Web scraping | Deed transfers | Weekly |
 | Bankruptcy courts | PACER | Chapter 7/13 | Real-time |
 
+## Top 50 County Pipeline
+
+Active monitoring across 50 highest-volume US foreclosure counties. Configuration:
+`/root/deployment-engine/services/foreclosure-pipeline/counties.json`
+
+Parser types: Odyssey (38%), Generic (32%), NY ECFS (10%), Harris TX custom.
+Pipeline script: `/root/scripts/foreclosure-pipeline.py`
+Leads route to FRGCRM API (:8150) via Lead Intelligence agent.
+
 ## Key Reference Documents
 
 - /root/FRG_NATIONWIDE_ENGINE.md — Full nationwide foreclosure engine design
 - /root/SURPLUSAI_ENTERPRISE_ARCHITECTURE.md — SurplusAI system architecture
 - /root/SURPLUSAI_PRODUCTIZATION_PLAN.md — Productization roadmap
+- /root/deployment-engine/services/foreclosure-pipeline/counties.json — Top 50 county config
 
 ## Foreclosure Intelligence Operations
 

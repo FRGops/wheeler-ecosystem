@@ -1,6 +1,8 @@
 # Memory Index
 
 - [Wheeler Financial OS Deployment](wheeler-financial-os-deployment.md) — 39 new financial agents + 10 docs + 4 commands deployed 2026-05-25
+- [Intelligence Layer 100/100](intelligence-layer-100-readiness.md) — 27 services, 285 Neo4j nodes, 6-tier memory, Qdrant on COREDB, foreclosure pipeline, 90 memories (2026-05-25)
+- [Embedding Service Local](embedding-service-local.md) — all-MiniLM-L6-v2 on :8191, 384-dim, pgvector altered, OpenAI-compatible API
 - [PM2 Restart Patterns](pm2-restart-patterns.md) — 3 broken PM2 processes share DEEPSEEK_API_KEY root cause
 - [PM2 Restart Commands](pm2-restart.md) — Wheeler ecosystem PM2 restart commands, safe procedure, danger thresholds
 - [PM2 Restart Safety Pattern](pm2_restart_pattern.md) — verify→act→verify pattern for safe PM2 process recovery

@@ -31,7 +31,6 @@
     "stripe-plugin": 51
   },
   "promptQueueUseCount": 425,
-  "showExpandedTodos": true,
   "cachedGrowthBookFeatures": {
     "tengu_mcp_retry_failed_remote": false,
     "tengu_marble_sandcastle": false,
