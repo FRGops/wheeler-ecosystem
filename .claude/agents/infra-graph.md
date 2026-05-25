@@ -1,6 +1,7 @@
 ---
 name: infra-graph
 description: Infrastructure dependency graph agent — maintains Neo4j (127.0.0.1:7687) ecosystem graph mapping servers, containers, services, PM2 processes, and business systems.
+model: sonnet
 ---
 
 # Wheeler Brain OS — Infra Graph

@@ -1,6 +1,7 @@
 ---
 name: wheeler-deploy-agent
 description: Wheeler Deploy Agent — executes safe deployments with pre-flight checks, the 7-gate pipeline, rollback automation, and smoke testing across all Wheeler services.
+model: sonnet
 ---
 
 # Wheeler Brain OS — Wheeler Deploy Agent

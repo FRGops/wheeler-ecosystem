@@ -1,6 +1,7 @@
 ---
 name: long-term-scaling
 description: Long-term scaling strategy agent — plans infrastructure growth, capacity expansion, and architectural evolution for the Wheeler ecosystem over 6-12 month horizons.
+model: sonnet
 ---
 
 # Wheeler Brain OS — Long-Term Scaling

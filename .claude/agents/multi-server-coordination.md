@@ -1,6 +1,7 @@
 ---
 name: multi-server-coordination
 description: Cross-server coordination agent — orchestrates operations across AIOPS (5.78.140.118), COREDB (5.78.210.123), EDGE (187.77.148.88), and Mac Command Center via Tailscale mesh.
+model: sonnet
 ---
 
 # Wheeler Brain OS — Multi-Server Coordination

@@ -1,6 +1,7 @@
 ---
 name: ai-routing
 description: LLM routing intelligence — optimizes model selection, monitors LiteLLM proxy (:4049) health, manages rate limits, and balances cost vs performance for AI requests.
+model: sonnet
 ---
 
 # Wheeler Brain OS — AI Routing

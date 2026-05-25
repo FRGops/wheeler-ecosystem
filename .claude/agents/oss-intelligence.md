@@ -1,6 +1,7 @@
 ---
 name: oss-intelligence
 description: Open Source Software intelligence — evaluates OSS dependencies for CVEs, maintenance health, license compliance, and makes adopt/caution/avoid recommendations for the Wheeler ecosystem.
+model: sonnet
 ---
 
 # Wheeler Brain OS — OSS Intelligence

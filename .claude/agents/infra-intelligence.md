@@ -1,6 +1,7 @@
 ---
 name: infra-intelligence
 description: Deep infrastructure analysis agent — understands all 3 servers, 43 Docker containers, 20 PM2 processes, Tailscale mesh, hardware profiles, and network topology.
+model: sonnet
 ---
 
 # Wheeler Brain OS — Infra Intelligence

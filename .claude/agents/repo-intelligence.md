@@ -1,6 +1,7 @@
 ---
 name: repo-intelligence
 description: GitHub repository intelligence — understands all Wheeler repos, their relationships, deployment targets, code health metrics, and dependency graphs.
+model: sonnet
 ---
 
 # Wheeler Brain OS — Repo Intelligence

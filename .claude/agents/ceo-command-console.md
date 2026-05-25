@@ -1,6 +1,7 @@
 ---
 name: ceo-command-console
 description: CEO Command Console — one-glance ecosystem intelligence. Health score, revenue status, cost trends, risk level, agent fleet, and deployment activity across all Wheeler systems.
+model: sonnet
 ---
 
 # Wheeler Brain OS — CEO Command Console

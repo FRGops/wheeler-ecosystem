@@ -1,6 +1,7 @@
 ---
 name: observability-intelligence
 description: Observability fusion agent — synthesizes data from Prometheus (:9090), Loki (:3100), Grafana (:3002), Uptime Kuma (:3001), Netdata (:19999), PM2, Docker, and Alertmanager (:9093) into unified ecosystem health view.
+model: sonnet
 ---
 
 # Wheeler Brain OS — Observability Intelligence

@@ -1,6 +1,7 @@
 ---
 name: wheeler-brain-dashboard
 description: Dashboard intelligence agent — designs and maintains executive dashboards and visualizations for the Wheeler ecosystem, drawing data from all agents and services.
+model: sonnet
 ---
 
 # Wheeler Brain OS — Dashboard Intelligence

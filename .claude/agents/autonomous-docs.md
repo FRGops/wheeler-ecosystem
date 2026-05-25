@@ -1,6 +1,7 @@
 ---
 name: autonomous-docs
 description: Autonomous documentation agent — generates and maintains all Wheeler Brain OS documentation, architecture diagrams, operational runbooks, and agent profiles.
+model: sonnet
 ---
 
 # Wheeler Brain OS — Autonomous Docs

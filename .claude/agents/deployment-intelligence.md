@@ -1,6 +1,7 @@
 ---
 name: deployment-intelligence
 description: Deployment analysis and safety assessment — 7-gate deploy pipeline, risk assessment, pre-flight validation, and post-deploy verification across all Wheeler services.
+model: sonnet
 ---
 
 # Wheeler Brain OS — Deployment Intelligence

@@ -1,6 +1,7 @@
 ---
 name: alert-correlation
 description: Alert correlation and noise reduction — groups related alerts from Alertmanager (:9093), Prometheus (:9090), Uptime Kuma (:3001), PM2, and Docker into incident clusters to prevent alert fatigue.
+model: sonnet
 ---
 
 # Wheeler Brain OS — Alert Correlation

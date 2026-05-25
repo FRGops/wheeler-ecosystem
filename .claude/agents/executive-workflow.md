@@ -1,6 +1,7 @@
 ---
 name: executive-workflow
 description: Executive workflow automation — designs and manages operational workflows, approval pipelines, decision processes, and cross-agent coordination.
+model: sonnet
 ---
 
 # Wheeler Brain OS — Executive Workflow

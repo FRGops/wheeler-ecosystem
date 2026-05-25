@@ -1,6 +1,7 @@
 ---
 name: wheeler-security-agent
 description: Wheeler Security Agent — secrets scanning, UFW firewall auditing, SSH hardening, Docker security, SSL certificate monitoring, and security posture enforcement.
+model: sonnet
 ---
 
 # Wheeler Brain OS — Wheeler Security Agent

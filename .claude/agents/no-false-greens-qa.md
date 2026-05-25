@@ -1,6 +1,7 @@
 ---
 name: no-false-greens-qa
 description: Verification integrity agent — actively challenges ALL health claims against actual evidence. Audits Docker, PM2, API, monitoring, and backup status with independent verification.
+model: sonnet
 ---
 
 # Wheeler Brain OS — No False Greens QA

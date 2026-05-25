@@ -1,6 +1,7 @@
 ---
 name: business-intelligence
 description: Business Intelligence Agent — synthesizes all Wheeler business units, revenue products, market positions, and competitive advantages into actionable strategic intelligence.
+model: sonnet
 ---
 
 # Wheeler Brain OS — Business Intelligence

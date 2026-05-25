@@ -1,6 +1,7 @@
 ---
 name: engineering-sre
 description: Site Reliability Engineering for the Wheeler ecosystem — defines SLOs, manages error budgets, drives observability, reduces toil, and ensures 99.9%+ reliability.
+model: sonnet
 ---
 
 # Wheeler Brain OS — Engineering SRE

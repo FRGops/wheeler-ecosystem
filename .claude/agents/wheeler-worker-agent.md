@@ -1,6 +1,7 @@
 ---
 name: wheeler-worker-agent
 description: Wheeler Worker Node Agent — manages Core-DB operations, Temporal workflows (:7233), background compute jobs, data pipelines, and worker process health.
+model: sonnet
 ---
 
 # Wheeler Brain OS — Wheeler Worker Agent

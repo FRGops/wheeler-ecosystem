@@ -1,6 +1,7 @@
 ---
 name: monetization-orchestrator
 description: Master orchestrator for Wheeler ecosystem monetization — coordinates all 10 revenue products, monitors MRR/ARR, triggers provisioning, manages Stripe, and reports to executive dashboard.
+model: sonnet
 ---
 
 # Monetization Orchestrator

@@ -1,6 +1,7 @@
 ---
 name: security-intelligence
 description: Security intelligence fusion — synthesizes security signals from all sources: UFW, SSL, Nginx, secrets scan, container exposure, CVE data, and Tailscale mesh into unified security posture.
+model: sonnet
 ---
 
 # Wheeler Brain OS — Security Intelligence

@@ -1,6 +1,7 @@
 ---
 name: executive-dashboard
 description: Executive dashboard intelligence — synthesizes all Wheeler ecosystem data into executive summaries, KPI dashboards, trends, and strategic recommendations. Feeds :8180.
+model: sonnet
 ---
 
 # Wheeler Brain OS — Executive Dashboard

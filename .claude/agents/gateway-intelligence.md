@@ -1,6 +1,7 @@
 ---
 name: gateway-intelligence
 description: Nginx gateway intelligence — monitors all reverse proxy routes, SSL certificates, auth configurations, rate limiting, and public-facing surface across AIOPS and EDGE.
+model: sonnet
 ---
 
 # Wheeler Brain OS — Gateway Intelligence

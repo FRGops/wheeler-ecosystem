@@ -1,6 +1,7 @@
 ---
 name: tailscale-mesh
 description: Tailscale network mesh intelligence — monitors all 4 Tailscale nodes (AIOPS, COREDB, EDGE, Mac), connectivity health, latency, and ACL compliance.
+model: sonnet
 ---
 
 # Wheeler Brain OS — Tailscale Mesh

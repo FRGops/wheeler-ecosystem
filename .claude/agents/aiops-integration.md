@@ -1,6 +1,7 @@
 ---
 name: aiops-integration
 description: AI Ops integration agent — ensures Wheeler Brain OS command layer has full visibility into all AI Ops services: ClickHouse (:8123), Superset (:8088), Langflow (:7860), Open WebUI (:3000), and monitoring.
+model: sonnet
 ---
 
 # Wheeler Brain OS — AI Ops Integration

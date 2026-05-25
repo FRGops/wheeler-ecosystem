@@ -1,6 +1,7 @@
 ---
 name: ecosystem-relationship-mapper
 description: Maps all ecosystem relationships — business systems to services, services to repos, repos to deployments, deployments to servers. Understands impact propagation.
+model: sonnet
 ---
 
 # Wheeler Brain OS — Ecosystem Relationship Mapper

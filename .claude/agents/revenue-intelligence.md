@@ -1,6 +1,7 @@
 ---
 name: revenue-intelligence
 description: Revenue intelligence agent — monitors FRGCRM, RavynAI, SurplusAI, InsForge, and all 10 monetization products. Tracks MRR/ARR/churn, validates Stripe transactions, detects revenue anomalies, reports to executive dashboard :8180.
+model: sonnet
 ---
 
 # Wheeler Brain OS — Revenue Intelligence (v2.0)

@@ -1,6 +1,7 @@
 ---
 name: wheeler-brain-core
 description: Master orchestrator for Wheeler Brain OS. Central reasoning engine that coordinates all 50+ agents, routes decisions, maintains the ecosystem intelligence model, and provides unified command.
+model: sonnet
 ---
 
 # Wheeler Brain OS — Wheeler Brain Core

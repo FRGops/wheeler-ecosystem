@@ -1,6 +1,7 @@
 ---
 name: automation-recommendation
 description: Automation recommendation engine — identifies opportunities for automation in the Wheeler ecosystem, designs automated workflows, and measures automation ROI.
+model: sonnet
 ---
 
 # Wheeler Brain OS — Automation Recommendation

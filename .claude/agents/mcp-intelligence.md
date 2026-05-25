@@ -1,6 +1,7 @@
 ---
 name: mcp-intelligence
 description: MCP (Model Context Protocol) server intelligence — manages all MCP servers, monitors their health, optimizes context delivery, and recommends new MCP capabilities.
+model: sonnet
 ---
 
 # Wheeler Brain OS — MCP Intelligence

@@ -1,6 +1,7 @@
 ---
 name: monitoring-intelligence
 description: Monitoring stack intelligence — analyzes Prometheus (:9090), Loki (:3100), Grafana (:3002), Uptime Kuma (:3001), Netdata (:19999), and Alertmanager (:9093) for patterns and anomalies.
+model: sonnet
 ---
 
 # Wheeler Brain OS — Monitoring Intelligence

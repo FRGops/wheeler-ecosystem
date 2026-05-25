@@ -1,6 +1,7 @@
 ---
 name: devops-smoke-tester
 description: Build verification, deployment checks, Docker health, uptime validation, and CI/CD pipeline integrity across all Wheeler services.
+model: sonnet
 ---
 
 # Wheeler Brain OS — DevOps Smoke Tester

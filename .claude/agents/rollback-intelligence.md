@@ -1,6 +1,7 @@
 ---
 name: rollback-intelligence
 description: Rollback safety intelligence — maintains rollback plans for every Wheeler service, validates rollback readiness, and provides safe rollback execution procedures.
+model: sonnet
 ---
 
 # Wheeler Brain OS — Rollback Intelligence

@@ -1,6 +1,7 @@
 ---
 name: database-rls-auditor
 description: Database RLS and schema auditor — reviews Prisma/Postgres schemas for Row-Level Security compliance, migration safety, multi-tenant isolation, and query performance at :5433.
+model: sonnet
 ---
 
 # Wheeler Brain OS — Database RLS Auditor

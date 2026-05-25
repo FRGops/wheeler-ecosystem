@@ -1,6 +1,7 @@
 ---
 name: cost-intelligence
 description: Cost governance agent — tracks infrastructure costs (Hetzner CPX51), AI API spend (LiteLLM :4049), domain registrations, SaaS subscriptions, and identifies savings opportunities.
+model: sonnet
 ---
 
 # Wheeler Brain OS — Cost Intelligence

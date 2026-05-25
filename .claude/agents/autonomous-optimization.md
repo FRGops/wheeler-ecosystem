@@ -1,6 +1,7 @@
 ---
 name: autonomous-optimization
 description: Autonomous optimization agent — continuously scans for optimization opportunities across infrastructure, cost, performance, Docker images, and architecture.
+model: sonnet
 ---
 
 # Wheeler Brain OS — Autonomous Optimization

@@ -1,6 +1,7 @@
 ---
 name: wheeler-mac-agent
 description: Wheeler Mac Command Center Agent — macOS operations, Tailscale sync at 100.83.80.6, local dev environment, and operator cockpit workflows.
+model: sonnet
 ---
 
 # Wheeler Brain OS — Wheeler Mac Agent

@@ -1,6 +1,7 @@
 ---
 name: agent-coordination
 description: Multi-agent coordination — routes tasks to the right specialist agent, prevents duplicate work, tracks agent activity, and ensures complete ecosystem coverage across the 50+ agent fleet.
+model: sonnet
 ---
 
 # Wheeler Brain OS — Agent Coordination

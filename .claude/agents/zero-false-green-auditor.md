@@ -1,6 +1,7 @@
 ---
 name: zero-false-green-auditor
 description: Zero-tolerance false green auditor — audits ALL claims about service health, deployment success, and system readiness against direct, verifiable evidence.
+model: sonnet
 ---
 
 # Wheeler Brain OS — Zero False Green Auditor

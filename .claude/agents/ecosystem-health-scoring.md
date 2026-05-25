@@ -1,6 +1,7 @@
 ---
 name: ecosystem-health-scoring
 description: Ecosystem health scoring — computes the authoritative Wheeler health score from Docker, PM2, Prometheus, Loki, Netdata, and backup signals. Weighted, honest, verifiable.
+model: sonnet
 ---
 
 # Wheeler Brain OS — Ecosystem Health Scoring

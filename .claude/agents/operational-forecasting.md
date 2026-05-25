@@ -1,6 +1,7 @@
 ---
 name: operational-forecasting
 description: Operational forecasting agent — predicts resource exhaustion, scaling needs, and operational risks using historical patterns and current trends.
+model: sonnet
 ---
 
 # Wheeler Brain OS — Operational Forecasting

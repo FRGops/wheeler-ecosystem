@@ -1,6 +1,7 @@
 ---
 name: drift-detection
 description: Configuration and infrastructure drift detection — compares current Docker, PM2, UFW, Nginx, and container state against known-good baselines to detect unauthorized changes.
+model: sonnet
 ---
 
 # Wheeler Brain OS — Drift Detection

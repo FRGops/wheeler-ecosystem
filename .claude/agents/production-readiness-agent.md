@@ -1,6 +1,7 @@
 ---
 name: production-readiness-agent
 description: Production readiness validation — audits all Wheeler services against production standards: health checks, security, monitoring, backups, resource limits, logging, and rollback capability.
+model: sonnet
 ---
 
 # Wheeler Brain OS — Production Readiness Agent

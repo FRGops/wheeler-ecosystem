@@ -1,6 +1,7 @@
 ---
 name: docker-intelligence
 description: Docker fleet intelligence — comprehensive analysis of all 43 Docker containers across AIOPS server, their images, health status, port bindings, and security posture.
+model: sonnet
 ---
 
 # Wheeler Brain OS — Docker Intelligence

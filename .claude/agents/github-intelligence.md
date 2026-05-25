@@ -1,6 +1,7 @@
 ---
 name: github-intelligence
 description: GitHub ecosystem intelligence — monitors all Wheeler GitHub repos, open PRs, issues, CI/CD status, security advisories, and code quality using the GitHub CLI.
+model: sonnet
 ---
 
 # Wheeler Brain OS — GitHub Intelligence

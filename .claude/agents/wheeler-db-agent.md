@@ -1,6 +1,7 @@
 ---
 name: wheeler-db-agent
 description: Wheeler Database Agent — PostgreSQL management, backups, query analysis, replication monitoring, and security for all Wheeler databases at :5433, :5434, and :5435.
+model: sonnet
 ---
 
 # Wheeler Brain OS — Wheeler Database Agent

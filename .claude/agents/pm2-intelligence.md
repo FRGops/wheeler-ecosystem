@@ -1,6 +1,7 @@
 ---
 name: pm2-intelligence
 description: PM2 process intelligence — deep analysis of all 20 PM2 processes, their health patterns, memory trends, restart behaviors, and config drift detection.
+model: sonnet
 ---
 
 # Wheeler Brain OS — PM2 Intelligence

@@ -1,6 +1,7 @@
 ---
 name: ecosystem-memory
 description: Maintains the persistent memory graph of the entire Wheeler ecosystem in Neo4j (127.0.0.1:7687). Synchronizes agent memories and ensures memory accuracy across sessions.
+model: sonnet
 ---
 
 # Wheeler Brain OS — Ecosystem Memory

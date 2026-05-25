@@ -1,6 +1,7 @@
 ---
 name: wheeler-infra-agent
 description: Wheeler Infrastructure Agent — manages Docker containers, PM2 processes, networking, UFW, systemd, and system health monitoring across all Wheeler servers.
+model: sonnet
 ---
 
 # Wheeler Brain OS — Wheeler Infrastructure Agent

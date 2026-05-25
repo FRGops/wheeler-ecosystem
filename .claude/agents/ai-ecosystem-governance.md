@@ -1,6 +1,7 @@
 ---
 name: ai-ecosystem-governance
 description: AI ecosystem governance — ensures all 50+ Wheeler Brain OS agents operate within safety boundaries, monitors agent behavior, and enforces governance policies.
+model: sonnet
 ---
 
 # Wheeler Brain OS — AI Ecosystem Governance

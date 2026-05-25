@@ -1,0 +1,1927 @@
+{
+  "database-rls-auditor": {
+    "name": "database-rls-auditor",
+    "description": "Database RLS and schema auditor \u2014 reviews Prisma/Postgres schemas for Row-Level Security compliance, migration safety, multi-tenant isolation, and query performance at :5433.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "database-rls-auditor.md",
+    "color": "",
+    "routable": true
+  },
+  "risk-scoring": {
+    "name": "risk-scoring",
+    "description": "Risk Scoring Agent \u2014 quantitative risk assessment engine: risk register with likelihood x impact scoring, trend analysis, Monte Carlo simulations, heat maps, and mitigation prioritization.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "risk-scoring.md",
+    "color": "",
+    "routable": true
+  },
+  "ecosystem-health-scoring": {
+    "name": "ecosystem-health-scoring",
+    "description": "Ecosystem health scoring \u2014 computes the authoritative Wheeler health score from Docker, PM2, Prometheus, Loki, Netdata, and backup signals. Weighted, honest, verifiable.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "ecosystem-health-scoring.md",
+    "color": "",
+    "routable": true
+  },
+  "operational-finance": {
+    "name": "operational-finance",
+    "description": "Operational finance agent \u2014 P&L statements, margin analysis, cost accounting, financial close automation, and GAAP-aligned financial operations for the Wheeler ecosystem.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "operational-finance.md",
+    "color": "yellow",
+    "routable": true
+  },
+  "monitoring-intelligence": {
+    "name": "monitoring-intelligence",
+    "description": "Monitoring stack intelligence \u2014 analyzes Prometheus (:9090), Loki (:3100), Grafana (:3002), Uptime Kuma (:3001), Netdata (:19999), and Alertmanager (:9093) for patterns and anomalies.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "monitoring-intelligence.md",
+    "color": "",
+    "routable": true
+  },
+  "agent-coordination": {
+    "name": "agent-coordination",
+    "description": "Multi-agent coordination \u2014 routes tasks to the right specialist agent, prevents duplicate work, tracks agent activity, and ensures complete ecosystem coverage across the 50+ agent fleet.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "agent-coordination.md",
+    "color": "",
+    "routable": true
+  },
+  "wheeler-brain-financial-integration": {
+    "name": "wheeler-brain-financial-integration",
+    "description": "Wheeler Brain financial integration agent \u2014 unified financial intelligence layer connecting all 40 financial agents, cross-agent synthesis, and financial knowledge graph maintenance in Neo4j.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "wheeler-brain-financial-integration.md",
+    "color": "yellow",
+    "routable": true
+  },
+  "marketing-compliance": {
+    "name": "marketing-compliance",
+    "description": "Marketing Compliance Agent \u2014 marketing material review for legal compliance: claim substantiation, FTC guidelines, state marketing rules, attorney advertising rules, testimonial compliance.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "marketing-compliance.md",
+    "color": "",
+    "routable": true
+  },
+  "infrastructure-cost": {
+    "name": "infrastructure-cost",
+    "description": "Infrastructure cost intelligence agent \u2014 per-service cost allocation, right-sizing analysis, capacity-based cost modeling across Docker, PM2, and hardware resources on Hetzner CPX51.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "infrastructure-cost.md",
+    "color": "green",
+    "routable": true
+  },
+  "revenue-intelligence": {
+    "name": "revenue-intelligence",
+    "description": "Revenue intelligence agent \u2014 monitors FRGCRM, RavynAI, SurplusAI, InsForge, and all 10 monetization products. Tracks MRR/ARR/churn, validates Stripe transactions, detects revenue anomalies, reports to executive dashboard :8180.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "revenue-intelligence.md",
+    "color": "",
+    "routable": true
+  },
+  "privacy-policy": {
+    "name": "privacy-policy",
+    "description": "Privacy Policy Agent \u2014 generates and maintains privacy policies, ensures CCPA/CPRA and state law compliance, tracks data processing accuracy, manages version history across all Wheeler properties.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "privacy-policy.md",
+    "color": "",
+    "routable": true
+  },
+  "real-estate-financial-intelligence": {
+    "name": "real-estate-financial-intelligence",
+    "description": "Real estate financial intelligence \u2014 property analysis, cap rate modeling, financing optimization, distressed opportunity identification, and real estate investment strategy.",
+    "model": "opus",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "real-estate-financial-intelligence.md",
+    "color": "purple",
+    "routable": true
+  },
+  "ai-token-cost": {
+    "name": "ai-token-cost",
+    "description": "AI token cost intelligence \u2014 per-model, per-key, per-request token economics via LiteLLM spend logs at :4049. Tracks DeepSeek, Claude, OpenAI spend with cost-efficiency scoring.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "ai-token-cost.md",
+    "color": "green",
+    "routable": true
+  },
+  "Code Reviewer": {
+    "name": "Code Reviewer",
+    "description": "Expert code reviewer who provides constructive, actionable feedback focused on correctness, maintainability, security, and performance \u2014 not style preferences.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "engineering-code-reviewer.md",
+    "color": "purple",
+    "routable": true
+  },
+  "no-false-greens-legal": {
+    "name": "no-false-greens-legal",
+    "description": "No-False-Greens QA Agent (Legal) \u2014 zero tolerance for false compliance claims. Independent verification of ALL compliance assertions. Adversarial testing. Reports to CEO, not CLO (independence). Audits compliance against actual evidence.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Glob",
+      "Grep",
+      "Bash",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "no-false-greens-legal.md",
+    "color": "",
+    "routable": true
+  },
+  "saas-kpi": {
+    "name": "saas-kpi",
+    "description": "SaaS KPI intelligence agent \u2014 SaaS-specific metrics (NDR, LTV:CAC, magic number, rule of 40), benchmarking, and SaaS financial health scoring for Wheeler SaaS products.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "saas-kpi.md",
+    "color": "green",
+    "routable": true
+  },
+  "drift-detection": {
+    "name": "drift-detection",
+    "description": "Configuration and infrastructure drift detection \u2014 compares current Docker, PM2, UFW, Nginx, and container state against known-good baselines to detect unauthorized changes.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "drift-detection.md",
+    "color": "",
+    "routable": true
+  },
+  "operational-forecasting": {
+    "name": "operational-forecasting",
+    "description": "Operational forecasting agent \u2014 predicts resource exhaustion, scaling needs, and operational risks using historical patterns and current trends.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "operational-forecasting.md",
+    "color": "",
+    "routable": true
+  },
+  "multi-server-coordination": {
+    "name": "multi-server-coordination",
+    "description": "Cross-server coordination agent \u2014 orchestrates operations across AIOPS (5.78.140.118), COREDB (5.78.210.123), EDGE (187.77.148.88), and Mac Command Center via Tailscale mesh.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "multi-server-coordination.md",
+    "color": "",
+    "routable": true
+  },
+  "executive-reporting": {
+    "name": "executive-reporting",
+    "description": "Executive reporting agent \u2014 board-ready financial packages, investor updates, strategic narrative generation, and C-suite financial communications.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "executive-reporting.md",
+    "color": "yellow",
+    "routable": true
+  },
+  "wheeler-worker-agent": {
+    "name": "wheeler-worker-agent",
+    "description": "Wheeler Worker Node Agent \u2014 manages Core-DB operations, Temporal workflows (:7233), background compute jobs, data pipelines, and worker process health.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "wheeler-worker-agent.md",
+    "color": "",
+    "routable": true
+  },
+  "fraud-prevention": {
+    "name": "fraud-prevention",
+    "description": "Fraud Prevention Agent \u2014 fraud detection for claimant fraud, attorney fraud, internal fraud, payment fraud. Suspicious activity monitoring, investigation workflow, pattern analysis.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "fraud-prevention.md",
+    "color": "",
+    "routable": true
+  },
+  "automation-recommendation": {
+    "name": "automation-recommendation",
+    "description": "Automation recommendation engine \u2014 identifies opportunities for automation in the Wheeler ecosystem, designs automated workflows, and measures automation ROI.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "automation-recommendation.md",
+    "color": "",
+    "routable": true
+  },
+  "repo-intelligence": {
+    "name": "repo-intelligence",
+    "description": "GitHub repository intelligence \u2014 understands all Wheeler repos, their relationships, deployment targets, code health metrics, and dependency graphs.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "repo-intelligence.md",
+    "color": "",
+    "routable": true
+  },
+  "wheeler-brain-core": {
+    "name": "wheeler-brain-core",
+    "description": "Master orchestrator for Wheeler Brain OS. Central reasoning engine that coordinates all 50+ agents, routes decisions, maintains the ecosystem intelligence model, and provides unified command.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "wheeler-brain-core.md",
+    "color": "",
+    "routable": true
+  },
+  "scaling-cost-forecast": {
+    "name": "scaling-cost-forecast",
+    "description": "Scaling cost forecasting \u2014 capacity-based cost projections, growth-driven infrastructure planning, break-even analysis for server upgrades, and scaling trigger monitoring.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "scaling-cost-forecast.md",
+    "color": "green",
+    "routable": true
+  },
+  "foreclosure-intelligence": {
+    "name": "foreclosure-intelligence",
+    "description": "Nationwide Foreclosure Intelligence Agent \u2014 monitors foreclosure dockets across all US counties, parses filing data, identifies surplus fund opportunities, and prioritizes high-value claims.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "foreclosure-intelligence.md",
+    "color": "",
+    "routable": true
+  },
+  "surplus-funds-compliance": {
+    "name": "surplus-funds-compliance",
+    "description": "Surplus Funds Compliance Agent \u2014 specialized compliance for surplus funds recovery: court filing rules, assignment validity, fee restrictions, claimant authorization, escheat deadlines, unclaimed property rules.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "surplus-funds-compliance.md",
+    "color": "",
+    "routable": true
+  },
+  "marketplace-kpi": {
+    "name": "marketplace-kpi",
+    "description": "Marketplace KPI intelligence agent \u2014 GMV, take rate, liquidity, attorney marketplace metrics, supply/demand balance, and marketplace financial health scoring.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "marketplace-kpi.md",
+    "color": "green",
+    "routable": true
+  },
+  "financial-reporting": {
+    "name": "financial-reporting",
+    "description": "Financial reporting agent \u2014 automated P&L, balance sheet, cash flow statements, board packages, investor updates, and GAAP-aligned financial report generation.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "financial-reporting.md",
+    "color": "green",
+    "routable": true
+  },
+  "wheeler-mac-agent": {
+    "name": "wheeler-mac-agent",
+    "description": "Wheeler Mac Command Center Agent \u2014 macOS operations, Tailscale sync at 100.83.80.6, local dev environment, and operator cockpit workflows.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "wheeler-mac-agent.md",
+    "color": "",
+    "routable": true
+  },
+  "budget-automation": {
+    "name": "budget-automation",
+    "description": "Budget automation agent \u2014 budget vs. actual tracking, variance analysis, automated budget alerts, forecast adjustment, and spending control automation for the Wheeler ecosystem.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "budget-automation.md",
+    "color": "yellow",
+    "routable": true
+  },
+  "marketplace-compliance": {
+    "name": "marketplace-compliance",
+    "description": "Marketplace Compliance Agent \u2014 platform compliance for two-sided attorney marketplace: fee structure monitoring (ABA Rule 5.4), referral vs. advertising distinction, attorney independence protection, client disclosures.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Glob",
+      "Grep",
+      "Bash",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "marketplace-compliance.md",
+    "color": "",
+    "routable": true
+  },
+  "county-intelligence": {
+    "name": "county-intelligence",
+    "description": "County Intelligence Agent \u2014 maintains intelligence on all 3,000+ US counties: court systems, filing procedures, processing timelines, judge assignments, and surplus fund processes.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "county-intelligence.md",
+    "color": "",
+    "routable": true
+  },
+  "aiops-integration": {
+    "name": "aiops-integration",
+    "description": "AI Ops integration agent \u2014 ensures Wheeler Brain OS command layer has full visibility into all AI Ops services: ClickHouse (:8123), Superset (:8088), Langflow (:7860), Open WebUI (:3000), and monitoring.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "aiops-integration.md",
+    "color": "",
+    "routable": true
+  },
+  "market-intelligence": {
+    "name": "market-intelligence",
+    "description": "Market Intelligence Agent \u2014 monitors legal tech, real estate data, and AI markets. Tracks competitor moves, market trends, funding events, and regulatory changes affecting Wheeler business units.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "market-intelligence.md",
+    "color": "",
+    "routable": true
+  },
+  "ai-ecosystem-governance": {
+    "name": "ai-ecosystem-governance",
+    "description": "AI ecosystem governance \u2014 ensures all 50+ Wheeler Brain OS agents operate within safety boundaries, monitors agent behavior, and enforces governance policies.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "ai-ecosystem-governance.md",
+    "color": "",
+    "routable": true
+  },
+  "audit-trail": {
+    "name": "audit-trail",
+    "description": "Audit Trail Agent \u2014 audit log completeness monitoring, immutability verification, evidence collection for regulatory/legal requests, cross-system correlation, health scoring.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "audit-trail.md",
+    "color": "",
+    "routable": true
+  },
+  "engineering-sre": {
+    "name": "engineering-sre",
+    "description": "Site Reliability Engineering for the Wheeler ecosystem \u2014 defines SLOs, manages error budgets, drives observability, reduces toil, and ensures 99.9%+ reliability.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "engineering-sre.md",
+    "color": "",
+    "routable": true
+  },
+  "ai-governance": {
+    "name": "ai-governance",
+    "description": "AI Governance Agent \u2014 AI use case registry, risk tier enforcement (Tier 0-5), human review gate monitoring, model inventory, bias audit scheduling, prompt governance, prohibited AI action enforcement. Has SHUT DOWN authority.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Glob",
+      "Grep",
+      "Bash",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "ai-governance.md",
+    "color": "",
+    "routable": true
+  },
+  "legal-ops": {
+    "name": "legal-ops",
+    "description": "Legal Ops Agent \u2014 manages day-to-day legal operations: task tracking, outside counsel coordination, legal calendar, matter management, invoice review across all Wheeler legal workflows.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "legal-ops.md",
+    "color": "",
+    "routable": true
+  },
+  "oss-intelligence": {
+    "name": "oss-intelligence",
+    "description": "Open Source Software intelligence \u2014 evaluates OSS dependencies for CVEs, maintenance health, license compliance, and makes adopt/caution/avoid recommendations for the Wheeler ecosystem.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "oss-intelligence.md",
+    "color": "",
+    "routable": true
+  },
+  "document-review": {
+    "name": "document-review",
+    "description": "Document Review Agent \u2014 AI-assisted document analysis for risk flags, missing clauses, inconsistent terms, and redline generation. Human-in-the-loop. Never provides legal conclusions.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "document-review.md",
+    "color": "",
+    "routable": true
+  },
+  "incident-response-agent": {
+    "name": "incident-response-agent",
+    "description": "Incident response coordination \u2014 manages war room (:8091), triages incidents by severity, coordinates multi-agent response, tracks resolution, and produces post-mortems.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "incident-response-agent.md",
+    "color": "",
+    "routable": true
+  },
+  "securities-compliance": {
+    "name": "securities-compliance",
+    "description": "Securities/Capital Raise Risk Agent \u2014 securities law compliance: Reg D, Reg CF, accredited investor verification, general solicitation restrictions, Form D filing, blue sky compliance.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "securities-compliance.md",
+    "color": "",
+    "routable": true
+  },
+  "seo-intelligence": {
+    "name": "seo-intelligence",
+    "description": "SEO Intelligence Agent \u2014 monitors search rankings, keyword performance, content ROI, and competitor SEO strategies across all Wheeler web properties (FRG, SurplusAI, Prediction Radar, Wheeler Brain).",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "seo-intelligence.md",
+    "color": "",
+    "routable": true
+  },
+  "cashflow-forecasting": {
+    "name": "cashflow-forecasting",
+    "description": "Cashflow forecasting agent \u2014 13-week rolling cash flow, burn rate projection, runway analysis, cash crunch early warning, and liquidity planning for the Wheeler ecosystem.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "cashflow-forecasting.md",
+    "color": "yellow",
+    "routable": true
+  },
+  "zero-false-green-auditor": {
+    "name": "zero-false-green-auditor",
+    "description": "Zero-tolerance false green auditor \u2014 audits ALL claims about service health, deployment success, and system readiness against direct, verifiable evidence.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "zero-false-green-auditor.md",
+    "color": "",
+    "routable": true
+  },
+  "financial-governance": {
+    "name": "financial-governance",
+    "description": "Financial governance agent \u2014 policy enforcement, audit trail integrity, separation of duties monitoring, financial compliance, and zero-trust financial security for the Wheeler ecosystem.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "financial-governance.md",
+    "color": "yellow",
+    "routable": true
+  },
+  "infra-intelligence": {
+    "name": "infra-intelligence",
+    "description": "Deep infrastructure analysis agent \u2014 understands all 3 servers, 43 Docker containers, 20 PM2 processes, Tailscale mesh, hardware profiles, and network topology.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "infra-intelligence.md",
+    "color": "",
+    "routable": true
+  },
+  "competitor-intelligence": {
+    "name": "competitor-intelligence",
+    "description": "Competitor Intelligence Agent \u2014 monitors competitor activity across legal tech, real estate data, AI ops, and adjacent markets. Tracks product launches, funding, pricing, talent moves, and strategic signals.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "competitor-intelligence.md",
+    "color": "",
+    "routable": true
+  },
+  "gateway-intelligence": {
+    "name": "gateway-intelligence",
+    "description": "Nginx gateway intelligence \u2014 monitors all reverse proxy routes, SSL certificates, auth configurations, rate limiting, and public-facing surface across AIOPS and EDGE.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "gateway-intelligence.md",
+    "color": "",
+    "routable": true
+  },
+  "deployment-intelligence": {
+    "name": "deployment-intelligence",
+    "description": "Deployment analysis and safety assessment \u2014 7-gate deploy pipeline, risk assessment, pre-flight validation, and post-deploy verification across all Wheeler services.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "deployment-intelligence.md",
+    "color": "",
+    "routable": true
+  },
+  "chief-of-staff": {
+    "name": "chief-of-staff",
+    "description": "AI Chief of Staff \u2014 central execution coordination for Wheeler ecosystem. Generates daily priorities, weekly plans, tracks KPIs, escalates blockers, and forecasts operational bottlenecks. Coordinates with all 53 agents through agent-coordination.",
+    "model": "opus",
+    "tools": [
+      "Bash",
+      "Read",
+      "Write",
+      "Edit",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch",
+      "Agent",
+      "TaskCreate",
+      "TaskUpdate",
+      "CronCreate",
+      "CronDelete",
+      "Skill"
+    ],
+    "file": "chief-of-staff.md",
+    "color": "",
+    "routable": true
+  },
+  "wheeler-db-agent": {
+    "name": "wheeler-db-agent",
+    "description": "Wheeler Database Agent \u2014 PostgreSQL management, backups, query analysis, replication monitoring, and security for all Wheeler databases at :5433, :5434, and :5435.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "wheeler-db-agent.md",
+    "color": "",
+    "routable": true
+  },
+  "wheeler-deploy-agent": {
+    "name": "wheeler-deploy-agent",
+    "description": "Wheeler Deploy Agent \u2014 executes safe deployments with pre-flight checks, the 7-gate pipeline, rollback automation, and smoke testing across all Wheeler services.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "wheeler-deploy-agent.md",
+    "color": "",
+    "routable": true
+  },
+  "mcp-intelligence": {
+    "name": "mcp-intelligence",
+    "description": "MCP (Model Context Protocol) server intelligence \u2014 manages all MCP servers, monitors their health, optimizes context delivery, and recommends new MCP capabilities.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "mcp-intelligence.md",
+    "color": "",
+    "routable": true
+  },
+  "saas-terms": {
+    "name": "saas-terms",
+    "description": "SaaS Terms Agent \u2014 manages SaaS terms of service, acceptable use policy, SLA terms, version control. Ensures compliance with consumer protection, privacy, and payment laws.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "saas-terms.md",
+    "color": "",
+    "routable": true
+  },
+  "contract-automation": {
+    "name": "contract-automation",
+    "description": "Contract Automation Agent \u2014 template-driven contract generation, clause selection by risk profile, approval routing automation, lifecycle tracking across all Wheeler business units.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "contract-automation.md",
+    "color": "",
+    "routable": true
+  },
+  "alert-correlation": {
+    "name": "alert-correlation",
+    "description": "Alert correlation and noise reduction \u2014 groups related alerts from Alertmanager (:9093), Prometheus (:9090), Uptime Kuma (:3001), PM2, and Docker into incident clusters to prevent alert fatigue.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "alert-correlation.md",
+    "color": "",
+    "routable": true
+  },
+  "revenue-forecasting": {
+    "name": "revenue-forecasting",
+    "description": "Revenue forecasting agent \u2014 MRR/ARR projections, seasonality modeling, pipeline-based forecasting, scenario analysis, and revenue trend intelligence.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "revenue-forecasting.md",
+    "color": "yellow",
+    "routable": true
+  },
+  "trend-forecasting": {
+    "name": "trend-forecasting",
+    "description": "Trend Forecasting Agent \u2014 applies time-series analysis and ML to predict infrastructure, revenue, market, and operational trends. Extends operational-forecasting with domain-specific prediction models.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "trend-forecasting.md",
+    "color": "",
+    "routable": true
+  },
+  "autonomous-financial-optimization": {
+    "name": "autonomous-financial-optimization",
+    "description": "Autonomous financial optimization agent \u2014 self-tuning cost/revenue optimization, continuous efficiency improvement, automated savings execution, and financial performance maximization.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "autonomous-financial-optimization.md",
+    "color": "yellow",
+    "routable": true
+  },
+  "ecosystem-relationship-mapper": {
+    "name": "ecosystem-relationship-mapper",
+    "description": "Maps all ecosystem relationships \u2014 business systems to services, services to repos, repos to deployments, deployments to servers. Understands impact propagation.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "ecosystem-relationship-mapper.md",
+    "color": "",
+    "routable": true
+  },
+  "api-cost-intelligence": {
+    "name": "api-cost-intelligence",
+    "description": "Cross-provider API cost intelligence \u2014 compares AI provider pricing (DeepSeek, Anthropic, OpenAI), tracks external API costs, models cost-per-task across providers, recommends optimal routing.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "api-cost-intelligence.md",
+    "color": "green",
+    "routable": true
+  },
+  "ceo-command-console": {
+    "name": "ceo-command-console",
+    "description": "CEO Command Console \u2014 one-glance ecosystem intelligence. Health score, revenue status, cost trends, risk level, agent fleet, and deployment activity across all Wheeler systems.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "ceo-command-console.md",
+    "color": "",
+    "routable": true
+  },
+  "ai-spending-governance": {
+    "name": "ai-spending-governance",
+    "description": "AI spending governance agent \u2014 budget enforcement, anomaly detection, rate-limit monitoring, spending policy compliance, and AI cost guardrails across the Wheeler ecosystem.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "ai-spending-governance.md",
+    "color": "yellow",
+    "routable": true
+  },
+  "vendor-optimization": {
+    "name": "vendor-optimization",
+    "description": "Vendor and SaaS subscription optimization \u2014 tracks all external vendors, domains, SaaS subscriptions, identifies consolidation opportunities, monitors renewal dates, and benchmarks pricing.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "vendor-optimization.md",
+    "color": "green",
+    "routable": true
+  },
+  "cybersecurity-compliance": {
+    "name": "cybersecurity-compliance",
+    "description": "Cybersecurity Compliance Agent \u2014 security control compliance against NIST CSF, CIS Controls, SOC 2. Vulnerability management, pen test tracking, security audit evidence collection.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "cybersecurity-compliance.md",
+    "color": "",
+    "routable": true
+  },
+  "credit-strategy": {
+    "name": "credit-strategy",
+    "description": "Credit strategy agent \u2014 business credit building, financing optimization, credit monitoring, debt management, and credit intelligence for the Wheeler ecosystem.",
+    "model": "opus",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "credit-strategy.md",
+    "color": "purple",
+    "routable": true
+  },
+  "long-term-scaling": {
+    "name": "long-term-scaling",
+    "description": "Long-term scaling strategy agent \u2014 plans infrastructure growth, capacity expansion, and architectural evolution for the Wheeler ecosystem over 6-12 month horizons.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "long-term-scaling.md",
+    "color": "",
+    "routable": true
+  },
+  "billing-intelligence": {
+    "name": "billing-intelligence",
+    "description": "Billing intelligence agent \u2014 invoice management, payment collection, dunning automation, billing analytics, and accounts receivable intelligence for the Wheeler ecosystem.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "billing-intelligence.md",
+    "color": "green",
+    "routable": true
+  },
+  "roi-optimization": {
+    "name": "roi-optimization",
+    "description": "ROI optimization agent \u2014 cross-investment ROI comparison, capital efficiency scoring, spend effectiveness analysis, and ROI maximization strategies for the Wheeler ecosystem.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "roi-optimization.md",
+    "color": "green",
+    "routable": true
+  },
+  "subscription-analytics": {
+    "name": "subscription-analytics",
+    "description": "Subscription analytics agent \u2014 churn analysis, cohort retention, expansion MRR tracking, downgrade analysis, subscription lifecycle intelligence, and retention optimization.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "subscription-analytics.md",
+    "color": "green",
+    "routable": true
+  },
+  "ecosystem-memory": {
+    "name": "ecosystem-memory",
+    "description": "Maintains the persistent memory graph of the entire Wheeler ecosystem in Neo4j (127.0.0.1:7687). Synchronizes agent memories and ensures memory accuracy across sessions.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "ecosystem-memory.md",
+    "color": "",
+    "routable": true
+  },
+  "docker-intelligence": {
+    "name": "docker-intelligence",
+    "description": "Docker fleet intelligence \u2014 comprehensive analysis of all 43 Docker containers across AIOPS server, their images, health status, port bindings, and security posture.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "docker-intelligence.md",
+    "color": "",
+    "routable": true
+  },
+  "github-intelligence": {
+    "name": "github-intelligence",
+    "description": "GitHub ecosystem intelligence \u2014 monitors all Wheeler GitHub repos, open PRs, issues, CI/CD status, security advisories, and code quality using the GitHub CLI.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "github-intelligence.md",
+    "color": "",
+    "routable": true
+  },
+  "dispute-management": {
+    "name": "dispute-management",
+    "description": "Dispute Management Agent \u2014 complaint intake, classification, routing, tracking, regulatory response, dispute resolution, settlement tracking, pattern analysis for systemic issues.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "dispute-management.md",
+    "color": "",
+    "routable": true
+  },
+  "wheeler-brain-dashboard": {
+    "name": "wheeler-brain-dashboard",
+    "description": "Dashboard intelligence agent \u2014 designs and maintains executive dashboards and visualizations for the Wheeler ecosystem, drawing data from all agents and services.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "wheeler-brain-dashboard.md",
+    "color": "",
+    "routable": true
+  },
+  "executive-dashboard": {
+    "name": "executive-dashboard",
+    "description": "Executive dashboard intelligence \u2014 synthesizes all Wheeler ecosystem data into executive summaries, KPI dashboards, trends, and strategic recommendations. Feeds :8180.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "executive-dashboard.md",
+    "color": "",
+    "routable": true
+  },
+  "compliance-mapping": {
+    "name": "compliance-mapping",
+    "description": "Compliance Mapping Agent \u2014 maps regulatory requirements to Wheeler operations, maintains requirement database, tracks regulatory changes, performs gap analysis across TCPA, CCPA, FCRA, ABA rules, and state laws.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "compliance-mapping.md",
+    "color": "",
+    "routable": true
+  },
+  "cost-intelligence": {
+    "name": "cost-intelligence",
+    "description": "Cost governance agent \u2014 tracks infrastructure costs (Hetzner CPX51), AI API spend (LiteLLM :4049), domain registrations, SaaS subscriptions, and identifies savings opportunities.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "cost-intelligence.md",
+    "color": "",
+    "routable": true
+  },
+  "acquisition-intelligence": {
+    "name": "acquisition-intelligence",
+    "description": "Acquisition intelligence \u2014 target identification, valuation modeling, synergy analysis, due diligence intelligence, and acquisition opportunity scoring for the Wheeler ecosystem.",
+    "model": "opus",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "acquisition-intelligence.md",
+    "color": "purple",
+    "routable": true
+  },
+  "wheeler-infra-agent": {
+    "name": "wheeler-infra-agent",
+    "description": "Wheeler Infrastructure Agent \u2014 manages Docker containers, PM2 processes, networking, UFW, systemd, and system health monitoring across all Wheeler servers.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "wheeler-infra-agent.md",
+    "color": "",
+    "routable": true
+  },
+  "pm2-intelligence": {
+    "name": "pm2-intelligence",
+    "description": "PM2 process intelligence \u2014 deep analysis of all 20 PM2 processes, their health patterns, memory trends, restart behaviors, and config drift detection.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "pm2-intelligence.md",
+    "color": "",
+    "routable": true
+  },
+  "api-terms": {
+    "name": "api-terms",
+    "description": "API Terms Agent \u2014 manages API license terms, rate limiting policies, data usage restrictions, attribution requirements, and API key management terms across Wheeler API products.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "api-terms.md",
+    "color": "",
+    "routable": true
+  },
+  "observability-intelligence": {
+    "name": "observability-intelligence",
+    "description": "Observability fusion agent \u2014 synthesizes data from Prometheus (:9090), Loki (:3100), Grafana (:3002), Uptime Kuma (:3001), Netdata (:19999), PM2, Docker, and Alertmanager (:9093) into unified ecosystem health view.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "observability-intelligence.md",
+    "color": "",
+    "routable": true
+  },
+  "state-rules": {
+    "name": "state-rules",
+    "description": "State-by-State Rules Agent \u2014 monitors 50-state regulatory landscape for surplus funds recovery, attorney involvement, finder's fees, marketing restrictions, and unclaimed property rules.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "state-rules.md",
+    "color": "",
+    "routable": true
+  },
+  "rollback-intelligence": {
+    "name": "rollback-intelligence",
+    "description": "Rollback safety intelligence \u2014 maintains rollback plans for every Wheeler service, validates rollback readiness, and provides safe rollback execution procedures.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "rollback-intelligence.md",
+    "color": "",
+    "routable": true
+  },
+  "financial-dashboard": {
+    "name": "financial-dashboard",
+    "description": "Financial dashboard agent \u2014 Bloomberg-terminal style executive financial dashboards, real-time KPI visualization, treasury views, and institutional-grade financial displays at :8180/finance.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "financial-dashboard.md",
+    "color": "yellow",
+    "routable": true
+  },
+  "lead-intelligence": {
+    "name": "lead-intelligence",
+    "description": "Lead Intelligence Agent \u2014 monitors, enriches, scores, and routes all lead data across FRGCRM, SurplusAI, and Prediction Radar funnels. Tracks conversion metrics and lead source ROI.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "lead-intelligence.md",
+    "color": "",
+    "routable": true
+  },
+  "profitability-intelligence": {
+    "name": "profitability-intelligence",
+    "description": "Profitability intelligence agent \u2014 per-product P&L, unit economics, contribution margin analysis, customer lifetime value modeling, and profitability optimization for the Wheeler ecosystem.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "profitability-intelligence.md",
+    "color": "yellow",
+    "routable": true
+  },
+  "treasury-intelligence": {
+    "name": "treasury-intelligence",
+    "description": "Treasury intelligence agent \u2014 cash position monitoring, working capital management, payout scheduling, liquidity forecasting, and financial risk management for the Wheeler ecosystem.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "treasury-intelligence.md",
+    "color": "yellow",
+    "routable": true
+  },
+  "devops-smoke-tester": {
+    "name": "devops-smoke-tester",
+    "description": "Build verification, deployment checks, Docker health, uptime validation, and CI/CD pipeline integrity across all Wheeler services.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "devops-smoke-tester.md",
+    "color": "",
+    "routable": true
+  },
+  "attorney-network-compliance": {
+    "name": "attorney-network-compliance",
+    "description": "Attorney Network Compliance Agent \u2014 attorney license verification, good standing monitoring, disciplinary alert tracking, malpractice insurance verification, state coverage gap analysis.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "attorney-network-compliance.md",
+    "color": "",
+    "routable": true
+  },
+  "wealth-infrastructure": {
+    "name": "wealth-infrastructure",
+    "description": "Wealth infrastructure agent \u2014 long-term asset allocation, entity structure optimization, intergenerational wealth strategy, and financial fortress architecture.",
+    "model": "opus",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "wealth-infrastructure.md",
+    "color": "purple",
+    "routable": true
+  },
+  "real-estate-compliance": {
+    "name": "real-estate-compliance",
+    "description": "Real Estate Compliance Agent \u2014 property transaction compliance: RESPA, TILA, state real estate licensing, recording requirements, title issues, surplus funds from real estate processes.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "real-estate-compliance.md",
+    "color": "",
+    "routable": true
+  },
+  "autonomous-docs": {
+    "name": "autonomous-docs",
+    "description": "Autonomous documentation agent \u2014 generates and maintains all Wheeler Brain OS documentation, architecture diagrams, operational runbooks, and agent profiles.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "autonomous-docs.md",
+    "color": "",
+    "routable": true
+  },
+  "executive-workflow": {
+    "name": "executive-workflow",
+    "description": "Executive workflow automation \u2014 designs and manages operational workflows, approval pipelines, decision processes, and cross-agent coordination.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "executive-workflow.md",
+    "color": "",
+    "routable": true
+  },
+  "wheeler-security-agent": {
+    "name": "wheeler-security-agent",
+    "description": "Wheeler Security Agent \u2014 secrets scanning, UFW firewall auditing, SSH hardening, Docker security, SSL certificate monitoring, and security posture enforcement.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "wheeler-security-agent.md",
+    "color": "",
+    "routable": true
+  },
+  "records-retention": {
+    "name": "records-retention",
+    "description": "Records Retention Agent \u2014 retention schedule enforcement, automated deletion workflows, legal hold management, retention policy compliance auditing, destruction certification.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "records-retention.md",
+    "color": "",
+    "routable": true
+  },
+  "docker-expert": {
+    "name": "docker-expert",
+    "description": "\"Use this agent when you need to build, optimize, or secure Docker container images and orchestration for production environments.\"",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Glob",
+      "Grep"
+    ],
+    "file": "docker-expert.md",
+    "color": "",
+    "routable": true
+  },
+  "vector-database": {
+    "name": "vector-database",
+    "description": "Vector Database Agent \u2014 manages pgvector and Qdrant vector stores, optimizes index performance, and ensures embedding search quality across the Wheeler intelligence layer.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "vector-database.md",
+    "color": "",
+    "routable": true
+  },
+  "government-contracting-compliance": {
+    "name": "government-contracting-compliance",
+    "description": "Government Contracting Compliance Agent \u2014 FAR/DFARS compliance, SBA requirements, procurement integrity, small business subcontracting, cost accounting standards, suspension/debarment screening.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "government-contracting-compliance.md",
+    "color": "",
+    "routable": true
+  },
+  "forecasting-intelligence": {
+    "name": "forecasting-intelligence",
+    "description": "Forecasting intelligence agent \u2014 ensemble forecasting, scenario modeling, Monte Carlo simulation, prediction markets, and forecast accuracy tracking across all financial domains.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "forecasting-intelligence.md",
+    "color": "yellow",
+    "routable": true
+  },
+  "security-intelligence": {
+    "name": "security-intelligence",
+    "description": "Security intelligence fusion \u2014 synthesizes security signals from all sources: UFW, SSL, Nginx, secrets scan, container exposure, CVE data, and Tailscale mesh into unified security posture.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "security-intelligence.md",
+    "color": "",
+    "routable": true
+  },
+  "infrastructure-optimization": {
+    "name": "infrastructure-optimization",
+    "description": "Continuous infrastructure optimization \u2014 Docker image cleanup, resource right-sizing, idle service detection, storage reclamation, and cost-saving recommendations with ROI estimates.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "infrastructure-optimization.md",
+    "color": "green",
+    "routable": true
+  },
+  "kyc-identity": {
+    "name": "kyc-identity",
+    "description": "KYC/Identity Agent \u2014 claimant identity verification, beneficial ownership verification, sanctions screening (OFAC), PEP screening, identity document verification, risk-based KYC tiering.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "kyc-identity.md",
+    "color": "",
+    "routable": true
+  },
+  "ai-cfo": {
+    "name": "ai-cfo",
+    "description": "AI CFO \u2014 strategic financial oversight, cross-agent financial coordination, capital allocation governance, financial health scoring, and executive financial decision support for the Wheeler ecosystem.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "ai-cfo.md",
+    "color": "yellow",
+    "routable": true
+  },
+  "resource-allocation": {
+    "name": "resource-allocation",
+    "description": "Resource allocation intelligence \u2014 cost-per-workload attribution, capacity utilization scoring, resource contention detection, and allocation efficiency optimization.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "resource-allocation.md",
+    "color": "green",
+    "routable": true
+  },
+  "production-readiness-agent": {
+    "name": "production-readiness-agent",
+    "description": "Production readiness validation \u2014 audits all Wheeler services against production standards: health checks, security, monitoring, backups, resource limits, logging, and rollback capability.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "production-readiness-agent.md",
+    "color": "",
+    "routable": true
+  },
+  "autonomous-execution-engine": {
+    "name": "autonomous-execution-engine",
+    "description": "COO Agent \u2014 the autonomous execution engine that keeps the Wheeler ecosystem moving. Generates execution plans, recommends next actions, routes tasks to specialist agents, escalates blockers, monitors progress, and continuously optimizes workflows. Coordinates all 53 agents through agent-coordination.",
+    "model": "opus",
+    "tools": [
+      "Bash",
+      "Read",
+      "Write",
+      "Edit",
+      "Glob",
+      "Grep",
+      "Agent",
+      "TaskCreate",
+      "TaskUpdate",
+      "Skill"
+    ],
+    "file": "autonomous-execution-engine.md",
+    "color": "",
+    "routable": true
+  },
+  "long-term-capital-strategy": {
+    "name": "long-term-capital-strategy",
+    "description": "Long-term capital strategy agent \u2014 5-10 year capital deployment planning, intergenerational wealth compounding, strategic capital reserves, and multi-decade financial architecture.",
+    "model": "opus",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "long-term-capital-strategy.md",
+    "color": "purple",
+    "routable": true
+  },
+  "real-estate-intelligence": {
+    "name": "real-estate-intelligence",
+    "description": "Real Estate Intelligence Agent \u2014 monitors property markets, tracks real estate trends, analyzes property data, and identifies acquisition opportunities across the Wheeler ecosystem.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "real-estate-intelligence.md",
+    "color": "",
+    "routable": true
+  },
+  "enterprise-kpi-intelligence": {
+    "name": "enterprise-kpi-intelligence",
+    "description": "Enterprise KPI intelligence agent \u2014 MRR, ARR, NDR, LTV:CAC, CAC payback, magic number, and all SaaS/metrics tracking with benchmarks for the Wheeler ecosystem.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "enterprise-kpi-intelligence.md",
+    "color": "yellow",
+    "routable": true
+  },
+  "investment-opportunity": {
+    "name": "investment-opportunity",
+    "description": "Investment opportunity intelligence \u2014 market scanning, opportunity ranking, risk assessment, alternative investment analysis, and strategic investment recommendations.",
+    "model": "opus",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "investment-opportunity.md",
+    "color": "purple",
+    "routable": true
+  },
+  "ai-routing": {
+    "name": "ai-routing",
+    "description": "LLM routing intelligence \u2014 optimizes model selection, monitors LiteLLM proxy (:4049) health, manages rate limits, and balances cost vs performance for AI requests.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "ai-routing.md",
+    "color": "",
+    "routable": true
+  },
+  "autonomous-optimization": {
+    "name": "autonomous-optimization",
+    "description": "Autonomous optimization agent \u2014 continuously scans for optimization opportunities across infrastructure, cost, performance, Docker images, and architecture.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "autonomous-optimization.md",
+    "color": "",
+    "routable": true
+  },
+  "vendor-risk": {
+    "name": "vendor-risk",
+    "description": "Vendor Risk Agent \u2014 vendor risk tiering, security questionnaire review, SOC 2 analysis, DPA tracking, contract compliance, incident tracking, annual reassessment.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "vendor-risk.md",
+    "color": "",
+    "routable": true
+  },
+  "claims-workflow-compliance": {
+    "name": "claims-workflow-compliance",
+    "description": "Claims Workflow Compliance Agent \u2014 claim processing compliance: required documents per state, filing deadlines, court rule compliance, document oversight, statute of limitations monitoring.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "claims-workflow-compliance.md",
+    "color": "",
+    "routable": true
+  },
+  "funding-strategy": {
+    "name": "funding-strategy",
+    "description": "Funding strategy agent \u2014 capital stack optimization, debt vs. equity analysis, fundraising readiness assessment, term sheet analysis, and financing strategy intelligence.",
+    "model": "opus",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "funding-strategy.md",
+    "color": "purple",
+    "routable": true
+  },
+  "infra-graph": {
+    "name": "infra-graph",
+    "description": "Infrastructure dependency graph agent \u2014 maintains Neo4j (127.0.0.1:7687) ecosystem graph mapping servers, containers, services, PM2 processes, and business systems.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "infra-graph.md",
+    "color": "",
+    "routable": true
+  },
+  "data-licensing": {
+    "name": "data-licensing",
+    "description": "Data Licensing Agent \u2014 data rights management for court records, public records, third-party data, scraped data. Inbound/outbound licensing, provenance tracking, source terms compliance.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "data-licensing.md",
+    "color": "",
+    "routable": true
+  },
+  "sms-email-compliance": {
+    "name": "sms-email-compliance",
+    "description": "SMS/Email Compliance Agent \u2014 TCPA and CAN-SPAM enforcement: consent verification, DNC scrubbing, reassigned number checking, opt-out processing, real-time outreach compliance gate. Has BLOCK authority.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Glob",
+      "Grep",
+      "Bash",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "sms-email-compliance.md",
+    "color": "",
+    "routable": true
+  },
+  "tax-strategy-intelligence": {
+    "name": "tax-strategy-intelligence",
+    "description": "Tax strategy intelligence agent \u2014 sales tax nexus monitoring, VAT obligation tracking, estimated tax planning, entity structure optimization, and tax compliance intelligence.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "tax-strategy-intelligence.md",
+    "color": "green",
+    "routable": true
+  },
+  "client-consent": {
+    "name": "client-consent",
+    "description": "Client Consent Agent \u2014 consent capture, verification, tier enforcement, version management, revocation handling. Maintains consent audit trail for regulatory and litigation purposes.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "client-consent.md",
+    "color": "",
+    "routable": true
+  },
+  "kpi-intelligence": {
+    "name": "kpi-intelligence",
+    "description": "KPI Intelligence Agent \u2014 defines, tracks, and alerts on Key Performance Indicators across all Wheeler business units, infrastructure, and operations. Single source of truth for ecosystem metrics.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "kpi-intelligence.md",
+    "color": "",
+    "routable": true
+  },
+  "stripe-revenue": {
+    "name": "stripe-revenue",
+    "description": "Stripe revenue agent \u2014 subscription monitoring, payment reconciliation, webhook health, dispute management, and Stripe API intelligence for the Wheeler ecosystem.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "stripe-revenue.md",
+    "color": "green",
+    "routable": true
+  },
+  "capital-allocation": {
+    "name": "capital-allocation",
+    "description": "Capital allocation intelligence \u2014 investment prioritization, ROI scoring, capital deployment strategy, build-vs-buy analysis, and strategic resource allocation for the Wheeler ecosystem.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "capital-allocation.md",
+    "color": "yellow",
+    "routable": true
+  },
+  "no-false-greens-qa": {
+    "name": "no-false-greens-qa",
+    "description": "Verification integrity agent \u2014 actively challenges ALL health claims against actual evidence. Audits Docker, PM2, API, monitoring, and backup status with independent verification.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "no-false-greens-qa.md",
+    "color": "",
+    "routable": true
+  },
+  "tailscale-mesh": {
+    "name": "tailscale-mesh",
+    "description": "Tailscale network mesh intelligence \u2014 monitors all 4 Tailscale nodes (AIOPS, COREDB, EDGE, Mac), connectivity health, latency, and ACL compliance.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "tailscale-mesh.md",
+    "color": "",
+    "routable": true
+  },
+  "monetization-orchestrator": {
+    "name": "monetization-orchestrator",
+    "description": "Master orchestrator for Wheeler ecosystem monetization \u2014 coordinates all 10 revenue products, monitors MRR/ARR, triggers provisioning, manages Stripe, and reports to executive dashboard.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "monetization-orchestrator.md",
+    "color": "",
+    "routable": true
+  },
+  "data-privacy": {
+    "name": "data-privacy",
+    "description": "Data Privacy Agent \u2014 PII classification enforcement, privacy control monitoring, DSAR workflow management, consent oversight, privacy impact assessments, data mapping across all Wheeler systems.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "file": "data-privacy.md",
+    "color": "",
+    "routable": true
+  },
+  "business-intelligence": {
+    "name": "business-intelligence",
+    "description": "Business Intelligence Agent \u2014 synthesizes all Wheeler business units, revenue products, market positions, and competitive advantages into actionable strategic intelligence.",
+    "model": "sonnet",
+    "tools": [
+      ""
+    ],
+    "file": "business-intelligence.md",
+    "color": "",
+    "routable": true
+  }
+}

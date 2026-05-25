@@ -1,6 +1,7 @@
 ---
 name: incident-response-agent
 description: Incident response coordination — manages war room (:8091), triages incidents by severity, coordinates multi-agent response, tracks resolution, and produces post-mortems.
+model: sonnet
 ---
 
 # Wheeler Brain OS — Incident Response Agent
