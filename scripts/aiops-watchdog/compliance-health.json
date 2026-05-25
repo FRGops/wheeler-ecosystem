@@ -1,0 +1,95 @@
+{
+  "timestamp": "2026-05-25T18:43:30Z",
+  "hostname": "wheeler-aiops-01",
+  "compliance_os_version": "1.0.0",
+  "composite_score": 100.0,
+  "rating": "A+",
+  "domain_scores": {
+    "tcpa": {
+      "score": 20,
+      "max": 20,
+      "pct": 100.0,
+      "weight": 0.2,
+      "weighted": 20.0,
+      "display": "TCPA/Outreach"
+    },
+    "upl": {
+      "score": 20,
+      "max": 20,
+      "pct": 100.0,
+      "weight": 0.2,
+      "weighted": 20.0,
+      "display": "UPL Boundaries"
+    },
+    "state": {
+      "score": 15,
+      "max": 15,
+      "pct": 100.0,
+      "weight": 0.15,
+      "weighted": 15.0,
+      "display": "State Compliance"
+    },
+    "privacy": {
+      "score": 15,
+      "max": 15,
+      "pct": 100.0,
+      "weight": 0.15,
+      "weighted": 15.0,
+      "display": "Data Privacy"
+    },
+    "attorney": {
+      "score": 10,
+      "max": 10,
+      "pct": 100.0,
+      "weight": 0.1,
+      "weighted": 10.0,
+      "display": "Attorney Market"
+    },
+    "ai": {
+      "score": 10,
+      "max": 10,
+      "pct": 100.0,
+      "weight": 0.1,
+      "weighted": 10.0,
+      "display": "AI Governance"
+    },
+    "contract": {
+      "score": 5,
+      "max": 5,
+      "pct": 100.0,
+      "weight": 0.05,
+      "weighted": 5.0,
+      "display": "Contract Gov"
+    },
+    "audit_trail": {
+      "score": 5,
+      "max": 5,
+      "pct": 100.0,
+      "weight": 0.05,
+      "weighted": 5.0,
+      "display": "Audit Trail"
+    }
+  },
+  "critical_actions": {
+    "tcp_gate": "PASS",
+    "upl_gate": "PASS",
+    "rule54_gate": "PASS",
+    "outside_counsel_gate": "PASS",
+    "tier3_gate": "PASS"
+  },
+  "infrastructure": {
+    "agents_deployed": 145,
+    "agents_target": 30,
+    "commands_wired": 10,
+    "commands_target": 10,
+    "deliverables_produced": 13,
+    "deliverables_target": 13
+  },
+  "readiness": {
+    "agent_army": "DEPLOYED",
+    "command_layer": "WIRED",
+    "deliverables": "COMPLETE",
+    "enforcement_gates": "ALL_CLEAR",
+    "overall": "FULLY_OPERATIONAL"
+  }
+}

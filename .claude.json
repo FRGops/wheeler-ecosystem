@@ -1,5 +1,5 @@
 {
-  "numStartups": 51,
+  "numStartups": 59,
   "installMethod": "global",
   "hasSeenTasksHint": true,
   "tipsHistory": {
@@ -8,7 +8,7 @@
     "memory-command": 47,
     "theme-command": 45,
     "colorterm-truecolor": 33,
-    "status-line": 27,
+    "status-line": 55,
     "prompt-queue": 2,
     "enter-to-steer-in-relatime": 45,
     "todo-list": 45,
@@ -17,20 +17,20 @@
     "continue": 50,
     "shift-tab": 51,
     "image-paste": 45,
-    "subagent-fanout-nudge": 51,
-    "loop-command-nudge": 51,
+    "subagent-fanout-nudge": 59,
+    "loop-command-nudge": 59,
     "install-github-app": 5,
     "custom-agents": 40,
-    "permissions": 45,
-    "color-when-multi-clauding": 48,
+    "permissions": 59,
+    "color-when-multi-clauding": 59,
     "rename-conversation": 47,
     "custom-commands": 31,
-    "ide-upsell-external-terminal": 24,
-    "agent-flag": 39,
+    "ide-upsell-external-terminal": 58,
+    "agent-flag": 59,
     "git-worktrees": 51,
     "stripe-plugin": 51
   },
-  "promptQueueUseCount": 352,
+  "promptQueueUseCount": 407,
   "cachedGrowthBookFeatures": {
     "tengu_mcp_retry_failed_remote": false,
     "tengu_marble_sandcastle": false,
@@ -517,63 +517,39 @@
       "hasClaudeMdExternalIncludesApproved": false,
       "hasClaudeMdExternalIncludesWarningShown": false,
       "exampleFiles": [],
-      "lastGracefulShutdown": true,
+      "lastGracefulShutdown": false,
       "lastVersionBase": "2.1.150",
-      "lastCost": 15.208224999999993,
-      "lastAPIDuration": 1828398,
-      "lastAPIDurationWithoutRetries": 1828056,
-      "lastToolDuration": 284228,
-      "lastDuration": 3648041,
-      "lastLinesAdded": 164,
-      "lastLinesRemoved": 13,
-      "lastTotalInputTokens": 400485,
-      "lastTotalOutputTokens": 93224,
+      "lastCost": 0,
+      "lastAPIDuration": 0,
+      "lastAPIDurationWithoutRetries": 0,
+      "lastToolDuration": 0,
+      "lastDuration": 298893,
+      "lastLinesAdded": 0,
+      "lastLinesRemoved": 0,
+      "lastTotalInputTokens": 0,
+      "lastTotalOutputTokens": 0,
       "lastTotalCacheCreationInputTokens": 0,
-      "lastTotalCacheReadInputTokens": 21750400,
+      "lastTotalCacheReadInputTokens": 0,
       "lastTotalWebSearchRequests": 0,
-      "lastFpsAverage": 12.1,
-      "lastFpsLow1Pct": 101.33,
-      "lastModelUsage": {
-        "deepseek-v4-pro": {
-          "inputTokens": 400104,
-          "outputTokens": 92685,
-          "cacheReadInputTokens": 21750400,
-          "cacheCreationInputTokens": 0,
-          "webSearchRequests": 0,
-          "costUSD": 15.192844999999993
-        },
-        "deepseek-v4-flash": {
-          "inputTokens": 381,
-          "outputTokens": 539,
-          "cacheReadInputTokens": 0,
-          "cacheCreationInputTokens": 0,
-          "webSearchRequests": 0,
-          "costUSD": 0.01538
-        }
-      },
-      "lastSessionId": "fd60059c-19e3-49a8-a6f0-6f7f465319eb",
+      "lastFpsAverage": 0.63,
+      "lastFpsLow1Pct": 106.75,
+      "lastModelUsage": {},
+      "lastSessionId": "9e935dc0-6bf0-45c0-b8a6-e454698aa3a6",
       "lastSessionMetrics": {
-        "frame_duration_ms_count": 44112,
-        "frame_duration_ms_min": 0.0524880001321435,
-        "frame_duration_ms_max": 130.7540699999954,
-        "frame_duration_ms_avg": 1.2856990773268948,
-        "frame_duration_ms_p50": 1.080394999939017,
-        "frame_duration_ms_p95": 2.1003687499382067,
-        "frame_duration_ms_p99": 7.767252560114138,
-        "hook_duration_ms_count": 541,
-        "hook_duration_ms_min": 11,
-        "hook_duration_ms_max": 217,
-        "hook_duration_ms_avg": 66.81330868761553,
-        "hook_duration_ms_p50": 65,
-        "hook_duration_ms_p95": 99,
-        "hook_duration_ms_p99": 111.60000000000002,
-        "pre_tool_hook_duration_ms_count": 274,
-        "pre_tool_hook_duration_ms_min": 46,
-        "pre_tool_hook_duration_ms_max": 219,
-        "pre_tool_hook_duration_ms_avg": 81.25912408759125,
-        "pre_tool_hook_duration_ms_p50": 80,
-        "pre_tool_hook_duration_ms_p95": 106,
-        "pre_tool_hook_duration_ms_p99": 115
+        "frame_duration_ms_count": 186,
+        "frame_duration_ms_min": 0.09707299999718089,
+        "frame_duration_ms_max": 32.05482600000687,
+        "frame_duration_ms_avg": 1.2203679892460069,
+        "frame_duration_ms_p50": 0.8330305000126828,
+        "frame_duration_ms_p95": 2.5643747499998426,
+        "frame_duration_ms_p99": 9.157119749984123,
+        "hook_duration_ms_count": 2,
+        "hook_duration_ms_min": 51,
+        "hook_duration_ms_max": 97,
+        "hook_duration_ms_avg": 74,
+        "hook_duration_ms_p50": 74,
+        "hook_duration_ms_p95": 94.69999999999999,
+        "hook_duration_ms_p99": 96.53999999999999
       },
       "hasCompletedProjectOnboarding": true
     }
@@ -587,12 +563,16 @@
       "lastUsedAt": 1779346011553
     },
     "slay": {
-      "usageCount": 9,
-      "lastUsedAt": 1779659452382
+      "usageCount": 10,
+      "lastUsedAt": 1779733905897
     },
     "superpowers": {
-      "usageCount": 7,
-      "lastUsedAt": 1779657663107
+      "usageCount": 14,
+      "lastUsedAt": 1779731303215
+    },
+    "chief-of-staff": {
+      "usageCount": 1,
+      "lastUsedAt": 1779731837683
     }
   },
   "lastPlanModeUse": 1779610989518,
@@ -600,6 +580,6 @@
   "cachedExperimentFeatures": [
     "tengu_cedar_inlet"
   ],
-  "closedIssuesLastChecked": 1779608334712,
+  "closedIssuesLastChecked": 1779730222285,
   "opus47LaunchSeenCount": 5
 }

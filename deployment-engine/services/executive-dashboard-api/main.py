@@ -45,6 +45,23 @@ def get_docker_healthy():
         return int(out) if out else 0
     except: return 0
 
+def get_docker_unhealthy():
+    """Only containers with explicit failing health checks, not containers missing HEALTHCHECK."""
+    try:
+        out = run("docker ps --filter 'health=unhealthy' -q | wc -l")
+        return int(out) if out else 0
+    except: return 0
+
+def get_docker_no_healthcheck():
+    """Containers running without HEALTHCHECK defined (informational, not an alert)."""
+    try:
+        all_ids = run("docker ps -q").strip().split()
+        healthy_ids = run("docker ps --filter 'health=healthy' -q").strip().split()
+        unhealthy_ids = run("docker ps --filter 'health=unhealthy' -q").strip().split()
+        checked = set(healthy_ids + unhealthy_ids)
+        return len([i for i in all_ids if i and i not in checked])
+    except: return 0
+
 def get_pm2_status():
     processes = []
     try:
@@ -114,16 +131,27 @@ def get_system_resources():
         }
     except: return {}
 
-def get_demo_revenue():
-    return {
-        "mrr": 0.0, "mrr_change_24h": 0.0, "arr_run_rate": 0.0,
-        "active_subscriptions": 0, "new_subscriptions_24h": 0,
-        "churned_subscriptions_24h": 0, "failed_payments_24h": 0,
-        "pending_payouts": 0.0, "pending_payouts_attorneys": 0,
-        "pending_payouts_partners": 0, "ai_cost_allocation": {},
-        "revenue_by_product": {}, "subscriptions_by_tier": {},
-        "note": "PRE-REVENUE - Stripe in test mode. Zero revenue."
-    }
+def get_revenue_summary():
+    """Fetch real revenue data from revenue-metrics-collector (:8170). Falls back to zeros."""
+    try:
+        out = run("curl -s http://127.0.0.1:8170/api/v1/revenue/summary 2>/dev/null")
+        data = json.loads(out)
+        return {
+            "mrr": data.get("mrr", 0.0),
+            "arr_run_rate": data.get("arr_run_rate", 0.0),
+            "active_subscriptions": data.get("active_subscriptions", 0),
+            "failed_payments_24h": data.get("failed_payments_24h", 0),
+            "revenue_by_product": data.get("revenue_by_product", {}),
+            "subscriptions_by_product": data.get("subscriptions_by_product", {}),
+            "source": "revenue-metrics-collector",
+        }
+    except:
+        return {
+            "mrr": 0.0, "arr_run_rate": 0.0,
+            "active_subscriptions": 0, "failed_payments_24h": 0,
+            "revenue_by_product": {}, "subscriptions_by_product": {},
+            "source": "fallback",
+        }
 
 @app.get("/health")
 async def health():
@@ -131,7 +159,7 @@ async def health():
 
 @app.get("/api/v1/revenue/summary")
 async def revenue_summary():
-    return get_demo_revenue()
+    return get_revenue_summary()
 
 @app.get("/api/v1/kpi/dashboard")
 async def kpi_dashboard():
@@ -155,6 +183,8 @@ async def live_containers():
         "containers": get_docker_stats(),
         "total": get_docker_count(),
         "healthy": get_docker_healthy(),
+        "unhealthy": get_docker_unhealthy(),
+        "no_healthcheck": get_docker_no_healthcheck(),
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
@@ -186,6 +216,7 @@ async def live_all():
         "litellm_health": get_litellm_health(),
         "litellm_spend": get_litellm_spend(),
         "system": get_system_resources(),
+        "revenue": get_revenue_summary(),
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
@@ -193,15 +224,14 @@ async def live_all():
 async def alerts():
     alerts_list = []
     pm2 = get_pm2_counts()
-    docker_total = get_docker_count()
-    docker_healthy = get_docker_healthy()
+    docker_unhealthy = get_docker_unhealthy()
     sys = get_system_resources()
     disk_pct = float(sys.get("disk_use_pct","0%").replace("%","") or 0)
 
     if pm2["online"] < pm2["total"]:
         alerts_list.append({"severity":"P1","message":f"PM2: {pm2['total']-pm2['online']} processes offline","timestamp":datetime.now(timezone.utc).isoformat()})
-    if docker_healthy < docker_total:
-        alerts_list.append({"severity":"P2","message":f"Docker: {docker_total-docker_healthy} containers unhealthy","timestamp":datetime.now(timezone.utc).isoformat()})
+    if docker_unhealthy > 0:
+        alerts_list.append({"severity":"P2","message":f"Docker: {docker_unhealthy} containers with failing health checks","timestamp":datetime.now(timezone.utc).isoformat()})
     if disk_pct > 90:
         alerts_list.append({"severity":"P0","message":f"Disk usage critical: {disk_pct:.0f}%","timestamp":datetime.now(timezone.utc).isoformat()})
     elif disk_pct > 80:
@@ -271,10 +301,12 @@ function render() {
       var r = E('div','metric-row'); r.appendChild(E('span','metric-label',p[0])); r.appendChild(E('span','metric-value',p[1])); c4.appendChild(r);
     }); g.appendChild(c4);
 
+    var rev = d.revenue || {};
     var c5 = E('div','card'); c5.appendChild(E('h3','','REVENUE'));
-    c5.appendChild(E('div','big-number','$0')); c5.appendChild(E('div','big-label','MRR (PRE-REVENUE)'));
-    var r1 = E('div','metric-row'); r1.appendChild(E('span','metric-label','ARR Run Rate')); r1.appendChild(E('span','metric-value metric-amber','$0')); c5.appendChild(r1);
-    var r2 = E('div','metric-row'); r2.appendChild(E('span','metric-label','Subscriptions')); r2.appendChild(E('span','metric-value','0')); c5.appendChild(r2);
+    c5.appendChild(E('div','big-number','$'+(rev.mrr||0).toLocaleString())); c5.appendChild(E('div','big-label','MRR'));
+    var r1 = E('div','metric-row'); r1.appendChild(E('span','metric-label','ARR Run Rate')); r1.appendChild(E('span','metric-value metric-green','$'+(rev.arr_run_rate||0).toLocaleString())); c5.appendChild(r1);
+    var r2 = E('div','metric-row'); r2.appendChild(E('span','metric-label','Subscriptions')); r2.appendChild(E('span','metric-value',(rev.active_subscriptions||0).toLocaleString())); c5.appendChild(r2);
+    var r3 = E('div','metric-row'); r3.appendChild(E('span','metric-label','Failed Payments 24H')); r3.appendChild(E('span','metric-value '+(rev.failed_payments_24h>0?'metric-red':'metric-green'),rev.failed_payments_24h||0)); c5.appendChild(r3);
     g.appendChild(c5);
 
     var c6 = E('div','card'); c6.appendChild(E('h3','','ALERTS'));

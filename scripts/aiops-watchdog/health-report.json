@@ -1,12 +1,12 @@
 {
   "ecosystem_health": {
     "script": "ecosystem-health",
-    "timestamp": "2026-05-24T21:56:01Z",
+    "timestamp": "2026-05-25T18:42:01Z",
     "version": "1.0.0",
     "platform": "Wheeler Autonomous AI Ops"
   },
   "summary": {
-    "overall_score": 99,
+    "overall_score": 94,
     "status": "HEALTHY",
     "classification": "healthy"
   },
@@ -22,18 +22,18 @@
     {
       "name": "pm2-watchdog",
       "weight": 25,
-      "total": 24,
-      "pass": 24,
-      "fail": 0,
-      "score": 100
+      "total": 26,
+      "pass": 25,
+      "fail": 1,
+      "score": 96
     },
     {
       "name": "port-watchdog",
       "weight": 20,
       "total": 1,
-      "pass": 1,
-      "fail": 0,
-      "score": 100
+      "pass": 0,
+      "fail": 1,
+      "score": 80
     },
     {
       "name": "resource-watchdog",
