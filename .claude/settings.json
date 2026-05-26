@@ -41,6 +41,15 @@
             "command": "bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/posttooluse-log.sh"
           }
         ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/posttooluse-repo-detect.sh"
+          }
+        ]
       }
     ],
     "Stop": [
@@ -57,6 +66,21 @@
   },
   "permissions": {
     "allow": [
+      "Write",
+      "Edit",
+      "Read",
+      "Agent",
+      "TaskCreate",
+      "TaskUpdate",
+      "TaskGet",
+      "TaskList",
+      "TaskOutput",
+      "TaskStop",
+      "CronCreate",
+      "CronDelete",
+      "CronList",
+      "WebFetch",
+      "WebSearch",
       "Bash(curl:*)",
       "Bash(python3 /root/wheeler-workflow-orchestrator/cli.py:*)",
       "Bash(python3 -m pytest:*)",
