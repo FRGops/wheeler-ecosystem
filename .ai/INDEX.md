@@ -6,7 +6,8 @@
 - [Escalation Policy](model-routing/ESCALATION_POLICY.md) — When to escalate and to whom
 
 ## Subagents
-- [Agent Army Deployment Matrix](subagents/AGENT_ARMY_DEPLOYMENT_MATRIX.md) — When to deploy which agents
+- [Build Pipeline — Autonomous 7-Phase Masterpiece](subagents/BUILD_PIPELINE.md) — The autonomous build pipeline specification
+- [Agent Army Deployment Matrix](subagents/AGENT_ARMY_DEPLOYMENT_MATRIX.md) — When to deploy which agents, phase-to-agent mapping
 - [Orchestrator Agent](subagents/ORCHESTRATOR_AGENT.md)
 - [DeepSeek Implementer Agent](subagents/DEEPSEEK_IMPLEMENTER_AGENT.md)
 - [Backend API Agent](subagents/BACKEND_API_AGENT.md)
@@ -24,6 +25,7 @@
 - [SEO Conversion Agent](subagents/SEO_CONVERSION_AGENT.md)
 
 ## Autonomy
+- [Autonomous Build Pipeline](autonomy/AUTONOMOUS_BUILD_PIPELINE.md) — End-to-end fully agentic autonomous framework
 - [Preflight Checklist](autonomy/PREFLIGHT_CHECKLIST.md)
 - [Postflight Checklist](autonomy/POSTFLIGHT_CHECKLIST.md)
 - [Army Mode Policy](autonomy/ARMY_MODE_POLICY.md)
@@ -60,6 +62,10 @@
 ## Skills
 - [Agent Skills Registry](skills/AGENT_SKILLS_REGISTRY.md)
 - [Skill Creation Template](skills/SKILL_CREATION_TEMPLATE.md)
+
+## Capabilities (Auto-Discovery)
+- [Dynamic Capability Matcher](capabilities/DYNAMIC_CAPABILITY_MATCHER.md) — Keyword-to-domain matching engine. New agents/skills/plugins auto-discover.
+- [Capability Scanner](../.claude/hooks/capability-scanner.sh) — SessionStart scan of available capabilities
 
 ## Observability
 - [AI Session Telemetry](observability/AI_SESSION_TELEMETRY.md)

@@ -1,15 +1,15 @@
 ---
 name: pm2-deploy-state-20260526
-description: "Canonical 28-process PM2 baseline — 28/28 online, 0 restarts, resurrect chain verified, pm2-logrotate configured (2026-05-26)"
-metadata: 
+description: "Canonical 28-process PM2 baseline — 28/28 online, 0 leaks, 20/20 health, 100/100 A+ (2026-05-26)"
+metadata:
   node_type: memory
   type: project
-  originSessionId: b8a59dc1-7438-47d2-b512-f987dadd80da
+  originSessionId: session-20260526-024918
 ---
 
 # PM2 Deploy State — 2026-05-26
 
-**28/28 online, 0 restarts, 0 secret leaks, 0 :latest images, 20/20 health**
+**28/28 online, 0 restarts, 0 jlist leaks, 0 :latest images, 20/20 health, daemon env clean**
 
 Supersedes [[pm2-deploy-state-20260525]] (was 27/27).
 
@@ -36,6 +36,7 @@ Supersedes [[pm2-deploy-state-20260525]] (was 27/27).
 | prediction-radar-agent-svc | 111MB | healthy |
 | ravyn-agent-svc | 108MB | healthy |
 | repo-engine | 3MB | healthy |
+| repo-listener | 3MB | healthy |
 | revenue-metrics-collector | 49MB | healthy |
 | surplusai-portal-api | 103MB | healthy |
 | surplusai-scraper-agent-svc | 109MB | healthy |
@@ -50,16 +51,30 @@ Supersedes [[pm2-deploy-state-20260525]] (was 27/27).
 
 44 containers: 42 healthy, 2 no-healthcheck (fincept + crowdsec, both running fine)
 
-## Resurrect Chain (survives reboot)
+## Daemon (PID 3776088)
+
+PM2 daemon environ: **CLEAN** — 0 secrets. Only HOME, PATH, PM2_HOME, SHELL, USER, standard systemd vars.
+secrets.env: **DELETED** — no plaintext credentials at /root/.pm2/
+
+## Resurrect Chain
 
 - pm2-root systemd: **enabled** (boots on system start)
-- dump.pm2: 27 processes saved (pm2-logrotate is a PM2 module, persists separately)
+- dump.pm2: **28 processes** saved (pm2-logrotate is module, persists separately)
 - pm2-logrotate module: configured (10M max, retain 30, compress, rotate at midnight)
 
-## Verified
+## Permissions
 
-- /slay audit: 20/20 health, 0 secret leaks, 0 :latest, network clean
+- settings.json + settings.local.json: 14 tool-level permissions (Write, Edit, Read, Agent, TaskCreate/Update/Get/List/Output/Stop, CronCreate/Delete/List, WebFetch, WebSearch)
+- Auto-approve working for all coding operations
+
+## Verified (2026-05-26 02:50 UTC)
+
+- PM2 jlist secret scan: 29/29 clean, 0 leaks
 - Functional healthcheck: 20/20 passed
-- All critical endpoints responding
-- PM2 resurrect tested: processes restore from dump.pm2
-- Disk: 75G/338G (23%)
+- Docker :latest audit: CLEAN
+- Network binds: Expected only (SSH :22, nginx :443, Tailscale, systemd-resolved)
+- Daemon environ: 0 secrets
+- /root/.pm2/secrets.env: DELETED
+- Disk: 72G/338G (22%)
+
+## Score: 100/100 A+

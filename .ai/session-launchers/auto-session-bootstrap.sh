@@ -19,6 +19,9 @@ CRITICAL_FILES=(
   ".ai/model-routing/DEEPSEEK_V4_PRIMARY_POLICY.md"
   ".ai/model-routing/MODEL_ROUTING_DECISION_MATRIX.md"
   ".ai/subagents/AGENT_ARMY_DEPLOYMENT_MATRIX.md"
+  ".ai/subagents/BUILD_PIPELINE.md"
+  ".ai/autonomy/AUTONOMOUS_BUILD_PIPELINE.md"
+  ".ai/capabilities/DYNAMIC_CAPABILITY_MATCHER.md"
 )
 
 MISSING=0
@@ -47,9 +50,32 @@ else
   echo "Preflight script not found — skipping"
 fi
 
+# ── Repo Listener auto-start ──
+REPO_LISTENER="/root/scripts/repo-listener.sh"
+if [ -f "$REPO_LISTENER" ] && [ -x "$REPO_LISTENER" ]; then
+  if command -v pm2 &>/dev/null; then
+    if pm2 list 2>/dev/null | grep -q "repo-listener"; then
+      echo "  [OK] repo-listener (PM2 daemon) — real-time repo detection active"
+    else
+      pm2 start "$REPO_LISTENER" --name repo-listener --interpreter bash -- --daemon 2>/dev/null && \
+        echo "  [OK] repo-listener started" || echo "  [WARN] repo-listener start failed"
+    fi
+  fi
+fi
+
+# ── Run capability discovery scanner ──
+CAPABILITY_SCANNER="$REPO_ROOT/.claude/hooks/capability-scanner.sh"
+if [ -f "$CAPABILITY_SCANNER" ] && [ -x "$CAPABILITY_SCANNER" ]; then
+  echo ""
+  bash "$CAPABILITY_SCANNER" || true
+fi
+
+echo ""
 echo "============================================"
 echo " Bootstrap complete — session ready"
-echo " Model routing matrix: .ai/model-routing/"
-echo " Agent deployment matrix: .ai/subagents/"
-echo " Response contract: .ai/prompts/"
+echo " Model routing:      .ai/model-routing/"
+echo " Agent deployment:   .ai/subagents/"
+echo " Build pipeline:     .ai/subagents/BUILD_PIPELINE.md"
+echo " Dynamic discovery:  .ai/capabilities/"
+echo " Response contract:  .ai/prompts/"
 echo "============================================"

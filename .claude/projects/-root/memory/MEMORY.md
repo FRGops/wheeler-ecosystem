@@ -1,5 +1,6 @@
 # Memory Index
 
+- [Sovereign Scripts Data Loss](sovereign-scripts-data-loss-20260526.md) — 6 of 8 sovereign scripts lost to worktree isolation bug on 2026-05-26
 - [Wheeler Financial OS Deployment](wheeler-financial-os-deployment.md) — 39 new financial agents + 10 docs + 4 commands deployed 2026-05-25
 - [Intelligence Layer 100/100](intelligence-layer-100-readiness.md) — 27 services, 285 Neo4j nodes, 6-tier memory, Qdrant on COREDB, foreclosure pipeline, 90 memories (2026-05-25)
 - [Embedding Service Local](embedding-service-local.md) — all-MiniLM-L6-v2 on :8191, 384-dim, pgvector altered, OpenAI-compatible API

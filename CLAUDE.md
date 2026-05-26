@@ -11,6 +11,34 @@ The SessionStart hook (wired in `.claude/settings.json`) fires automatically and
 
 **You never need to run anything manually. The OS boots itself.**
 
+## AUTONOMOUS BUILD PIPELINE (THE MASTERPIECE)
+
+Every build task automatically flows through a 7-phase autonomous pipeline. The UserPromptSubmit intelligence hook classifies each prompt, determines the required pipeline depth, and auto-deploys the right agents for each phase. You can walk away — the build continues to 100% completion.
+
+```
+PROMPT → [INTELLIGENCE] → DISCOVER → PLAN → ARCHITECT → IMPLEMENT → TEST → REVIEW → SECURITY → VERIFY → FINAL BOSS → DONE
+```
+
+Full specification: `.ai/subagents/BUILD_PIPELINE.md`
+
+### Phase Auto-Progression
+Phases auto-proceed without human intervention. Only pause for:
+- Large/Critical PLAN phase (ExitPlanMode for approval)
+- Production deploys (always human)
+- Secrets/DeepSeek routing changes (always human)
+- Database migrations (always human)
+- Blocker encountered (escalate with description)
+
+### Pipeline Depth by Task Size
+
+| Task Size | Phases | Max Parallel Agents |
+|-----------|--------|-------------------|
+| Micro | IMPLEMENT → REVIEW | 1 |
+| Small | PLAN → IMPLEMENT → TEST → REVIEW | 2 |
+| Medium | DISCOVER → PLAN → IMPLEMENT → TEST → REVIEW → SECURITY → FINAL BOSS | 4 |
+| Large | Full 7-phase pipeline | 6 |
+| Critical | Full pipeline + human gates | As needed |
+
 ## CORE RULES
 
 ### DeepSeek V4 Protection (IMMUTABLE)
@@ -19,48 +47,88 @@ The SessionStart hook (wired in `.claude/settings.json`) fires automatically and
 - **NEVER** read .env files or secrets/.
 - If a task requires touching these: STOP and escalate to human.
 
-### Task Classification (MANDATORY)
-Every task MUST be classified before work begins:
+### Task Classification (AUTOMATIC)
+Task classification is now automatic via the UserPromptSubmit intelligence hook. Manual classification is a fallback:
 - **Micro**: 1 file, < 20 lines
 - **Small**: 1-3 files, < 100 lines
 - **Medium**: 3-10 files, < 500 lines
 - **Large**: 10-25 files, < 2000 lines
 - **Critical**: Any size, production/security impact
 
-### Agent Routing (MANDATORY)
-Route intelligently based on `.ai/subagents/AGENT_ARMY_DEPLOYMENT_MATRIX.md`:
-- DeepSeek V4: bounded implementation, tests, small refactors
-- DeepSeek Reasoner: complex debugging, architecture reasoning
-- Claude Code: architecture, final boss review, high-stakes decisions
-- OpenCode: parallel terminal builds, multi-worktree sessions
-- Roo Code: IDE auto-approve workflows
-- Human: production deploy, DB migrations, secrets, shell profiles, DeepSeek routing
+### Agent Auto-Deployment (MANDATORY)
+When a build task is detected, deploy agents according to `.ai/subagents/BUILD_PIPELINE.md`:
+- DISCOVER: Explore agents (2-3 parallel) for codebase understanding
+- PLAN: Plan agent + architecture-critic for adversarial review
+- ARCHITECT: code-architect + type-design-analyzer
+- IMPLEMENT: general-purpose agents (parallel where independent)
+- TEST: test-engineer agent + manual verification
+- REVIEW: Code Reviewer + code-simplifier + silent-failure-hunter + type-design-analyzer (all parallel)
+- SECURITY: security-auditor + automated secrets scan
+- VERIFY: devops-smoke-tester + production-readiness-agent + zero-false-green-auditor
+- FINAL BOSS: Code Reviewer (final sweep + scorecard)
 
-### Preflight/Postflight (MANDATORY)
-- **Preflight**: Run before significant work — verifies branch, env var presence, agent locks.
-- **Postflight**: Run after work — verifies diff, dependency safety, DeepSeek protection, gates.
+### Agent Communication Protocol
+- Each phase outputs a handoff summary: what was done, key decisions, files changed, known issues
+- Independent agents in the same phase: deploy in parallel (single message, multiple Agent() calls)
+- Agents NEVER edit the same file simultaneously
+- Each agent reports back before the phase proceeds
+- Failed agents retry with clearer instructions (max 2 retries)
 
-### Quality Gates
+### Skills Auto-Detection
+| Task Context | Auto-Loaded Skill |
+|-------------|------------------|
+| PM2 issues, crashes, restarts | `/slay` |
+| Configuration, hooks, settings | `/update-config` |
+| Multi-agent builds | `/superpowers` |
+| GitHub, git operations | gh CLI auto-detected |
+| Docker operations | docker-expert agent |
+
+### Plugin Auto-Utilization
+| Context | Plugin Used |
+|---------|------------|
+| Code review needed | code-review, code-simplifier |
+| Feature development | feature-dev (code-architect, code-explorer) |
+| PR review | pr-review-toolkit (all 4 sub-agents) |
+| Code modernization | code-modernization (all 4 sub-agents) |
+| Security audit | security-guidance |
+
+### Preflight/Postflight (AUTOMATIC)
+- **Preflight**: Runs on SessionStart — verifies branch, env var presence, agent locks.
+- **Postflight**: Runs on Stop — verifies diff, dependency safety, DeepSeek protection, gates.
+
+### Quality Gates (EVIDENCE-BASED)
 Every completion claim requires evidence:
 - Tests passing? Show the output.
 - Lint clean? Show the output.
 - No secrets? Run pattern scan.
 - DeepSeek untouched? Verify.
 - Live endpoint? Show the curl result.
+- Agent results? Show the handoff summary.
 
-### No False Greens
+### No False Greens (ZERO TOLERANCE)
 - Never claim 100/100 unless ALL validations pass.
 - Never say "live" unless you hit a live endpoint/UI.
 - Never say "deployed" unless a deploy command/log proves it.
 - Label unknowns as UNVERIFIED.
+- Zero-false-green-auditor runs in VERIFY phase for independent validation.
+
+### Walk-Away Autonomy
+- The build pipeline auto-progresses through phases
+- Agents auto-deploy when their phase triggers
+- Progress is tracked in the conversation and agent activity log
+- You can walk away at any point — the pipeline continues to completion
+- Builds pause only at explicit human approval gates (production, secrets, DB migrations)
 
 ## FILE REFERENCES
 - Index: `.ai/INDEX.md`
-- Model routing: `.ai/model-routing/MODEL_ROUTING_DECISION_MATRIX.md`
+- Build Pipeline: `.ai/subagents/BUILD_PIPELINE.md` (the autonomous masterpiece)
 - Agent deployment: `.ai/subagents/AGENT_ARMY_DEPLOYMENT_MATRIX.md`
+- Model routing: `.ai/model-routing/MODEL_ROUTING_DECISION_MATRIX.md`
+- DeepSeek policy: `.ai/model-routing/DEEPSEEK_V4_PRIMARY_POLICY.md`
 - Response contract: `.ai/prompts/DEFAULT_FUTURE_AGENT_RESPONSE_CONTRACT.md`
 - Preflight: `.ai/autonomy/PREFLIGHT_CHECKLIST.md`
 - Postflight: `.ai/autonomy/POSTFLIGHT_CHECKLIST.md`
+- Autonomous pipeline: `.ai/autonomy/AUTONOMOUS_BUILD_PIPELINE.md`
 - Runbooks: `.ai/runbooks/`
 - Session launchers: `.ai/session-launchers/`
 

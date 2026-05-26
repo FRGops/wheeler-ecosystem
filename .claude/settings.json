@@ -1,5 +1,27 @@
 {
-  "theme": "dark",
+  "permissions": {
+    "allow": [
+      "Write",
+      "Edit",
+      "Read",
+      "Agent",
+      "TaskCreate",
+      "TaskUpdate",
+      "TaskGet",
+      "TaskList",
+      "TaskOutput",
+      "TaskStop",
+      "CronCreate",
+      "CronDelete",
+      "CronList",
+      "WebFetch",
+      "WebSearch",
+      "Bash(curl:*)",
+      "Bash(python3 /root/wheeler-workflow-orchestrator/cli.py:*)",
+      "Bash(python3 -m pytest:*)",
+      "Bash(pm2:*)"
+    ]
+  },
   "hooks": {
     "SessionStart": [
       {
@@ -62,29 +84,17 @@
           }
         ]
       }
-    ]
-  },
-  "permissions": {
-    "allow": [
-      "Write",
-      "Edit",
-      "Read",
-      "Agent",
-      "TaskCreate",
-      "TaskUpdate",
-      "TaskGet",
-      "TaskList",
-      "TaskOutput",
-      "TaskStop",
-      "CronCreate",
-      "CronDelete",
-      "CronList",
-      "WebFetch",
-      "WebSearch",
-      "Bash(curl:*)",
-      "Bash(python3 /root/wheeler-workflow-orchestrator/cli.py:*)",
-      "Bash(python3 -m pytest:*)",
-      "Bash(pm2:*)"
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/userprompt-intelligence.sh"
+          }
+        ]
+      }
     ]
   },
   "enabledPlugins": {
@@ -121,6 +131,8 @@
     "session-report@claude-plugins-official": true,
     "skill-creator@claude-plugins-official": true,
     "swift-lsp@claude-plugins-official": true,
-    "typescript-lsp@claude-plugins-official": true
-  }
+    "typescript-lsp@claude-plugins-official": true,
+    "superpowers@claude-plugins-official": true
+  },
+  "theme": "dark"
 }
