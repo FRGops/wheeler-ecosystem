@@ -2,12 +2,13 @@
 # =============================================================================
 # backup-all.sh — Master Backup Orchestrator for Wheeler Ecosystem
 # =============================================================================
-# Calls all 3 backup scripts in sequence:
+# Calls all 4 backup scripts in sequence:
 #   1. backup-postgres.sh — PostgreSQL databases
 #   2. backup-redis.sh — Redis snapshots
 #   3. backup-configs.sh — Configuration files + PM2 state
+#   4. backup-neo4j.sh — Neo4j graph database
 # Reports success/failure for each.
-# Exit code: 0 only if ALL three pass.
+# Exit code: 0 only if ALL four pass.
 # Logs summary to /root/backups/backup-summary.log
 # =============================================================================
 set -o pipefail
@@ -70,6 +71,7 @@ main() {
     mkdir -p /root/backups/postgres
     mkdir -p /root/backups/redis
     mkdir -p /root/backups/configs
+    mkdir -p /root/backups/neo4j
 
     # Header
     log "============================================================"
@@ -88,6 +90,9 @@ main() {
     # ---- Phase 3: Configs ----
     run_backup "Configurations" "${SCRIPT_DIR}/backup-configs.sh" || overall_ok=false
 
+    # ---- Phase 4: Neo4j ----
+    run_backup "Neo4j" "${SCRIPT_DIR}/backup-neo4j.sh" || overall_ok=false
+
     # ---- Summary ----
     local end_epoch
     end_epoch="$(date +%s)"
@@ -103,7 +108,7 @@ main() {
     log "Total duration: ${total_duration}s"
     log ""
 
-    for phase in "PostgreSQL" "Redis" "Configurations"; do
+    for phase in "PostgreSQL" "Redis" "Configurations" "Neo4j"; do
         local status="${RESULTS[${phase}]:-NOT RUN}"
         local dur="${DURATIONS[${phase}]:-0}"
         log "  ${phase}: ${status} (${dur}s)"
@@ -113,7 +118,7 @@ main() {
 
     # Size report
     log "Backup storage usage:"
-    for dir in postgres redis configs; do
+    for dir in postgres redis configs neo4j; do
         if [[ -d "/root/backups/${dir}" ]]; then
             local size
             size="$(du -sh "/root/backups/${dir}" 2>/dev/null | cut -f1)"
