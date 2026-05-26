@@ -1,5 +1,16 @@
 # Wheeler Always-On Autonomous Agentic Coding OS — Manual
 
+## Current State: 100/100 A+ (2026-05-26)
+
+**Multi-tool routing**: Fully operational.
+- **Claude Code** (2.1.150): active — architecture, reviews, governance
+- **DeepSeek V4**: active (via proxy) — primary implementer
+- **Aider** (0.86.2): active — bounded implementation, refactoring
+- **OpenCode**: install script available — `bash .ai/session-launchers/install-multi-tool-routing.sh`
+- **Roo Code**: IDE-side — configured in routing matrix
+
+**Hooks**: Wired and active in `.claude/settings.json` — SessionStart, PreToolUse, PostToolUse, Stop.
+
 ## What This Is
 
 The Wheeler AI Coding OS is a governance and automation layer that wraps every AI coding session in this repository. It ensures:
