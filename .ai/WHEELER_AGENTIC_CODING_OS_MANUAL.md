@@ -23,26 +23,23 @@ The Wheeler AI Coding OS is a governance and automation layer that wraps every A
 
 ## How It Activates
 
-### Automatic (via Hooks)
-When Claude Code starts in this repo:
-1. SessionStart hook fires → runs `auto-session-bootstrap.sh`
-2. Bootstrap verifies critical files exist
-3. Preflight checks DeepSeek presence, branch safety, agent locks
-4. Session is ready for classified, routed work
+### Fully Automatic (Zero Manual Steps)
 
-### Manual
+The Wheeler AI Coding OS boots itself. You open Claude Code in this repo (or any Wheeler ecosystem repo with this config), and it just works:
+
+1. **SessionStart hook fires** → orchestrator health check + Wheeler OS auto-bootstrap
+2. **Auto-bootstrap** verifies: CLAUDE.md, AGENTS.md, .ai/INDEX.md, DeepSeek policy, hooks
+3. **Preflight runs** → branch safety, DeepSeek env presence, agent locks, available gates
+4. **Session is live** → task classification and agent routing are ready
+
+**No commands. No setup. No remembering.** The OS is always on.
+
+### Emergency Manual Override (only if hooks are broken)
+
+If hooks are somehow disabled, you can manually invoke:
 ```bash
-# Start a new AI session
-bash .ai/session-launchers/start-next-safe-ai-session.sh
-
-# Start a complex mission
-bash .ai/session-launchers/start-ai-mission.sh "feature-name"
-
-# Run preflight only
-bash .ai/session-launchers/preflight-ai-session.sh
-
-# Run postflight only
-bash .ai/session-launchers/postflight-ai-session.sh
+bash .ai/session-launchers/preflight-ai-session.sh   # verify environment
+bash .ai/session-launchers/postflight-ai-session.sh   # verify after work
 ```
 
 ## Daily Workflow

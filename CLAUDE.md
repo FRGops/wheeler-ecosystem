@@ -1,8 +1,15 @@
 # Wheeler Always-On Autonomous Agentic Coding OS
 
-## AUTO-BOOTSTRAP
+## AUTO-BOOTSTRAP (FULLY AUTOMATED — ZERO MANUAL STEPS)
 
-Every Claude Code session in this repository automatically boots the Wheeler AI Coding OS. The SessionStart hook invokes `.ai/session-launchers/auto-session-bootstrap.sh` which runs the preflight checklist.
+Every Claude Code session in this repository — and all repos in the Wheeler ecosystem — automatically boots the Wheeler AI Coding OS on session start. No manual commands. No setup. It just works.
+
+The SessionStart hook (wired in `.claude/settings.json`) fires automatically and:
+1. Verifies all critical OS files exist (CLAUDE.md, AGENTS.md, .ai/INDEX.md, DeepSeek policy)
+2. Runs preflight: branch safety, DeepSeek env presence, agent locks, available gates
+3. Prints session context: branch, session ID, routing matrix path, response contract path
+
+**You never need to run anything manually. The OS boots itself.**
 
 ## CORE RULES
 
