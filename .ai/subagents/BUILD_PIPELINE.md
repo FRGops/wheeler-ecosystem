@@ -5,8 +5,10 @@
 Every build task flows through a 7-phase autonomous pipeline. Each phase has designated agents, quality gates, and handoff protocols. The pipeline auto-progresses through phases — you can walk away and the build continues to 100% completion.
 
 ```
-PROMPT → [INTELLIGENCE] → DISCOVER → PLAN → ARCHITECT → IMPLEMENT → TEST → REVIEW → SECURITY → VERIFY → FINAL BOSS → DONE
+PROMPT → [INTELLIGENCE] → DISCOVER → PLAN → ARCHITECT → IMPLEMENT → TEST → REVIEW+SECURITY → VERIFY+FINAL BOSS → DONE
 ```
+
+**7 phases (was 9)** — REVIEW and SECURITY run in parallel (zero data dependency). VERIFY and FINAL BOSS run in parallel (FINAL BOSS reviews code, VERIFY tests it). This eliminates two serial phase gates, saving 3-6 minutes per build.
 
 ## Dynamic Agent Pool (AUTO-DISCOVERY)
 
@@ -224,14 +226,14 @@ Proceeds to TEST automatically.
 ### Auto-progression
 Proceeds to REVIEW when all tests pass. If tests fail, returns to IMPLEMENT phase.
 
-## Phase 6: REVIEW
+## Phase 6: REVIEW+SECURITY (Merged — parallel dispatch)
 
-**Goal**: Code quality, correctness, and safety review.
+**Goal**: Code quality, correctness, AND security review in one parallel wave. These have zero data dependency — both inspect the same code diff independently.
 
 ### When to run
-- Always (every task)
+- Always (every task). Micro: code-simplifier only + automated secrets scan.
 
-### Agents deployed (parallel)
+### Agents deployed (ALL in parallel — single message, multiple Agent calls)
 
 | Agent | Focus | When |
 |-------|-------|------|
@@ -240,70 +242,49 @@ Proceeds to REVIEW when all tests pass. If tests fail, returns to IMPLEMENT phas
 | `pr-review-toolkit:silent-failure-hunter` | Error handling, fallbacks, catch blocks | Medium+ |
 | `pr-review-toolkit:type-design-analyzer` | Type design quality | When types changed |
 | `pr-review-toolkit:comment-analyzer` | Comment accuracy | When comments added |
+| `code-modernization:security-auditor` | OWASP, CWE, CVEs, injection, secrets | Always |
+| Automated secrets scan | `git diff \| grep -E 'API_KEY\|TOKEN\|SECRET\|PASSWORD'` | Always (parallel) |
+| DeepSeek routing check | Verify ANTHROPIC_* vars untouched | Always (parallel) |
 
 ### Review levels
 
-| Level | Reviewer | When |
-|-------|----------|------|
-| Self | Implementer self-reviews | Micro |
-| Peer | Single review agent | Small |
-| Standard | 2 review agents (parallel) | Medium |
-| Final Boss | All review agents + human-visible | Large |
-| Final Boss + Human | All review agents + human approval required | Critical |
+| Level | Reviewer | Security | When |
+|-------|----------|----------|------|
+| Self | Implementer self-reviews | Auto secrets scan | Micro |
+| Peer | Single review agent | Auto secrets scan | Small |
+| Standard | 2 review agents + security-auditor (parallel) | Full | Medium |
+| Final Boss | All review + security agents (parallel) | Full | Large |
+| Final Boss + Human | All agents + human approval required | Full | Critical |
 
-### Gate: Review passed
+### Gate: Review+Security passed
 - [ ] Code Reviewer: no critical/high issues
 - [ ] Code Simplifier: no simplification opportunities missed
 - [ ] Silent Failure Hunter: no unhandled errors (medium+)
 - [ ] Type Design: no design issues (if types changed)
-- [ ] All findings addressed or acknowledged
-
-### Auto-progression
-Proceeds to SECURITY when review passes. Findings from review agents auto-fixed before progression.
-
-## Phase 7: SECURITY
-
-**Goal**: Security audit — no vulnerabilities, no secrets, no unsafe patterns.
-
-### When to run
-- Always (every task)
-- Micro: automated secrets scan only
-
-### Agents deployed
-- **Primary**: `code-modernization:security-auditor` (OWASP, CWE, CVEs)
-- **Secrets**: Automated scan (git diff | grep secrets pattern)
-
-### Security checks
-- [ ] No secrets in diff (API keys, tokens, passwords)
-- [ ] No injection vectors (SQLi, XSS, command injection)
-- [ ] No hardcoded credentials
-- [ ] No unsafe eval/exec
-- [ ] Input validation present
-- [ ] Authentication/authorization correct (if auth changes)
-- [ ] DeepSeek routing untouched (IMMUTABLE check)
-
-### Gate: Security passed
 - [ ] Security auditor: no findings
 - [ ] Secrets scan: clean
 - [ ] DeepSeek routing: untouched
+- [ ] All findings addressed or acknowledged
 
 ### Auto-progression
-Proceeds to VERIFY. Critical/high security findings block progression.
+Proceeds to VERIFY+FINAL BOSS when all review and security checks pass. Findings auto-fixed before progression. Critical/high security findings block progression.
 
-## Phase 8: VERIFY
+## Phase 7: VERIFY+FINAL BOSS (Merged — parallel dispatch)
 
-**Goal**: End-to-end verification — does it actually work?
+**Goal**: End-to-end verification AND comprehensive final review in one parallel wave. The FINAL BOSS reviews code while VERIFY agents test it — no dependency between them.
 
 ### When to run
-- Medium+ tasks
-- Any deployment-related change
-- API/endpoint changes
+- Medium+ tasks. Any task claiming "done."
 
-### Agents deployed
-- **Primary**: `devops-smoke-tester` (build verification, deployment checks)
-- **Production**: `production-readiness-agent` (if deployable)
-- **Health**: `ecosystem-health-scoring` (if service changes)
-- **Auditor**: `zero-false-green-auditor` (independent verification)
+### Agents deployed (ALL in parallel — single message, multiple Agent calls)
+
+| Agent | Focus |
+|-------|-------|
+| `devops-smoke-tester` | Build verification, deployment checks, Docker health |
+| `production-readiness-agent` | Health checks, security, monitoring, backups |
+| `zero-false-green-auditor` | Independent verification of ALL claims |
+| `ecosystem-health-scoring` | Health score computation (service changes) |
+| `Code Reviewer` (FINAL BOSS) | Final comprehensive sweep of ALL changes |
 
 ### Verification checks
 - [ ] Build succeeds from clean state
@@ -313,47 +294,36 @@ Proceeds to VERIFY. Critical/high security findings block progression.
 - [ ] Dependent services unaffected
 - [ ] No new alerts triggered
 
-### Gate: Verification passed
-- [ ] All verifications passed with evidence
-- [ ] Zero False Green Auditor: no false claims detected
-- [ ] Build is deploy-ready (or explicitly marked not-for-deploy)
-
-## Phase 9: FINAL BOSS
-
-**Goal**: Final comprehensive review and scoring.
-
-### When to run
-- Medium+ tasks
-- Any task claiming "done"
-
-### Agent deployed
-- **Code Reviewer** (final sweep of all changes)
-
 ### Final Boss checks
 - [ ] All previous phase gates passed
 - [ ] Response contract completed (14 points)
 - [ ] Readiness score computed
 - [ ] UNVERIFIED items explicitly listed
 - [ ] Next best action recommended
+- [ ] Zero False Green Auditor: no false claims detected
+
+### Gate: Verification+Final Boss passed
+- [ ] All verifications passed with evidence
+- [ ] FINAL BOSS scorecard complete
+- [ ] Build is deploy-ready (or explicitly marked not-for-deploy)
+- [ ] Score: 100/100 or explicit UNVERIFIED list
 
 ### Output: Final Scorecard
 
 ```
 ═══════════════════════════════════════
 BUILD COMPLETE — [feature name]
-Task: [classification] | Size: [size]
-Agents deployed: [count] across [phase count] phases
+Task: [classification] | Size: [size] | Time: [duration]
+Agents deployed: [count] across 7 phases (optimized)
 
 PHASE RESULTS:
-  DISCOVER:   [PASS/SKIP]
-  PLAN:       [PASS/SKIP]
-  ARCHITECT:  [PASS/SKIP]
-  IMPLEMENT:  [PASS] — [N] files, [+N/-N] lines
-  TEST:       [PASS] — [N]/[N] tests
-  REVIEW:     [PASS] — [N] findings resolved
-  SECURITY:   [PASS] — 0 vulnerabilities
-  VERIFY:     [PASS] — [evidence]
-  FINAL BOSS: [PASS]
+  DISCOVER:         [PASS/SKIP/CACHED]
+  PLAN:             [PASS/SKIP]
+  ARCHITECT:        [PASS/SKIP]
+  IMPLEMENT:        [PASS] — [N] files, [+N/-N] lines
+  TEST:             [PASS] — [N]/[N] tests
+  REVIEW+SECURITY:  [PASS] — [N] findings, 0 vulns
+  VERIFY+FINAL:     [PASS] — [evidence]
 
 READINESS: [0-100]
 UNVERIFIED: [list or "none"]
@@ -368,10 +338,9 @@ NEXT ACTION: [one clear next step]
 - PLAN → ARCHITECT: Auto if task is medium or smaller
 - ARCHITECT → IMPLEMENT: Always auto-proceeds
 - IMPLEMENT → TEST: Always auto-proceeds
-- TEST → REVIEW: Auto if all tests pass
-- REVIEW → SECURITY: Auto if no critical findings
-- SECURITY → VERIFY: Auto if no security findings
-- VERIFY → FINAL BOSS: Auto if all verifications pass
+- TEST → REVIEW+SECURITY: Auto if all tests pass
+- REVIEW+SECURITY → VERIFY+FINAL BOSS: Auto if no critical/security findings
+- VERIFY+FINAL BOSS → DONE: Auto when scorecard complete
 
 ### When phases pause for human
 - PLAN phase for Large/Critical tasks (ExitPlanMode)
@@ -385,6 +354,29 @@ NEXT ACTION: [one clear next step]
 - If a gate fails: return to the appropriate phase for fixes
 - If a phase is stuck: escalate with specific blocker description
 - Never silently skip a phase
+
+### Never-Stop Enforcement (v2.1)
+The pipeline must NEVER stop silently before reaching 100/100:
+
+| Phase | Budget | On Exceed |
+|-------|--------|-----------|
+| DISCOVER | 3 min | Skip with warning, use cached/partial knowledge |
+| PLAN | 3 min | Auto-approve draft plan, proceed to IMPLEMENT |
+| ARCHITECT | 3 min | Skip for medium tasks (not critical path) |
+| IMPLEMENT | 8 min | Escalate with partial work and blocker report |
+| TEST | 4 min | Auto-fix failures (retry generate + run, max 3 loops) |
+| REVIEW+SECURITY | 5 min | Proceed with findings logged, not resolved |
+| VERIFY+FINAL BOSS | 5 min | Mark UNVERIFIED, report score with caveats |
+
+**Stuckness breaker**: If the SAME phase repeats 3+ times:
+1. Log the recurring failure with full context
+2. Try an alternative approach (different agent, different model)
+3. On 5th attempt: escalate to human with structured blocker
+
+**Terminal states** (pipeline must reach one):
+- (a) 100/100 complete — all gates green
+- (b) Score < 100 with explicit UNVERIFIED items listed
+- (c) Structured blocker report escalated to human
 
 ## Agent Communication Protocol
 

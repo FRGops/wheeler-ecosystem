@@ -8,11 +8,13 @@ This matrix works with `.ai/subagents/BUILD_PIPELINE.md`. Every build task flows
 
 | Task Size | Files | Lines | Phases | Max Parallel Agents | Review Level |
 |-----------|-------|-------|--------|-------------------|-------------|
-| Micro | 1 | < 20 | 2 (IMPLEMENT→REVIEW) | 1 | Self |
-| Small | 1-3 | < 100 | 4 (PLAN→IMPLEMENT→TEST→REVIEW) | 2 | Peer |
-| Medium | 3-10 | < 500 | 6 (DISCOVER→PLAN→IMPLEMENT→TEST→REVIEW→SECURITY→FINAL) | 4 | Final Boss |
+| Micro | 1 | < 20 | 2 (IMPLEMENT→REVIEW+SECURITY) | 2 | Self |
+| Small | 1-3 | < 100 | 4 (PLAN→IMPLEMENT→TEST→REVIEW+SECURITY) | 2 | Peer |
+| Medium | 3-10 | < 500 | 5 (DISCOVER→PLAN→IMPLEMENT→TEST→REVIEW+SEC→VERIFY+FINAL) | 4 | Final Boss |
 | Large | 10-25 | < 2000 | 7 (full pipeline) | 6 | Final Boss + Human |
 | Critical | Any | Any | Full + human gates | As needed | Final Boss + Human |
+
+**v2.1 Phase Merge**: REVIEW+SECURITY run in single parallel dispatch. VERIFY+FINAL BOSS run in single parallel dispatch. 9 phases → 7.
 
 ## Phase → Agent Deployment Map
 
@@ -90,29 +92,46 @@ This matrix works with `.ai/subagents/BUILD_PIPELINE.md`. Every build task flows
 
 **All REVIEW agents deploy in parallel** — single message, multiple Agent() calls. Each reports independently. Findings are aggregated and auto-fixed before proceeding.
 
-### SECURITY Phase (Always)
+### REVIEW+SECURITY Phase (Always — merged, all parallel)
 
 | Agent | Focus | When | Parallel |
 |-------|-------|------|----------|
-| `code-modernization:security-auditor` | OWASP, CWE, CVEs, injection, secrets | Always | — |
+| `Code Reviewer` | Correctness, security, maintainability, performance | Always | Yes |
+| `code-simplifier` | Clarity, consistency, simplification | Always | Yes |
+| `pr-review-toolkit:silent-failure-hunter` | Error handling, catch blocks, fallbacks | Medium+ | Yes |
+| `pr-review-toolkit:type-design-analyzer` | Type design quality | Types changed | Yes |
+| `pr-review-toolkit:comment-analyzer` | Comment accuracy, rot detection | Comments added | Yes |
+| `code-modernization:security-auditor` | OWASP, CWE, CVEs, injection, secrets | Always | Yes |
 | Automated secrets scan | `git diff \| grep -E 'API_KEY\|TOKEN\|SECRET\|PASSWORD'` | Always | Yes |
 | DeepSeek routing check | Verify ANTHROPIC_* vars untouched | Always | Yes |
 
-### VERIFY Phase (Medium+)
+**All 8 agents deploy in parallel** — single message, multiple Agent() calls. Zero data dependency between review and security (both inspect same diff).
+
+### VERIFY+FINAL BOSS Phase (Medium+ — merged, all parallel)
 
 | Agent | Focus | Parallel |
 |-------|-------|----------|
-| `devops-smoke-tester` | Build verification, deployment checks, Docker health | — |
+| `devops-smoke-tester` | Build verification, deployment checks, Docker health | Yes |
 | `production-readiness-agent` | Health checks, security, monitoring, backups | Yes |
 | `zero-false-green-auditor` | Independent verification of ALL claims | Yes |
 | `ecosystem-health-scoring` | Health score computation (service changes) | Yes |
+| `Code Reviewer` (FINAL BOSS) | Final comprehensive sweep + scorecard | Yes |
 
-### FINAL BOSS Phase (Medium+)
+**All 5 agents deploy in parallel** — single message. FINAL BOSS reviews code, VERIFY agents test it. No dependency.
 
-| Agent | Scope |
-|-------|-------|
-| `Code Reviewer` | Final comprehensive sweep of ALL changes |
-| 14-point response contract | Mandatory completion format |
+## Model Tier Routing (v2.1 — speed-optimized)
+
+| Agent Type | Model | Rationale |
+|-----------|-------|-----------|
+| DISCOVER (Explore) | deepseek-chat | Read-only, speed-critical |
+| IMPLEMENT (general-purpose) | deepseek-chat | Bulk of coding, need speed |
+| TEST (test-engineer) | deepseek-chat | Fast model for test gen |
+| REVIEW (code-simplifier, silent-failure, type-design, comment) | deepseek-chat | Simple analysis tasks |
+| REVIEW (Code Reviewer) | premium_review | Quality-critical review |
+| SECURITY (security-auditor) | premium_review | Quality-critical security |
+| VERIFY (smoke-tester, readiness, eco-health) | deepseek-chat | Simple verification |
+| VERIFY (zero-false-green) | premium_review | Independent audit needs quality |
+| FINAL BOSS | claude-opus-4 | Ultimate quality gate |
 
 ## Army Mode Triggers
 

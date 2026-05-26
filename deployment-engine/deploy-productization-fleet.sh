@@ -88,19 +88,28 @@ deploy_phase() {
     log "Deploying Phase ${phase_num}: ${services}"
 
     IFS=',' read -ra SERVICE_ARRAY <<< "$services"
+
+    # v2.1: Parallel service starts (eliminates sleep 2 between each)
+    declare -a PIDS=()
     for svc in "${SERVICE_ARRAY[@]}"; do
         log "  Deploying: ${svc}"
         if [ "$DRY_RUN" = true ]; then
             log "    DRY RUN: would execute: pm2 start ${ECOSYSTEM_CONFIG} --only ${svc}"
             continue
         fi
-        pm2 start "$ECOSYSTEM_CONFIG" --only "$svc" || {
-            log "  FAILED to deploy: ${svc}"
-            return 1
-        }
-        sleep 2  # Brief pause between service starts
+        pm2 start "$ECOSYSTEM_CONFIG" --only "$svc" &
+        PIDS+=($!)
     done
-    return 0
+
+    # Wait for all starts to complete
+    local failed=0
+    for pid in "${PIDS[@]}"; do
+        wait "$pid" || {
+            log "  FAILED: a service start failed (pid=${pid})"
+            failed=1
+        }
+    done
+    return $failed
 }
 
 if [ "$PHASE" == "all" ]; then
@@ -126,13 +135,13 @@ check_health() {
 
     HEALTH_CHECKS=$((HEALTH_CHECKS + 1))
 
-    # Wait up to 15 seconds for service to start
-    for i in $(seq 1 15); do
+    # Wait up to 15 seconds for service to start (poll every 0.5s)
+    for i in $(seq 1 30); do
         if curl -sf -o /dev/null "http://127.0.0.1:${port}${path}" 2>/dev/null; then
             log "  HEALTH OK: ${service} http://127.0.0.1:${port}${path}"
             return 0
         fi
-        sleep 1
+        sleep 0.5
     done
 
     log "  HEALTH FAIL: ${service} http://127.0.0.1:${port}${path} not responding"

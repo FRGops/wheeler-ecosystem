@@ -5,27 +5,37 @@ model_list:
     api_key: os.environ/DEEPSEEK_API_KEY
     api_base: https://api.deepseek.com
     rpm: 1000
+    timeout: 45
+    num_retries: 2
 - model_name: deepseek-reasoner
   litellm_params:
     model: openai/deepseek-reasoner
     api_key: os.environ/DEEPSEEK_API_KEY
     api_base: https://api.deepseek.com
     rpm: 500
+    timeout: 60
+    num_retries: 2
 - model_name: premium_review
   litellm_params:
     model: anthropic/claude-sonnet-4-20250514
     api_key: os.environ/ANTHROPIC_API_KEY
     rpm: 100
+    timeout: 90
+    num_retries: 1
 - model_name: claude-sonnet-4
   litellm_params:
     model: anthropic/claude-sonnet-4-20250514
     api_key: os.environ/ANTHROPIC_API_KEY
     rpm: 100
+    timeout: 90
+    num_retries: 1
 - model_name: claude-opus-4
   litellm_params:
     model: anthropic/claude-opus-4-20250514
     api_key: os.environ/ANTHROPIC_API_KEY
     rpm: 50
+    timeout: 120
+    num_retries: 1
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
@@ -33,6 +43,8 @@ general_settings:
   redis_port: "6379"
 
 litellm_settings:
+  request_timeout: 45
+  num_retries: 2
   cache: true
   cache_params:
     type: redis
@@ -40,3 +52,10 @@ litellm_settings:
     port: "6379"
   drop_params: true
   set_verbose: false
+  fallbacks:
+    - deepseek-chat: ["claude-sonnet-4"]
+    - deepseek-reasoner: ["deepseek-chat"]
+    - premium_review: ["claude-sonnet-4"]
+    - claude-sonnet-4: ["deepseek-chat"]
+    - claude-opus-4: ["claude-sonnet-4"]
+  routing_strategy: "latency-based-routing"
