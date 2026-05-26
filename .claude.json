@@ -30,7 +30,7 @@
     "git-worktrees": 51,
     "stripe-plugin": 51
   },
-  "promptQueueUseCount": 438,
+  "promptQueueUseCount": 439,
   "cachedGrowthBookFeatures": {
     "tengu_mcp_retry_failed_remote": false,
     "tengu_marble_sandcastle": false,
@@ -594,19 +594,19 @@
       "lastUsedAt": 1779346011553
     },
     "slay": {
-      "usageCount": 13,
-      "lastUsedAt": 1779736550038
+      "usageCount": 15,
+      "lastUsedAt": 1779771879857
     },
     "superpowers": {
-      "usageCount": 17,
-      "lastUsedAt": 1779768534288
+      "usageCount": 19,
+      "lastUsedAt": 1779771568116
     },
     "chief-of-staff": {
       "usageCount": 1,
       "lastUsedAt": 1779731837683
     }
   },
-  "lastPlanModeUse": 1779610989518,
+  "lastPlanModeUse": 1779771133360,
   "showSpinnerTree": false,
   "cachedExperimentFeatures": [
     "tengu_cedar_inlet"
