@@ -1,222 +1,187 @@
 {
   "metadata": {
     "schema_version": "1.0.0",
-    "last_updated": "2026-05-24T12:00:00Z",
-    "description": "Current state of the Wheeler Repo Router pipeline system. Tracks active and completed pipeline runs, blocked repos, and system health."
+    "last_updated": "2026-05-26T03:14:18Z",
+    "description": "Repo Router pipeline state"
   },
   "system": {
     "status": "operational",
-    "uptime_seconds": 0,
-    "version": "1.0.0",
     "node": "aiops",
     "mode": "active",
     "last_drift_check": null,
-    "last_dashboard_update": null
+    "last_dashboard_update": "2026-05-26T03:14:18Z"
   },
   "active_runs": {
     "total_active": 0,
     "runs": []
   },
   "completed_runs": {
-    "total_completed": 0,
-    "last_10": []
+    "total_completed": 12,
+    "last_10": [
+      {
+        "run_id": "freellmapi-20260526031358",
+        "repo": "freellmapi",
+        "completed_at": "2026-05-26T03:14:18Z",
+        "started_at": "2026-05-26T03:13:58Z",
+        "duration_seconds": 20,
+        "result": "partial"
+      },
+      {
+        "run_id": "cmux-20260526031358",
+        "repo": "cmux",
+        "completed_at": "2026-05-26T03:14:17Z",
+        "started_at": "2026-05-26T03:13:58Z",
+        "duration_seconds": 19,
+        "result": "partial"
+      },
+      {
+        "run_id": "open-codesign-20260526031358",
+        "repo": "open-codesign",
+        "completed_at": "2026-05-26T03:14:10Z",
+        "started_at": "2026-05-26T03:13:58Z",
+        "duration_seconds": 12,
+        "result": "partial"
+      },
+      {
+        "run_id": "awesome-opencode-20260526031358",
+        "repo": "awesome-opencode",
+        "completed_at": "2026-05-26T03:14:10Z",
+        "started_at": "2026-05-26T03:13:58Z",
+        "duration_seconds": 12,
+        "result": "partial"
+      },
+      {
+        "run_id": "figmirror-20260526031358",
+        "repo": "figmirror",
+        "completed_at": "2026-05-26T03:14:09Z",
+        "started_at": "2026-05-26T03:13:58Z",
+        "duration_seconds": 11,
+        "result": "partial"
+      },
+      {
+        "run_id": "Understand-Anything-20260526031022",
+        "repo": "Understand-Anything",
+        "completed_at": "2026-05-26T03:10:35Z",
+        "started_at": "2026-05-26T03:10:22Z",
+        "duration_seconds": 13,
+        "result": "partial"
+      },
+      {
+        "run_id": "docker-agent-20260526030918",
+        "repo": "docker-agent",
+        "completed_at": "2026-05-26T03:09:21Z",
+        "started_at": "2026-05-26T03:09:18Z",
+        "duration_seconds": 2,
+        "result": "partial"
+      },
+      {
+        "run_id": "gastown-20260526030918",
+        "repo": "gastown",
+        "completed_at": "2026-05-26T03:09:20Z",
+        "started_at": "2026-05-26T03:09:18Z",
+        "duration_seconds": 2,
+        "result": "partial"
+      },
+      {
+        "run_id": "knowledge-work-plugins-20260526030918",
+        "repo": "knowledge-work-plugins",
+        "completed_at": "2026-05-26T03:09:20Z",
+        "started_at": "2026-05-26T03:09:18Z",
+        "duration_seconds": 2,
+        "result": "partial"
+      },
+      {
+        "run_id": "dns-blocklists-20260526030918",
+        "repo": "dns-blocklists",
+        "completed_at": "2026-05-26T03:09:20Z",
+        "started_at": "2026-05-26T03:09:18Z",
+        "duration_seconds": 2,
+        "result": "partial"
+      }
+    ]
   },
   "blocked_repos": {
     "total_blocked": 0,
     "entries": []
   },
-  "phases": {
-    "01_intake": {
-      "label": "Repository Intake",
-      "description": "Clone or verify repo, detect repo type",
-      "non_bypassable": false
-    },
-    "02_validate": {
-      "label": "Validation",
-      "description": "Validate repo structure, required files, conventions",
-      "non_bypassable": false
-    },
-    "03_scan": {
-      "label": "Security Scan",
-      "description": "Run security scans (trivy, semgrep, secrets scan)",
-      "non_bypassable": true
-    },
-    "04_profile": {
-      "label": "Profiling",
-      "description": "Generate repo profile (type, language, framework, dependencies)",
-      "non_bypassable": false
-    },
-    "05_allocate": {
-      "label": "Port Allocation",
-      "description": "Allocate ports from port-allocation-table, check conflicts",
-      "non_bypassable": true
-    },
-    "06_generate": {
-      "label": "Template Generation",
-      "description": "Generate compose/pm2/nginx templates from profile",
-      "non_bypassable": false
-    },
-    "07_configure": {
-      "label": "Configuration",
-      "description": "Apply runtime config, environment variables, secrets",
-      "non_bypassable": false
-    },
-    "08_build": {
-      "label": "Build",
-      "description": "Build Docker images, install dependencies",
-      "non_bypassable": false
-    },
-    "09_deploy": {
-      "label": "Deploy",
-      "description": "Deploy containers/processes, activate nginx routes",
-      "non_bypassable": false
-    },
-    "10_zt_validate": {
-      "label": "Zero-Trust Validation",
-      "description": "Non-bypassable: validate all services bind to 127.0.0.1, no exposed ports",
-      "non_bypassable": true
-    },
-    "11_health_check": {
-      "label": "Health Check",
-      "description": "Verify service health endpoints return 200, check logs",
-      "non_bypassable": false
-    },
-    "12_qa_gate": {
-      "label": "QA Gate",
-      "description": "Non-bypassable: run QA scorecard, must score >= 80",
-      "non_bypassable": true
-    },
-    "13_register": {
-      "label": "Route Registration",
-      "description": "Register in route-registry, update enforcement tables",
-      "non_bypassable": false
-    },
-    "14_finalize": {
-      "label": "Finalize",
-      "description": "Verify all phases passed, generate report, notify",
-      "non_bypassable": false
-    }
-  },
   "repo_profiles": {
-    "frgcrm": {
-      "repo_type": "fullstack",
-      "language": "typescript",
-      "framework": "react-express",
-      "node": "hostinger",
-      "port": 3300,
-      "status": "deployed",
-      "last_deployed": "2026-05-24T10:30:00Z",
-      "current_phase": 14
+    "Understand-Anything": {
+      "ecosystem_role": "ai-vision",
+      "role_category": "vision-ai",
+      "activated_at": "2026-05-26T03:20:39Z",
+      "status": "active"
     },
-    "surplusai": {
-      "repo_type": "fullstack",
-      "language": "typescript",
-      "framework": "nextjs",
-      "node": "aiops",
-      "port": 3600,
-      "status": "deployed",
-      "last_deployed": "2026-05-24T09:15:00Z",
-      "current_phase": 14
+    "awesome-opencode": {
+      "ecosystem_role": "knowledge-base",
+      "role_category": "osint-catalog",
+      "activated_at": "2026-05-26T03:20:39Z",
+      "status": "active"
     },
-    "private-ai": {
-      "repo_type": "agent",
-      "language": "python",
-      "framework": "fastapi",
-      "node": "aiops",
-      "port": 3700,
-      "status": "deployed",
-      "last_deployed": "2026-05-23T18:00:00Z",
-      "current_phase": 14
+    "cmux": {
+      "ecosystem_role": "dev-tool",
+      "role_category": "terminal-tool",
+      "activated_at": "2026-05-26T03:20:39Z",
+      "status": "active"
     },
-    "prediction-radar": {
-      "repo_type": "backend",
-      "language": "python",
-      "framework": "fastapi",
-      "node": "aiops",
-      "port": 3800,
-      "status": "deployed",
-      "last_deployed": "2026-05-23T16:45:00Z",
-      "current_phase": 14
+    "dns-blocklists": {
+      "ecosystem_role": "security-intel",
+      "role_category": "threat-intelligence",
+      "activated_at": "2026-05-26T03:20:39Z",
+      "status": "active"
     },
-    "openclaw": {
-      "repo_type": "frontend",
-      "language": "typescript",
-      "framework": "react",
-      "node": "hostinger",
-      "port": 3400,
-      "status": "deployed",
-      "last_deployed": "2026-05-20T14:00:00Z",
-      "current_phase": 14
+    "docker-agent": {
+      "ecosystem_role": "dev-tool",
+      "role_category": "container-automation",
+      "activated_at": "2026-05-26T03:20:39Z",
+      "status": "active"
     },
-    "revenue-automation": {
-      "repo_type": "backend",
-      "language": "python",
-      "framework": "fastapi",
-      "node": "hostinger",
-      "port": 3500,
-      "status": "deployed",
-      "last_deployed": "2026-05-22T11:00:00Z",
-      "current_phase": 14
+    "figmirror": {
+      "ecosystem_role": "design-tool",
+      "role_category": "design-automation",
+      "activated_at": "2026-05-26T03:20:39Z",
+      "status": "active"
     },
-    "healthchecks": {
-      "repo_type": "backend",
-      "language": "python",
-      "framework": "django",
-      "node": "aiops",
-      "port": 3900,
-      "status": "deployed",
-      "last_deployed": "2026-05-21T08:30:00Z",
-      "current_phase": 14
+    "freellmapi": {
+      "ecosystem_role": "ai-gateway",
+      "role_category": "llm-access",
+      "activated_at": "2026-05-26T03:20:39Z",
+      "status": "active"
     },
-    "changedetection": {
-      "repo_type": "backend",
-      "language": "python",
-      "framework": "flask",
-      "node": "aiops",
-      "port": 4000,
-      "status": "pending_deploy",
-      "last_deployed": null,
-      "current_phase": 8
+    "gastown": {
+      "ecosystem_role": "web-app",
+      "role_category": "community-platform",
+      "activated_at": "2026-05-26T03:20:39Z",
+      "status": "active"
     },
-    "langflow": {
-      "repo_type": "backend",
-      "language": "python",
-      "framework": "fastapi",
-      "node": "aiops",
-      "port": 4100,
-      "status": "deployed",
-      "last_deployed": "2026-05-22T15:00:00Z",
-      "current_phase": 14
+    "git-surgeon": {
+      "ecosystem_role": "dev-tool",
+      "role_category": "git-utility",
+      "activated_at": "2026-05-26T03:20:39Z",
+      "status": "active"
     },
-    "n8n": {
-      "repo_type": "backend",
-      "language": "typescript",
-      "framework": "vue-express",
-      "node": "aiops",
-      "port": 4200,
-      "status": "deployed",
-      "last_deployed": "2026-05-24T08:00:00Z",
-      "current_phase": 14
+    "knowledge-work-plugins": {
+      "ecosystem_role": "knowledge-base",
+      "role_category": "knowledge-management",
+      "activated_at": "2026-05-26T03:20:39Z",
+      "status": "active"
+    },
+    "open-codesign": {
+      "ecosystem_role": "dev-tool",
+      "role_category": "collaborative-design",
+      "activated_at": "2026-05-26T03:20:39Z",
+      "status": "active"
+    },
+    "photon": {
+      "ecosystem_role": "image-engine",
+      "role_category": "image-processing",
+      "activated_at": "2026-05-26T03:20:39Z",
+      "status": "active"
+    },
+    "skills": {
+      "ecosystem_role": "ai-skill",
+      "role_category": "skill-definitions",
+      "activated_at": "2026-05-26T03:20:40Z",
+      "status": "active"
     }
-  },
-  "registered_repos": [
-    "frgcrm",
-    "surplusai",
-    "private-ai",
-    "prediction-radar",
-    "openclaw",
-    "revenue-automation",
-    "healthchecks",
-    "changedetection",
-    "langflow",
-    "n8n"
-  ],
-  "metrics": {
-    "total_deployments": 42,
-    "successful_deployments": 40,
-    "failed_deployments": 2,
-    "total_rollbacks": 3,
-    "average_deploy_time_seconds": 145,
-    "average_qa_score": 94
   }
 }

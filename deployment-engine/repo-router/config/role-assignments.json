@@ -1,0 +1,170 @@
+{
+  "schema_version": "1.0.0",
+  "description": "Wheeler ecosystem role assignments for ingested repos",
+  "roles": {
+    "git-surgeon": {
+      "ecosystem_role": "dev-tool",
+      "category": "git-utility",
+      "activation": "cli-path",
+      "binary_path": "/opt/git-surgeon",
+      "description": "Git history rewriting and repository surgery toolkit",
+      "capabilities": ["git-history-rewrite", "repo-cleanup", "branch-surgery"],
+      "integrations": ["wheeler-repo-intelligence", "wheeler-code-quality"]
+    },
+    "open-codesign": {
+      "ecosystem_role": "dev-tool",
+      "category": "collaborative-design",
+      "activation": "cli-path",
+      "binary_path": "/opt/open-codesign",
+      "description": "Collaborative code design and architecture platform",
+      "capabilities": ["collaborative-design", "code-architecture", "design-review"],
+      "integrations": ["wheeler-code-review", "wheeler-architecture"]
+    },
+    "cmux": {
+      "ecosystem_role": "dev-tool",
+      "category": "terminal-tool",
+      "activation": "cli-path",
+      "binary_path": "/opt/cmux",
+      "description": "Terminal multiplexing and command routing utility",
+      "capabilities": ["terminal-multiplexing", "command-routing", "session-management"],
+      "integrations": ["wheeler-terminal", "wheeler-workflow"]
+    },
+    "freellmapi": {
+      "ecosystem_role": "ai-gateway",
+      "category": "llm-access",
+      "activation": "api-registry",
+      "binary_path": "/opt/freellmapi",
+      "description": "Free LLM API gateway for alternative model access",
+      "capabilities": ["llm-proxy", "model-routing", "free-tier-access"],
+      "integrations": ["litellm-proxy", "wheeler-ai-routing", "ai-cost-governance"]
+    },
+    "photon": {
+      "ecosystem_role": "image-engine",
+      "category": "image-processing",
+      "activation": "library-registry",
+      "binary_path": "/opt/photon",
+      "description": "High-performance native image processing engine (Rust)",
+      "capabilities": ["image-processing", "image-manipulation", "webp-encoding"],
+      "integrations": ["wheeler-vision", "wheeler-media", "wheeler-document-processing"]
+    },
+    "dns-blocklists": {
+      "ecosystem_role": "security-intel",
+      "category": "threat-intelligence",
+      "activation": "data-feed",
+      "binary_path": "/opt/dns-blocklists",
+      "description": "DNS-based threat intelligence and blocklist data feeds",
+      "capabilities": ["dns-filtering", "threat-blocking", "ad-blocking", "tracker-protection"],
+      "integrations": ["wheeler-security", "pihole", "ufw-rules", "wheeler-network"]
+    },
+    "gastown": {
+      "ecosystem_role": "web-app",
+      "category": "community-platform",
+      "activation": "web-service",
+      "binary_path": "/opt/gastown",
+      "description": "Community web application platform",
+      "capabilities": ["community-engagement", "web-platform", "content-management"],
+      "integrations": ["wheeler-dashboard", "nginx-gateway"]
+    },
+    "awesome-opencode": {
+      "ecosystem_role": "knowledge-base",
+      "category": "osint-catalog",
+      "activation": "knowledge-index",
+      "binary_path": "/opt/awesome-opencode",
+      "description": "Curated open source intelligence catalog and resource index",
+      "capabilities": ["osint-catalog", "tool-discovery", "resource-curation"],
+      "integrations": ["wheeler-knowledge-graph", "wheeler-oss-intelligence", "repo-intelligence"]
+    },
+    "figmirror": {
+      "ecosystem_role": "design-tool",
+      "category": "design-automation",
+      "activation": "cli-path",
+      "binary_path": "/opt/figmirror",
+      "description": "Figma design mirror and design-to-code automation",
+      "capabilities": ["figma-sync", "design-mirror", "asset-extraction"],
+      "integrations": ["wheeler-design-system", "wheeler-frontend"]
+    },
+    "docker-agent": {
+      "ecosystem_role": "dev-tool",
+      "category": "container-automation",
+      "activation": "cli-path",
+      "binary_path": "/opt/docker-agent",
+      "description": "Docker agent SDK for container management automation",
+      "capabilities": ["docker-automation", "container-management", "image-building"],
+      "integrations": ["wheeler-infra", "docker-fleet-intelligence", "wheeler-deploy"]
+    },
+    "Understand-Anything": {
+      "ecosystem_role": "ai-vision",
+      "category": "vision-ai",
+      "activation": "api-registry",
+      "binary_path": "/opt/Understand-Anything",
+      "description": "Universal image and video understanding AI model",
+      "capabilities": ["image-understanding", "video-analysis", "object-detection", "scene-parsing"],
+      "integrations": ["wheeler-vision", "wheeler-document-review", "wheeler-forensics"]
+    },
+    "knowledge-work-plugins": {
+      "ecosystem_role": "knowledge-base",
+      "category": "knowledge-management",
+      "activation": "knowledge-index",
+      "binary_path": "/opt/knowledge-work-plugins",
+      "description": "Anthropic knowledge work plugins for AI-assisted knowledge management",
+      "capabilities": ["knowledge-management", "ai-plugins", "work-automation"],
+      "integrations": ["wheeler-knowledge-graph", "wheeler-brain-os", "wheeler-ai-routing"]
+    },
+    "skills": {
+      "ecosystem_role": "ai-skill",
+      "category": "skill-definitions",
+      "activation": "skill-registry",
+      "binary_path": "/opt/skills",
+      "description": "AI skill definitions and capability templates for agent enhancement",
+      "capabilities": ["skill-definitions", "agent-capabilities", "task-templates"],
+      "integrations": ["wheeler-agent-fleet", "wheeler-brain-os", "wheeler-workflow"]
+    }
+  },
+  "role_categories": {
+    "dev-tool": {
+      "description": "Developer tools and utilities",
+      "activation_type": "cli-path",
+      "health_check": "binary-exists"
+    },
+    "ai-gateway": {
+      "description": "AI model access and routing gateways",
+      "activation_type": "api-registry",
+      "health_check": "api-endpoint"
+    },
+    "image-engine": {
+      "description": "Image and media processing engines",
+      "activation_type": "library-registry",
+      "health_check": "import-check"
+    },
+    "security-intel": {
+      "description": "Security threat intelligence feeds",
+      "activation_type": "data-feed",
+      "health_check": "data-freshness"
+    },
+    "web-app": {
+      "description": "Web applications and platforms",
+      "activation_type": "web-service",
+      "health_check": "http-endpoint"
+    },
+    "knowledge-base": {
+      "description": "Knowledge repositories and catalogs",
+      "activation_type": "knowledge-index",
+      "health_check": "index-freshness"
+    },
+    "design-tool": {
+      "description": "Design and creative tools",
+      "activation_type": "cli-path",
+      "health_check": "binary-exists"
+    },
+    "ai-vision": {
+      "description": "AI vision and image understanding",
+      "activation_type": "api-registry",
+      "health_check": "api-endpoint"
+    },
+    "ai-skill": {
+      "description": "AI skill and capability definitions",
+      "activation_type": "skill-registry",
+      "health_check": "schema-valid"
+    }
+  }
+}

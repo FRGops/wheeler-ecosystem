@@ -45,18 +45,27 @@ normalize_url() {
 # Check if a URL has already been processed
 is_processed() {
   local url="$1"
-  grep -qFx "$url" "$PROCESSED_FILE" 2>/dev/null
+  grep -qFx "$url" "$PROCESSED_FILE" 2>/dev/null || return 1
+  return 0
 }
 
 # Check if a repo is already registered in router state
 is_registered() {
   local url="$1"
   local repo_name
-  repo_name=$(echo "$url" | grep -oP '[^/]+/[^/]+$')
+  repo_name=$(echo "$url" | grep -oP '[^/]+/[^/]+$' || true)
+
+  if [[ -z "$repo_name" ]]; then
+    return 1
+  fi
 
   if [[ -f "$STATE_FILE" ]]; then
-    jq -e --arg name "$repo_name" '.repo_profiles[$name]' "$STATE_FILE" &>/dev/null && return 0
-    jq -e --arg name "$repo_name" '.registered_repos[] | select(. == $name)' "$STATE_FILE" &>/dev/null && return 0
+    if jq -e --arg name "$repo_name" '.repo_profiles[$name]' "$STATE_FILE" &>/dev/null; then
+      return 0
+    fi
+    if jq -e --arg name "$repo_name" '.registered_repos[] | select(. == $name)' "$STATE_FILE" &>/dev/null; then
+      return 0
+    fi
   fi
   return 1
 }
@@ -89,14 +98,15 @@ ingest_repo() {
   # Run full 14-phase deploy pipeline
   log_msg "DEPLOY ${repo_name}: Starting full 14-phase pipeline..."
 
-  if "$REPO_ROUTER" deploy "$url" >> "$LOG_FILE" 2>&1; then
+  local deploy_rc=0
+  "$REPO_ROUTER" deploy "$url" >> "$LOG_FILE" 2>&1 || deploy_rc=$?
+
+  if [[ "$deploy_rc" -eq 0 ]]; then
     log_msg "PASS   ${repo_name}: 14/14 phases complete — LIVE"
     mark_processed "$url"
     return 0
   else
-    local exit_code=$?
-    log_msg "FAIL   ${repo_name}: Pipeline exited with code ${exit_code} (check router-state.json for phase)"
-    # Still mark as processed to avoid infinite retry loops; use status command to check
+    log_msg "FAIL   ${repo_name}: Pipeline exited with code ${deploy_rc} (check router-state.json for phase)"
     mark_processed "$url"
     return 1
   fi
@@ -134,24 +144,30 @@ process_drop_zone() {
     return 0
   fi
 
-  # Read drop zone, deduplicate, process each
+  # Read drop zone, deduplicate
   local urls
-  urls=$(sort -u "$DROP_ZONE")
+  urls=$(sort -u "$DROP_ZONE" 2>/dev/null || true)
 
-  # Clear drop zone (atomic-ish: write to temp, then mv)
+  if [[ -z "$urls" ]]; then
+    : > "$DROP_ZONE"
+    return 0
+  fi
+
+  # Clear drop zone atomically
   : > "$DROP_ZONE"
 
   while IFS= read -r url; do
     [[ -z "$url" ]] && continue
     url=$(normalize_url "$url")
+    [[ -z "$url" ]] && continue
 
+    # Run ingest; don't let one failure kill the whole batch
     if ingest_repo "$url"; then
       ingested=$((ingested + 1))
     else
       failed=$((failed + 1))
     fi
 
-    # Small delay between ingestions to avoid resource contention
     sleep 1
   done <<< "$urls"
 

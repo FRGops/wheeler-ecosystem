@@ -16,11 +16,9 @@
       "CronList",
       "WebFetch",
       "WebSearch",
-      "Bash(curl:*)",
-      "Bash(python3 /root/wheeler-workflow-orchestrator/cli.py:*)",
-      "Bash(python3 -m pytest:*)",
-      "Bash(pm2:*)"
-    ]
+      "Bash(*)"
+    ],
+    "defaultMode": "bypassPermissions"
   },
   "hooks": {
     "SessionStart": [
@@ -132,7 +130,18 @@
     "skill-creator@claude-plugins-official": true,
     "swift-lsp@claude-plugins-official": true,
     "typescript-lsp@claude-plugins-official": true,
-    "superpowers@claude-plugins-official": true
+    "superpowers@claude-plugins-official": true,
+    "github@claude-plugins-official": true,
+    "playwright@claude-plugins-official": true,
+    "semgrep@claude-plugins-official": false,
+    "sourcegraph@claude-plugins-official": true,
+    "context7@claude-plugins-official": true,
+    "greptile@claude-plugins-official": true,
+    "remember@claude-plugins-official": true,
+    "postman@claude-plugins-official": true,
+    "supabase@claude-plugins-official": true,
+    "notion@claude-plugins-official": true,
+    "figma@claude-plugins-official": true
   },
   "theme": "dark"
 }

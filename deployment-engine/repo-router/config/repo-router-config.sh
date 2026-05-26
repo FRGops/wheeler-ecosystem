@@ -164,7 +164,10 @@ DIM='\033[2m'
 # Log a message with timestamp and level
 log_message() {
     local level="$1"
-    local message="$2"
+    local message="${2:-}"
+    if [[ -z "$message" ]]; then
+        message=$(cat)
+    fi
     local color=""
     case "$level" in
         INFO)    color="${GREEN}" ;;

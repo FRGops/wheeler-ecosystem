@@ -1,80 +1,60 @@
 ---
 name: pm2-deploy-state-20260526
-description: "Canonical 28-process PM2 baseline — 28/28 online, 0 leaks, 20/20 health, 100/100 A+ (2026-05-26)"
+description: Canonical 29-process PM2 baseline — 28/29 online, 46 plugins loaded, 10 MCP servers (2026-05-26 03:52 UTC)
 metadata:
   node_type: memory
   type: project
-  originSessionId: session-20260526-024918
+  originSessionId: session-20260526-034800
 ---
 
-# PM2 Deploy State — 2026-05-26
+# PM2 Deploy State — 2026-05-26 (03:52 UTC)
 
-**28/28 online, 0 restarts, 0 jlist leaks, 0 :latest images, 20/20 health, daemon env clean**
+**29 processes: 28 online, 1 waiting restart (embedding-service)**
 
-Supersedes [[pm2-deploy-state-20260525]] (was 27/27).
+Supersedes earlier 28-process snapshot. Now tracks 29 processes including `repo-listener`.
 
 ## Fleet
 
-| Process | Memory | Notes |
+| Process | Status | Notes |
 |---------|--------|-------|
-| aiops-saas-api | 48MB | healthy |
-| backup-verification | 3MB | healthy |
-| command-center | 48MB | healthy |
-| design-agent-svc | 110MB | healthy |
-| ecosystem-guardian | 61MB | healthy |
-| embedding-service | 859MB | healthy (all-MiniLM-L6-v2) |
-| event-bus-relay | 58MB | healthy |
-| executive-dashboard-api | 48MB | healthy |
-| frgcrm-agent-svc | 100MB | healthy |
-| frgcrm-api | 269MB | healthy |
-| horizon-agent-svc | 107MB | healthy |
-| insforge-agent-svc | 75MB | healthy |
-| litellm | 356MB | healthy (:4049) |
-| openclaw-dashboard | 61MB | healthy |
-| paperless-agent-svc | 109MB | healthy |
-| pm2-logrotate | 82MB | healthy (module, config: 10M/30retain/compress/midnight) |
-| prediction-radar-agent-svc | 111MB | healthy |
-| ravyn-agent-svc | 108MB | healthy |
-| repo-engine | 3MB | healthy |
-| repo-listener | 3MB | healthy |
-| revenue-metrics-collector | 49MB | healthy |
-| surplusai-portal-api | 103MB | healthy |
-| surplusai-scraper-agent-svc | 109MB | healthy |
-| voice-agent-svc | 106MB | healthy |
-| voice-outreach-service | 53MB | healthy |
-| war-room-server | 59MB | healthy |
-| wheeler-brain-api | 92MB | healthy |
-| wheeler-collectors | 29MB | healthy |
-| wheeler-orchestrator | 52MB | healthy |
+| aiops-saas-api | online | healthy |
+| backup-verification | online | healthy |
+| command-center | online | healthy |
+| design-agent-svc | online | healthy |
+| ecosystem-guardian | online | healthy |
+| embedding-service | waiting restart | 2 restarts (all-MiniLM-L6-v2 :8191) |
+| event-bus-relay | online | healthy |
+| executive-dashboard-api | online | healthy |
+| frgcrm-agent-svc | online | healthy |
+| frgcrm-api | online | healthy |
+| horizon-agent-svc | online | healthy |
+| insforge-agent-svc | online | healthy |
+| litellm | online | healthy (:4049) |
+| openclaw-dashboard | online | healthy |
+| paperless-agent-svc | online | healthy |
+| pm2-logrotate | online | 3 restarts (10M/30retain/compress/midnight) |
+| prediction-radar-agent-svc | online | healthy |
+| ravyn-agent-svc | online | healthy |
+| repo-engine | online | healthy |
+| repo-listener | online | 1 restart |
+| revenue-metrics-collector | online | healthy |
+| surplusai-portal-api | online | healthy |
+| surplusai-scraper-agent-svc | online | healthy |
+| voice-agent-svc | online | healthy |
+| voice-outreach-service | online | healthy |
+| war-room-server | online | healthy |
+| wheeler-brain-api | online | healthy |
+| wheeler-collectors | online | healthy |
+| wheeler-orchestrator | online | healthy |
 
-## Docker
+## Plugins (03:52 reload)
 
-44 containers: 42 healthy, 2 no-healthcheck (fincept + crowdsec, both running fine)
+46 plugins, 173 agents, 45 skills, 15 hooks, 10 MCP servers, 12 LSP servers
 
-## Daemon (PID 3776088)
+New since last snapshot: playwright, semgrep, sourcegraph, context7, greptile, remember, postman, supabase, notion, figma, github
 
-PM2 daemon environ: **CLEAN** — 0 secrets. Only HOME, PATH, PM2_HOME, SHELL, USER, standard systemd vars.
-secrets.env: **DELETED** — no plaintext credentials at /root/.pm2/
+210MB plugin cache disk usage.
 
-## Resurrect Chain
+## Need Attention
 
-- pm2-root systemd: **enabled** (boots on system start)
-- dump.pm2: **28 processes** saved (pm2-logrotate is module, persists separately)
-- pm2-logrotate module: configured (10M max, retain 30, compress, rotate at midnight)
-
-## Permissions
-
-- settings.json + settings.local.json: 14 tool-level permissions (Write, Edit, Read, Agent, TaskCreate/Update/Get/List/Output/Stop, CronCreate/Delete/List, WebFetch, WebSearch)
-- Auto-approve working for all coding operations
-
-## Verified (2026-05-26 02:50 UTC)
-
-- PM2 jlist secret scan: 29/29 clean, 0 leaks
-- Functional healthcheck: 20/20 passed
-- Docker :latest audit: CLEAN
-- Network binds: Expected only (SSH :22, nginx :443, Tailscale, systemd-resolved)
-- Daemon environ: 0 secrets
-- /root/.pm2/secrets.env: DELETED
-- Disk: 72G/338G (22%)
-
-## Score: 100/100 A+
+- embedding-service: "waiting restart" — 2 restarts. Verify with /slay if still in this state next session.

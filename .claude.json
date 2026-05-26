@@ -1,5 +1,5 @@
 {
-  "numStartups": 59,
+  "numStartups": 60,
   "installMethod": "global",
   "hasSeenTasksHint": true,
   "tipsHistory": {
@@ -14,7 +14,7 @@
     "todo-list": 45,
     "double-esc-code-restore": 51,
     "default-permission-mode-config": 51,
-    "continue": 50,
+    "continue": 60,
     "shift-tab": 51,
     "image-paste": 45,
     "subagent-fanout-nudge": 59,
@@ -30,7 +30,7 @@
     "git-worktrees": 51,
     "stripe-plugin": 51
   },
-  "promptQueueUseCount": 427,
+  "promptQueueUseCount": 438,
   "cachedGrowthBookFeatures": {
     "tengu_mcp_retry_failed_remote": false,
     "tengu_marble_sandcastle": false,
@@ -516,71 +516,78 @@
       "projectOnboardingSeenCount": 7,
       "hasClaudeMdExternalIncludesApproved": false,
       "hasClaudeMdExternalIncludesWarningShown": false,
-      "exampleFiles": [],
+      "exampleFiles": [
+        "ecosystem.config.js",
+        "main.py",
+        "auto-session-bootstrap.sh",
+        "autoheal-trigger.sh",
+        "ecosystem-health.sh"
+      ],
       "lastGracefulShutdown": true,
       "lastVersionBase": "2.1.150",
-      "lastCost": 31.60664299999999,
-      "lastAPIDuration": 5135211,
-      "lastAPIDurationWithoutRetries": 5134619,
-      "lastToolDuration": 781092,
-      "lastDuration": 6401557,
-      "lastLinesAdded": 10250,
-      "lastLinesRemoved": 87,
-      "lastTotalInputTokens": 1366168,
-      "lastTotalOutputTokens": 379571,
+      "lastCost": 17.509639,
+      "lastAPIDuration": 2401281,
+      "lastAPIDurationWithoutRetries": 2400960,
+      "lastToolDuration": 1509751,
+      "lastDuration": 7863948,
+      "lastLinesAdded": 1570,
+      "lastLinesRemoved": 150,
+      "lastTotalInputTokens": 716464,
+      "lastTotalOutputTokens": 124719,
       "lastTotalCacheCreationInputTokens": 0,
-      "lastTotalCacheReadInputTokens": 30573056,
+      "lastTotalCacheReadInputTokens": 21618688,
       "lastTotalWebSearchRequests": 0,
-      "lastFpsAverage": 13.69,
-      "lastFpsLow1Pct": 112.74,
+      "lastFpsAverage": 9.66,
+      "lastFpsLow1Pct": 95.35,
       "lastModelUsage": {
         "deepseek-v4-pro": {
-          "inputTokens": 806065,
-          "outputTokens": 182863,
-          "cacheReadInputTokens": 26148224,
+          "inputTokens": 498244,
+          "outputTokens": 115285,
+          "cacheReadInputTokens": 21430400,
           "cacheCreationInputTokens": 0,
           "webSearchRequests": 0,
-          "costUSD": 21.676012
+          "costUSD": 16.088545
         },
         "deepseek-v4-flash": {
-          "inputTokens": 560103,
-          "outputTokens": 196708,
-          "cacheReadInputTokens": 4424832,
+          "inputTokens": 218220,
+          "outputTokens": 9434,
+          "cacheReadInputTokens": 188288,
           "cacheCreationInputTokens": 0,
           "webSearchRequests": 0,
-          "costUSD": 9.930630999999998
+          "costUSD": 1.4210939999999999
         }
       },
-      "lastSessionId": "4aae710c-3a92-45ea-b733-567e6f247f7d",
+      "lastSessionId": "73653921-a518-4055-9ac6-06ee1a4747d8",
       "lastSessionMetrics": {
-        "frame_duration_ms_count": 87583,
-        "frame_duration_ms_min": 0.09745300002396107,
-        "frame_duration_ms_max": 34.05920100025833,
-        "frame_duration_ms_avg": 1.1718103226638303,
-        "frame_duration_ms_p50": 1.042483999975957,
-        "frame_duration_ms_p95": 2.091502199950628,
-        "frame_duration_ms_p99": 7.33714270000346,
-        "hook_duration_ms_count": 1325,
-        "hook_duration_ms_min": 20,
-        "hook_duration_ms_max": 113,
-        "hook_duration_ms_avg": 59.98792452830189,
-        "hook_duration_ms_p50": 57,
-        "hook_duration_ms_p95": 88,
-        "hook_duration_ms_p99": 97,
-        "pre_tool_hook_duration_ms_count": 678,
-        "pre_tool_hook_duration_ms_min": 43,
-        "pre_tool_hook_duration_ms_max": 115,
-        "pre_tool_hook_duration_ms_avg": 68.34808259587021,
-        "pre_tool_hook_duration_ms_p50": 67.5,
-        "pre_tool_hook_duration_ms_p95": 95,
-        "pre_tool_hook_duration_ms_p99": 103.23000000000002
+        "frame_duration_ms_count": 75961,
+        "frame_duration_ms_min": 0.10990600008517504,
+        "frame_duration_ms_max": 31.688205000013113,
+        "frame_duration_ms_avg": 1.4389158803872564,
+        "frame_duration_ms_p50": 1.2562315000686795,
+        "frame_duration_ms_p95": 2.5468656999757515,
+        "frame_duration_ms_p99": 7.713718129979657,
+        "hook_duration_ms_count": 510,
+        "hook_duration_ms_min": 0,
+        "hook_duration_ms_max": 186,
+        "hook_duration_ms_avg": 48.668627450980395,
+        "hook_duration_ms_p50": 51,
+        "hook_duration_ms_p95": 93.54999999999995,
+        "hook_duration_ms_p99": 108,
+        "pre_tool_hook_duration_ms_count": 246,
+        "pre_tool_hook_duration_ms_min": 2,
+        "pre_tool_hook_duration_ms_max": 138,
+        "pre_tool_hook_duration_ms_avg": 55.81707317073171,
+        "pre_tool_hook_duration_ms_p50": 63,
+        "pre_tool_hook_duration_ms_p95": 100,
+        "pre_tool_hook_duration_ms_p99": 111.10000000000002
       },
-      "hasCompletedProjectOnboarding": true
+      "hasCompletedProjectOnboarding": true,
+      "exampleFilesGeneratedAt": 1779767280982
     }
   },
   "officialMarketplaceAutoInstallAttempted": true,
   "officialMarketplaceAutoInstalled": true,
-  "changelogLastFetched": 1779518619444,
+  "changelogLastFetched": 1779767287001,
   "skillUsage": {
     "update-config": {
       "usageCount": 2,
@@ -591,8 +598,8 @@
       "lastUsedAt": 1779736550038
     },
     "superpowers": {
-      "usageCount": 14,
-      "lastUsedAt": 1779731303215
+      "usageCount": 17,
+      "lastUsedAt": 1779768534288
     },
     "chief-of-staff": {
       "usageCount": 1,
@@ -605,5 +612,10 @@
     "tengu_cedar_inlet"
   ],
   "closedIssuesLastChecked": 1779730222285,
-  "opus47LaunchSeenCount": 5
+  "opus47LaunchSeenCount": 5,
+  "githubRepoPaths": {
+    "frgops/wheeler-ecosystem": [
+      "/root"
+    ]
+  }
 }

@@ -98,12 +98,11 @@ if echo "$PROMPT" | grep -qiE '\b(build|code|implement|create|develop|make|write
     BUILD_INTENT="yes"
 fi
 
-ARMY_MODE="no"
-if [ "$TASK_SIZE" = "large" ] || [ "$TASK_SIZE" = "critical" ]; then
-    ARMY_MODE="yes"
-elif echo "$PROMPT" | grep -qiE '\b(army|agents|parallel|multi.agent|full.pipeline|autonomous|walk.away|expedite|all.*agents)\b'; then
-    ARMY_MODE="yes"
-fi
+# ═══════════════════════════════════════════════════════════════
+# ARMY MODE — ALWAYS ON for Wheeler Coding OS v2.0
+# Full agent fleet deploys on every prompt, every build, every session.
+# ═══════════════════════════════════════════════════════════════
+ARMY_MODE="yes"
 
 # ═══════════════════════════════════════════════════
 # PIPELINE DEPTH + REVIEW LEVEL
@@ -209,15 +208,13 @@ if [ "$ARMY_MODE" = "yes" ]; then
 "
 fi
 
-# ── Walk-Away ──
-if echo "$PROMPT" | grep -qiE '\b(walk.away|autonomous|auto.progress|continue.*build|in.my.sleep)\b'; then
-    BUILD_CONTEXT="$BUILD_CONTEXT
+# ── Walk-Away (ALWAYS ON for Wheeler Coding OS v2.0) ──
+BUILD_CONTEXT="$BUILD_CONTEXT
 
 🚀 WALK-AWAY MODE — builds to 100% without human input
   - All phases auto-progress (only pause at explicit human gates)
   - Report final scorecard when complete
 "
-fi
 
 # ── Human Gate ──
 if [ "$NEEDS_HUMAN" = "yes" ]; then
