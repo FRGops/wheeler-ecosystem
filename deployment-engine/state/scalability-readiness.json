@@ -1,0 +1,249 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "domain": "Scalability",
+  "current_score": 70,
+  "target_score": 85,
+  "status": "CANNOT PROCEED",
+  "assessment_date": "2026-05-26",
+  "auditor": "Claude Opus 4.7",
+  "policy": "Zero False Greens",
+
+  "current_state": {
+    "scaling_roadmap": {
+      "status": "Documented, content quality UNVERIFIED",
+      "score": 80,
+      "detail": "Scaling roadmap documents exist. Plans have been written but quality and completeness have not been independently validated."
+    },
+    "pm2_optimization": {
+      "status": "Plans documented, not executed",
+      "score": 75,
+      "detail": "PM2 optimization plans exist (cluster mode, instance counts, memory limits). None have been applied or tested."
+    },
+    "docker_optimization": {
+      "status": "Plans documented, not executed",
+      "score": 75,
+      "detail": "Docker optimization plans exist (resource limits, restart policies, log rotation). None have been applied or tested."
+    },
+    "postgresql_optimization": {
+      "status": "Plans documented, not executed",
+      "score": 70,
+      "detail": "PostgreSQL optimization plans exist (connection pooling, query optimization, indexing). None have been applied. Current connection pool limits, query performance, and index coverage are unknown."
+    },
+    "redis_optimization": {
+      "status": "Plans documented, not executed",
+      "score": 70,
+      "detail": "Redis optimization plans exist (maxmemory policy, persistence config, eviction strategy). Current Redis memory usage, hit ratio, and eviction behavior are unknown."
+    },
+    "load_testing": {
+      "status": "MAJOR GAP — zero load testing",
+      "score": 20,
+      "detail": "No load test has ever been executed against any Wheeler service. No baseline throughput, latency, or concurrency data exists. This is the single largest gap in the scalability domain."
+    },
+    "capacity_planning": {
+      "status": "No documented limits",
+      "score": 50,
+      "detail": "No verified capacity ceilings for: max concurrent PM2 processes, max Docker containers, max database connections, max API requests/sec, max WebSocket connections, max file descriptors per service."
+    },
+    "horizontal_scaling": {
+      "status": "Single-instance architecture",
+      "score": 40,
+      "detail": "All services run on a single AIOPS host. No load balancer configuration. No multi-instance capability. No service discovery mechanism for horizontal scaling."
+    },
+    "performance_baselines": {
+      "status": "MAJOR GAP — no baseline",
+      "score": 30,
+      "detail": "No baseline performance metrics exist for any service. Unknown: p50/p95/p99 latency, requests/second, error rates, resource consumption per request."
+    },
+    "auto_scaling": {
+      "status": "Not implemented",
+      "score": 0,
+      "detail": "No auto-scaling mechanisms of any kind. No horizontal pod autoscaling, no vertical scaling triggers, no load-based resource adjustment. Note: auto-scaling may not be needed at current scale — this is a documentation gap, not necessarily an implementation gap."
+    }
+  },
+
+  "known_resource_limits": {
+    "aioops_host": {
+      "cpu": "unknown (nproc output needed)",
+      "memory": "30Gi total, ~12Gi available at idle",
+      "disk": "338G total, 84G used (26%)",
+      "swap": "8Gi total, 2.3Gi in use (29%)",
+      "network": "Tailscale mesh, bandwidth unmeasured",
+      "open_files": "350k used / 1,048,576 limit (33%)"
+    },
+    "docker": {
+      "images": 56,
+      "containers_running": "~47",
+      "image_disk": "36GB"
+    },
+    "pm2": {
+      "processes": "~28 defined"
+    }
+  },
+
+  "load_test_plan": {
+    "phase_1_baseline": {
+      "description": "Establish performance baseline for all public/internal endpoints",
+      "tool": "wrk or ab (Apache Bench)",
+      "duration_seconds": 60,
+      "concurrency_levels": [1, 10, 50],
+      "targets": [
+        {"endpoint": "nginx :80/:443", "description": "Main web entry point"},
+        {"endpoint": "LiteLLM :4049", "description": "AI model proxy"},
+        {"endpoint": "war-room :8091", "description": "Incident dashboard"},
+        {"endpoint": "embedding-svc :8191", "description": "Vector embeddings"},
+        {"endpoint": "PM2 health endpoints", "description": "All PM2-managed services"}
+      ],
+      "metrics": ["requests/sec", "p50 latency", "p95 latency", "p99 latency", "error rate", "bytes transferred/sec"],
+      "output": ".ai/benchmarks/performance-baseline-{DATE}.md"
+    },
+    "phase_2_stress": {
+      "description": "Stress test at 2x, 5x, 10x baseline load",
+      "tool": "wrk with increasing concurrency",
+      "duration_seconds": 120,
+      "concurrency_levels": "2x, 5x, 10x of baseline max throughput concurrency",
+      "targets": "same as phase_1, prioritized by criticality",
+      "metrics": ["degradation point (first metric to breach SLA)", "breaking point (service failure)", "failure mode (graceful degradation vs hard crash)", "recovery time after load removal"],
+      "output": ".ai/benchmarks/load-test-results-{DATE}.md"
+    },
+    "phase_3_endurance": {
+      "description": "Sustained load test at 70% of breaking point",
+      "duration_minutes": 30,
+      "monitoring": ["memory leak detection", "connection pool exhaustion", "log growth rate", "disk I/O saturation"],
+      "output": ".ai/benchmarks/endurance-test-{DATE}.md"
+    }
+  },
+
+  "capacity_limits_to_define": [
+    {
+      "resource": "Max concurrent PM2 processes",
+      "rationale": "Memory/cpu ceiling per process type",
+      "current_guess": "unknown"
+    },
+    {
+      "resource": "Max Docker containers",
+      "rationale": "Disk, memory, PID namespace limits",
+      "current_guess": "~100 based on 30Gi RAM"
+    },
+    {
+      "resource": "Max PostgreSQL connections",
+      "rationale": "Connection pool sizing",
+      "current_guess": "100 (default PostgreSQL)"
+    },
+    {
+      "resource": "Max Redis connections",
+      "rationale": "Redis is single-threaded",
+      "current_guess": "10000 (default Redis)"
+    },
+    {
+      "resource": "Max API requests/second",
+      "rationale": "nginx + upstream capacity",
+      "current_guess": "unknown — needs baseline"
+    },
+    {
+      "resource": "Max WebSocket connections",
+      "rationale": "Real-time services",
+      "current_guess": "unknown — needs baseline"
+    }
+  ],
+
+  "scaling_triggers": {
+    "cpu": {
+      "threshold": "Sustained >70% for 10 minutes",
+      "action": "Evaluate PM2 instance scaling or service offloading"
+    },
+    "memory": {
+      "threshold": "Available <20% of total (>80% used)",
+      "action": "Identify memory leak, increase swap, or add RAM"
+    },
+    "disk": {
+      "threshold": "Usage >80%",
+      "action": "Log rotation, Docker cleanup, or disk expansion"
+    },
+    "response_time": {
+      "threshold": "p95 latency >2x baseline for 5 minutes",
+      "action": "Investigate bottleneck, consider scaling"
+    },
+    "error_rate": {
+      "threshold": ">1% error rate for 5 minutes",
+      "action": "Investigate and potentially rollback recent deploy"
+    }
+  },
+
+  "scaling_milestones": [
+    {
+      "milestone": "M1: Baseline established",
+      "description": "Performance baseline documented for all public endpoints",
+      "target_date": "Within 7 days",
+      "score_impact": "+5 (30 -> 35 on baselines)"
+    },
+    {
+      "milestone": "M2: Load test at 5x",
+      "description": "Load test completed at 5x baseline, bottlenecks identified",
+      "target_date": "Within 14 days",
+      "score_impact": "+8 (20 -> 28 on load testing)"
+    },
+    {
+      "milestone": "M3: Capacity limits defined",
+      "description": "All capacity ceilings documented with rationale",
+      "target_date": "Within 14 days",
+      "score_impact": "+8 (50 -> 58 on capacity planning)"
+    },
+    {
+      "milestone": "M4: Optimization executed",
+      "description": "Top 3 optimization actions from plans executed and measured",
+      "target_date": "Within 21 days",
+      "score_impact": "+10 (70-75 -> 80-85 on each optimization)"
+    },
+    {
+      "milestone": "M5: Multi-instance assessment",
+      "description": "Horizontal scaling feasibility documented for each service",
+      "target_date": "Within 30 days",
+      "score_impact": "+10 (40 -> 50 on horizontal scaling)"
+    }
+  ],
+
+  "remediation_pathway": {
+    "phase_1_measure": {
+      "actions": [
+        "Run baseline performance tests (wrk or ab) against all public endpoints",
+        "Document: requests/sec, p50/p95/p99 latency, error rate",
+        "Record resource consumption at baseline (CPU, memory, disk I/O)"
+      ],
+      "estimated_hours": 4,
+      "target_score_after": 74
+    },
+    "phase_2_load_test": {
+      "actions": [
+        "Execute 2x load test, identify first bottleneck",
+        "Execute 5x load test, identify breaking point",
+        "Document failure mode (graceful vs hard crash)",
+        "Define capacity limits based on test results"
+      ],
+      "estimated_hours": 8,
+      "target_score_after": 80
+    },
+    "phase_3_optimize": {
+      "actions": [
+        "Apply top 3 optimization actions from existing plans",
+        "Re-measure after each optimization",
+        "Document horizontal scaling feasibility per service",
+        "Conduct endurance test (30 min sustained load)"
+      ],
+      "estimated_hours": 12,
+      "target_score_after": 86
+    }
+  },
+
+  "projected_scores": {
+    "after_phase_1": 74,
+    "after_phase_2": 80,
+    "after_phase_3": 86,
+    "maximum_achievable": 92,
+    "maximum_blocked_by": "Full scalability proof requires sustained production traffic patterns, canary deployments under load, and multi-instance architecture — all of which require the ecosystem to be live first. Scalability is inherently validated in production."
+  },
+
+  "risk_assessment": {
+    "scaling_risk": "MEDIUM (latent)",
+    "detail": "At current scale (single host, moderate load), the system is stable. The risk is latent: without baselines and load testing, we do not know where the breaking point is. This means the system could fail unexpectedly under load with no advance warning. Priority: establish baselines immediately, load test within 14 days."
+  }
+}

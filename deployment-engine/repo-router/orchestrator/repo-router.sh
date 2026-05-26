@@ -93,12 +93,13 @@ load_state() {
 save_state() {
   local tmp_state
   tmp_state=$(mktemp)
-  local completed_count completed_runs blocked_count blocked_entries
+  local completed_count completed_runs blocked_count blocked_entries repo_profiles
 
   completed_count=$(jq '.completed_runs.total_completed // 0' "$REPO_ROUTER_STATE" 2>/dev/null || echo 0)
   completed_runs=$(jq '.completed_runs.last_10 // []' "$REPO_ROUTER_STATE" 2>/dev/null || echo "[]")
   blocked_count=$(jq '.blocked_repos.total_blocked // 0' "$REPO_ROUTER_STATE" 2>/dev/null || echo 0)
   blocked_entries=$(jq '.blocked_repos.entries // []' "$REPO_ROUTER_STATE" 2>/dev/null || echo "[]")
+  repo_profiles=$(jq '.repo_profiles // {}' "$REPO_ROUTER_STATE" 2>/dev/null || echo "{}")
 
   jq -n \
     --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
@@ -108,6 +109,7 @@ save_state() {
     --argjson completed_runs "$completed_runs" \
     --argjson blocked_count "$blocked_count" \
     --argjson blocked_entries "$blocked_entries" \
+    --argjson repo_profiles "$repo_profiles" \
     '{
       metadata: {
         schema_version: "1.0.0",
@@ -119,7 +121,8 @@ save_state() {
         node: $node,
         mode: "active",
         last_drift_check: null,
-        last_dashboard_update: $ts
+        last_dashboard_update: $ts,
+        last_verification: $ts
       },
       active_runs: {
         total_active: 0,
@@ -132,7 +135,8 @@ save_state() {
       blocked_repos: {
         total_blocked: $blocked_count,
         entries: $blocked_entries
-      }
+      },
+      repo_profiles: $repo_profiles
     }' > "$tmp_state"
 
   mv "$tmp_state" "$REPO_ROUTER_STATE"
@@ -1225,23 +1229,37 @@ phase_13_register() {
 phase_14_finalize() {
   log_message "INFO" "Finalizing pipeline..."
 
-  # Verify all phases passed
+  # Verify all prior phases passed (skip phase 14 — it is currently executing)
   local all_passed=true
+  local phases_completed=0
   for phase in "${PHASE_LABELS[@]}"; do
+    if [[ "$phase" == "14_finalize" ]]; then
+      continue  # Skip current phase — phase 14 is still "running" during its own execution
+    fi
     if [[ "${PHASE_STATUS[$phase]}" != "passed" ]]; then
       all_passed=false
       log_message "WARN" "  Phase ${phase}: ${PHASE_STATUS[$phase]}"
+    else
+      phases_completed=$((phases_completed + 1))
     fi
   done
 
   if [[ "$all_passed" == "true" ]]; then
-    log_message "PASS" "All ${TOTAL_PHASES} phases completed successfully."
+    log_message "PASS" "Pipeline complete: ${phases_completed}/13 prior phases passed — all green."
   else
-    log_message "WARN" "Pipeline completed with some phases not marked as passed."
+    log_message "WARN" "Pipeline completed with failures: only ${phases_completed}/13 prior phases passed."
   fi
 
   # Update metrics
   local duration_seconds=$(( $(date +%s) - $(date -d "${RUN_STARTED}" +%s 2>/dev/null || date +%s) ))
+
+  # Build phases_status JSON for the run record
+  local phases_json="{}"
+  for phase in "${PHASE_LABELS[@]}"; do
+    phases_json=$(echo "$phases_json" | jq --arg p "$phase" --arg s "${PHASE_STATUS[$phase]}" '. + {($p): $s}')
+  done
+  local verified_at
+  verified_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
   # Save completed run to state
   local tmp_list
@@ -1251,11 +1269,14 @@ phase_14_finalize() {
   echo "$existing_list" | jq \
     --arg id "$RUN_ID" \
     --arg repo "$CURRENT_REPO" \
-    --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    --arg ts "$verified_at" \
     --arg started "$RUN_STARTED" \
     --argjson duration "$duration_seconds" \
     --arg result "$(if [[ "$all_passed" == "true" ]]; then echo "success"; else echo "partial"; fi)" \
-    '.[:9] | [{ run_id: $id, repo: $repo, completed_at: $ts, started_at: $started, duration_seconds: $duration, result: $result }] + .' \
+    --argjson phases_completed "$phases_completed" \
+    --argjson phases_status "$phases_json" \
+    --arg verified_at "$verified_at" \
+    '.[:9] | [{ run_id: $id, repo: $repo, completed_at: $ts, started_at: $started, duration_seconds: $duration, result: $result, phases_completed: $phases_completed, phases_status: $phases_status, verified_at: $verified_at }] + .' \
     > "$tmp_list"
 
   local existing_completed

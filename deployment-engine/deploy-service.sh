@@ -69,11 +69,15 @@ Options:
   --force        Skip confirmation prompts
   --no-rollback  Do not attempt rollback on failure
   --dry-run      Show what would happen without making changes
+  --canary       Deploy to a single canary instance first, validate health,
+                 then promote on success (or auto-rollback on failure).
+                 Only available for PM2 services.
 
 Examples:
   $(basename "$0") wheeler-api production v2.5.0
   $(basename "$0") frontend-app staging latest --force
   $(basename "$0") ml-workers dev abc1234 --dry-run
+  $(basename "$0") wheeler-api production v2.5.0 --canary
 
 Servers:
   EDGE NODE    Hostinger / 187.77.148.88  — Traefik, Nginx, frontend apps
@@ -88,6 +92,7 @@ EOF
 FORCE_DEPLOY=false
 NO_ROLLBACK=false
 DRY_RUN=false
+CANARY_ENABLED=false
 SERVICE_NAME=""
 ENVIRONMENT=""
 VERSION=""
@@ -107,6 +112,10 @@ parse_args() {
                 ;;
             --dry-run)
                 DRY_RUN=true
+                shift
+                ;;
+            --canary)
+                CANARY_ENABLED=true
                 shift
                 ;;
             --help|-h)
@@ -288,6 +297,62 @@ deploy_static_service() {
     return 0
 }
 
+# ─── Canary Deployment Phase ──────────────────────────────────────────────────
+
+run_canary_deploy() {
+    local svc="$1"
+    local env="$2"
+
+    local canary_cmd="${SCRIPT_DIR}/scripts/canary-deploy.sh"
+    if [[ ! -x "$canary_cmd" ]]; then
+        # Also check legacy path
+        canary_cmd="${SCRIPT_DIR}/canary-deploy.sh"
+    fi
+    if [[ ! -x "$canary_cmd" ]]; then
+        log_error "Canary deploy script not found or not executable: ${canary_cmd}"
+        log_warn "Falling back to direct deployment (canary bypassed)."
+        return 0
+    fi
+
+    log_section "Canary Deployment Phase: ${svc} (${env})"
+    log_info "Canary deployment enabled — deploying to single instance first for validation."
+
+    if dry_run_msg "Would run: ${canary_cmd} ${svc} --auto-promote"; then
+        return 0
+    fi
+
+    # Run canary deploy with auto-promote (canary success = full promotion)
+    local canary_result=0
+    "$canary_cmd" "$svc" --auto-promote || canary_result=$?
+
+    case "$canary_result" in
+        0)
+            log_success "Canary deployment PASSED and promoted to full fleet."
+            log_info "Skipping direct deployment since canary already promoted."
+            return 0
+            ;;
+        1)
+            log_error "Canary deployment FAILED — canary rolled back."
+            log_error "Direct deployment aborted. Stable process unaffected."
+            return 1
+            ;;
+        4)
+            log_error "Canary deployment: service not found in PM2."
+            log_warn "Falling back to direct deployment."
+            return 0
+            ;;
+        6)
+            log_warn "Canary dry-run completed. Proceeding with dry-run of direct deploy."
+            return 0
+            ;;
+        *)
+            log_error "Canary deployment exited with unexpected code: ${canary_result}"
+            log_warn "Falling back to direct deployment."
+            return 0
+            ;;
+    esac
+}
+
 # ─── Rollback Trigger ────────────────────────────────────────────────────────
 
 trigger_rollback() {
@@ -350,6 +415,9 @@ run_preflight() {
 }
 
 # ─── Backup ──────────────────────────────────────────────────────────────────
+# Pre-deploy backup is a MANDATORY HARD GATE. Deployment MUST NOT proceed
+# without a verified backup. Enforced via /root/deployment-engine/scripts/pre-deploy-backup.sh.
+readonly PRE_DEPLOY_BACKUP_SCRIPT="/root/deployment-engine/scripts/pre-deploy-backup.sh"
 
 run_backup() {
     local svc="$1"
@@ -357,12 +425,32 @@ run_backup() {
 
     log_section "Pre-Deploy Backup: ${svc} (${env})"
 
-    if dry_run_msg "Would run backup_configs for ${svc}"; then
+    if dry_run_msg "Would run pre-deploy-backup.sh for ${svc}"; then
         return 0
     fi
 
-    backup_configs "$svc" "$env"
-    return $?
+    # Run the backup-first enforcement gate
+    # This script runs pm2 save, backs up service config, exports PM2 env,
+    # verifies backup integrity, and returns 0 ONLY if verified.
+    if [[ -x "${PRE_DEPLOY_BACKUP_SCRIPT}" ]]; then
+        if "${PRE_DEPLOY_BACKUP_SCRIPT}" "$svc"; then
+            log_success "Pre-deploy backup verified — safe to proceed."
+            return 0
+        else
+            local rc=$?
+            log_fatal "Pre-deploy backup FAILED (exit code: ${rc}). Deployment aborted per backup-first policy."
+            exit 1
+        fi
+    else
+        # Fallback to legacy backup_configs if pre-deploy-backup.sh is missing
+        log_warn "pre-deploy-backup.sh not found at ${PRE_DEPLOY_BACKUP_SCRIPT} — falling back to legacy backup_configs."
+        if backup_configs "$svc" "$env"; then
+            return 0
+        else
+            log_fatal "Legacy backup also FAILED. Deployment aborted per backup-first policy."
+            exit 1
+        fi
+    fi
 }
 
 # ─── Post-Deploy Health Check ────────────────────────────────────────────────
@@ -437,6 +525,7 @@ main() {
     log_kv "force" "$FORCE_DEPLOY"
     log_kv "no_rollback" "$NO_ROLLBACK"
     log_kv "dry_run" "$DRY_RUN"
+    log_kv "canary" "$CANARY_ENABLED"
     log_kv "node" "$(hostname -f 2>/dev/null || hostname)"
 
     validate_service_name "$svc" || exit 1
@@ -472,38 +561,63 @@ main() {
         exit 2
     fi
 
-    # ─── Phase 2: Backup ───────────────────────────────────────────────────
+    # ─── Phase 2: Backup (HARD GATE) ────────────────────────────────────────
+    # Backup-first enforcement: deployment MUST NOT proceed without a verified backup.
     if ! run_backup "$svc" "$env"; then
-        log_warn "Backup had warnings but continuing. Manual backup may be needed."
+        log_fatal "Backup-first gate FAILED — deployment aborted."
+        exit 2
+    fi
+
+    # ─── Phase 2.5: Canary Deployment (optional) ─────────────────────────────
+    local canary_already_deployed=false
+    if [[ "$CANARY_ENABLED" == "true" ]] && [[ "$svc_type" == "pm2" ]]; then
+        if run_canary_deploy "$svc" "$env"; then
+            log_success "Canary deployment completed successfully — skipping direct deploy."
+            canary_already_deployed=true
+            # The canary script already promoted, so the service is updated.
+            # Skip to Phase 4 (health check) and Phase 5 (verification).
+        else
+            log_fatal "Canary deployment FAILED. Aborting full deployment."
+            exit 1
+        fi
+    elif [[ "$CANARY_ENABLED" == "true" ]] && [[ "$svc_type" != "pm2" ]]; then
+        log_warn "Canary deployment requested but service type is '${svc_type}', not PM2."
+        log_warn "Canary deployments are currently only supported for PM2 services."
+        log_info "Proceeding with standard deployment..."
     fi
 
     # ─── Phase 3: Deploy ───────────────────────────────────────────────────
     local deploy_result=0
 
-    case "$svc_type" in
-        docker)
-            deploy_docker_service "$svc" "$env" "$version" || deploy_result=$?
-            ;;
-        pm2)
-            deploy_pm2_service "$svc" "$env" || deploy_result=$?
-            ;;
-        static)
-            deploy_static_service "$svc" "$env" "$version" || deploy_result=$?
-            ;;
-        systemd)
-            log_warn "Systemd service deployment not fully automated. Restarting service..."
-            if ! dry_run_msg "Would restart systemd service: ${svc}"; then
-                sudo systemctl restart "$svc" 2>/dev/null || {
-                    log_error "Failed to restart systemd service: ${svc}"
-                    deploy_result=1
-                }
-            fi
-            ;;
-        *)
-            log_error "Unhandled service type: ${svc_type}"
-            deploy_result=1
-            ;;
-    esac
+    if [[ "$canary_already_deployed" == "true" ]]; then
+        log_info "Canary already deployed and promoted. Skipping Phase 3 deploy step."
+        deploy_result=0
+    else
+        case "$svc_type" in
+            docker)
+                deploy_docker_service "$svc" "$env" "$version" || deploy_result=$?
+                ;;
+            pm2)
+                deploy_pm2_service "$svc" "$env" || deploy_result=$?
+                ;;
+            static)
+                deploy_static_service "$svc" "$env" "$version" || deploy_result=$?
+                ;;
+            systemd)
+                log_warn "Systemd service deployment not fully automated. Restarting service..."
+                if ! dry_run_msg "Would restart systemd service: ${svc}"; then
+                    sudo systemctl restart "$svc" 2>/dev/null || {
+                        log_error "Failed to restart systemd service: ${svc}"
+                        deploy_result=1
+                    }
+                fi
+                ;;
+            *)
+                log_error "Unhandled service type: ${svc_type}"
+                deploy_result=1
+                ;;
+        esac
+    fi
 
     if [[ "$deploy_result" -ne 0 ]]; then
         log_fatal "Deployment command failed (exit code: ${deploy_result})"

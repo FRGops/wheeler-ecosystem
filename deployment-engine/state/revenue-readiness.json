@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "domain": "Revenue Systems",
+  "current_score": 76,
+  "target_score": 85,
+  "status": "CANNOT PROCEED",
+  "assessment_date": "2026-05-26",
+  "auditor": "Claude Opus 4.7",
+  "policy": "Zero False Greens",
+
+  "current_state": {
+    "monetization_products": {
+      "status": "Defined, not verified live",
+      "score": 85,
+      "detail": "10 products documented in architecture. Live operational status is UNVERIFIED — no recent transaction data, no revenue flow confirmation."
+    },
+    "stripe_integration": {
+      "status": "Configured, not tested end-to-end",
+      "score": 85,
+      "detail": "Stripe integration configuration verified. No live transaction test has been executed. Webhook delivery unverified."
+    },
+    "crm_workflows": {
+      "status": "CRITICAL — LeadIngestion fetch failing",
+      "score": 40,
+      "detail": "FRGCRM LeadIngestion API fetch returns errors. Root cause appears to be EDGE connectivity failure (server unreachable from AIOPS). Blocks lead-to-revenue pipeline."
+    },
+    "edge_frgcrm": {
+      "status": "CRITICAL — :8082 unreachable from AIOPS",
+      "score": 30,
+      "detail": "FRGCRM service on EDGE node is unreachable from AIOPS via Tailscale. Causes: possible UFW block on EDGE, FRGCRM not bound to tailscale0, or service not running."
+    },
+    "payment_processing": {
+      "status": "UNVERIFIED — no end-to-end test",
+      "score": 60,
+      "detail": "No verified payment flow: charge -> webhook -> CRM update -> fulfillment. No test transaction ID on record."
+    },
+    "revenue_reporting": {
+      "status": "UNVERIFIED — no live dashboard",
+      "score": 65,
+      "detail": "Revenue dashboards documented but not independently verified to show live data. No revenue data flow confirmation."
+    },
+    "subscription_management": {
+      "status": "UNVERIFIED — no lifecycle test",
+      "score": 60,
+      "detail": "Subscription create/upgrade/downgrade/cancel/reactivate lifecycle not tested end-to-end."
+    },
+    "revenue_rollback": {
+      "status": "Plan documented, not tested",
+      "score": 85,
+      "detail": "Revenue rollback plan exists. No rollback drill has been executed. Plan quality is good but untested."
+    },
+    "financial_os_agents": {
+      "status": "Deployed, not verified live",
+      "score": 90,
+      "detail": "39 financial agents deployed per memory records. Live reachability and response health of these agents is UNVERIFIED."
+    }
+  },
+
+  "blockers": [
+    {
+      "id": "REV-BLK-001",
+      "severity": "CRITICAL",
+      "title": "FRGCRM LeadIngestion fetch failure",
+      "current_score_impact": -60,
+      "domain_impact": "Blocks lead-to-revenue pipeline entirely",
+      "estimated_fix_hours": 2,
+      "remediation": "Investigate fetch failure root cause. Likely depends on REV-BLK-002 (EDGE connectivity). Check FRGCRM service status, API endpoint, authentication."
+    },
+    {
+      "id": "REV-BLK-002",
+      "severity": "CRITICAL",
+      "title": "EDGE FRGCRM :8082 connectivity failure",
+      "current_score_impact": -70,
+      "domain_impact": "Blocks all EDGE revenue operations",
+      "estimated_fix_hours": 2,
+      "depends_on": "SSH key deployment to EDGE (infrastructure blocker)",
+      "remediation": "1) Deploy SSH key to EDGE. 2) SSH to EDGE: verify FRGCRM is running. 3) Check Tailscale ACLs allow AIOPS->EDGE on :8082. 4) Verify FRGCRM binds to tailscale0. 5) Test: curl EDGE-TAILSCALE-IP:8082/health"
+    }
+  ],
+
+  "gaps": [
+    {
+      "id": "REV-GAP-001",
+      "priority": "HIGH",
+      "title": "End-to-end payment transaction test",
+      "current_score_impact": -40,
+      "estimated_effort_hours": 2,
+      "test_plan": "Execute test charge through Stripe -> verify webhook fires -> verify CRM LeadIngestion captures -> verify dashboard updates -> void/refund test charge"
+    },
+    {
+      "id": "REV-GAP-002",
+      "priority": "HIGH",
+      "title": "Revenue dashboard live verification",
+      "current_score_impact": -35,
+      "estimated_effort_hours": 4,
+      "test_plan": "Verify live revenue data flows to Grafana/command-center dashboard. If dashboard does not exist, create minimum viable revenue dashboard with: MRR, transaction count, churn rate, revenue by product."
+    },
+    {
+      "id": "REV-GAP-003",
+      "priority": "MEDIUM",
+      "title": "Subscription lifecycle test",
+      "current_score_impact": -40,
+      "estimated_effort_hours": 3,
+      "test_plan": "Test full subscription lifecycle: create -> upgrade -> downgrade -> cancel -> reactivate. Verify each state transition triggers correct CRM workflow and Stripe reflects correct state."
+    },
+    {
+      "id": "REV-GAP-004",
+      "priority": "MEDIUM",
+      "title": "Financial OS agent live verification",
+      "current_score_impact": -10,
+      "estimated_effort_hours": 1,
+      "test_plan": "Verify 39 financial agents are reachable. Check agent health endpoints. Verify agent routing is functional."
+    }
+  ],
+
+  "remediation_pathway": {
+    "phase_1_critical_path": {
+      "actions": [
+        "Deploy SSH key to EDGE (shared with Infrastructure remediation)",
+        "SSH to EDGE: verify FRGCRM service status",
+        "Fix FRGCRM connectivity from AIOPS to EDGE:8082",
+        "Fix FRGCRM LeadIngestion fetch"
+      ],
+      "estimated_hours": 4,
+      "target_score_after": 82
+    },
+    "phase_2_verification": {
+      "actions": [
+        "Execute end-to-end payment test transaction",
+        "Verify revenue dashboard shows live data",
+        "Test subscription lifecycle",
+        "Verify financial OS agent health"
+      ],
+      "estimated_hours": 10,
+      "target_score_after": 88
+    },
+    "phase_3_validation": {
+      "actions": [
+        "Execute revenue rollback drill",
+        "Conduct full revenue path audit (lead -> payment -> fulfillment -> reporting)",
+        "Document revenue system runbook"
+      ],
+      "estimated_hours": 8,
+      "target_score_after": 93
+    }
+  },
+
+  "projected_scores": {
+    "after_phase_1": 82,
+    "after_phase_2": 88,
+    "after_phase_3": 93,
+    "maximum_achievable": 95,
+    "maximum_blocked_by": "Production transaction verification carries inherent risk. Full 95+ requires sustained live revenue operations with verifiable uptime and transaction history."
+  },
+
+  "risk_assessment": {
+    "revenue_loss_risk": "HIGH",
+    "detail": "With FRGCRM connectivity broken, any leads generated cannot be ingested into the CRM pipeline. This means all demand generation efforts (SEO, content, ads) have zero revenue capture capability. This is the single most financially damaging blocker in the Wheeler ecosystem."
+  }
+}

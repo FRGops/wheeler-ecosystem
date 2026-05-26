@@ -1,3 +1,5 @@
+**SUPERSEDED by QA_SCORECARD_20260526.md (83/100 B+, 85-process fleet) as of 2026-05-26 19:55 UTC. This scorecard covered 17-29 processes and is retained for historical reference only.**
+
 # STAGE2 QA SCORECARD — 100/100 A+
 **Date:** 2026-05-24 06:55 UTC
 **Auditor:** Wheeler Enforcement + QA Validation Agent

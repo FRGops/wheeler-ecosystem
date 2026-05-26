@@ -457,7 +457,7 @@ module.exports = {
         PROMETHEUS_URL: 'http://127.0.0.1:9090',
         GRAFANA_URL: 'http://127.0.0.1:3002',
         SUPERSET_URL: 'http://127.0.0.1:8088',
-        NE04J_URL: 'bolt://127.0.0.1:7687',
+        NEO4J_URL: 'bolt://127.0.0.1:7687',
         JWT_SECRET: '${EXEC_DASH_JWT_SECRET}',
         LOG_LEVEL: 'info',
       },

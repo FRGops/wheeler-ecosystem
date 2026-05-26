@@ -365,20 +365,20 @@ module.exports = {
       // ── Environment — Production ────────────────────────────────────────
       env: {
         LITELLM_LOG: 'INFO',
-        LITELLM_MASTER_KEY: process.env.LITELLM_MASTER_KEY || '',
+        LITELLM_MASTER_KEY: "${LITELLM_MASTER_KEY}",
         // API keys for upstream providers (OpenAI, Anthropic, etc.) are
         // injected by the host environment.  The config.yaml references them
         // via os.environ[...] syntax.
-        OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
-        ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || '',
+        OPENAI_API_KEY: "${OPENAI_API_KEY}",
+        ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY}",
       },
 
       // ── Environment — Staging ───────────────────────────────────────────
       env_staging: {
         LITELLM_LOG: 'DEBUG',
-        LITELLM_MASTER_KEY: process.env.LITELLM_MASTER_KEY || '',
-        OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
-        ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || '',
+        LITELLM_MASTER_KEY: "${LITELLM_MASTER_KEY}",
+        OPENAI_API_KEY: "${OPENAI_API_KEY}",
+        ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY}",
       }
     }
   ],

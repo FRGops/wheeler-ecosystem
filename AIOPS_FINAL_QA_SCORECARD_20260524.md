@@ -1,3 +1,5 @@
+**SUPERSEDED by QA_SCORECARD_20260526.md (83/100 B+, 85-process fleet) as of 2026-05-26 19:55 UTC. This scorecard covered 19 processes and is retained for historical reference only.**
+
 # Wheeler Autonomous AI Ops — Final QA Scorecard
 **Date:** 2026-05-24  
 **Auditor:** Agent Army (7 specialized agents + zero-false-green verification + 4 remediation rounds)  
