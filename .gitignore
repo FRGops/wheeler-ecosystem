@@ -52,3 +52,8 @@
 .semgrep/
 .ai/repo-drop-zone.txt
 .ai/repo-processed.txt
+
+# SSH keys and PM2 state (never commit)
+.ssh/
+.pm2/
+backups/
