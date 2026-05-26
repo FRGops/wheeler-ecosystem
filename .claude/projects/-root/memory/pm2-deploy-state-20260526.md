@@ -1,6 +1,6 @@
 ---
 name: pm2-deploy-state-20260526
-description: "Canonical 28-process PM2 baseline — 28/28 online, 0 restarts, full ecosystem healthy (2026-05-26)"
+description: "Canonical 28-process PM2 baseline — 28/28 online, 0 restarts, resurrect chain verified, pm2-logrotate configured (2026-05-26)"
 metadata: 
   node_type: memory
   type: project
@@ -9,7 +9,7 @@ metadata:
 
 # PM2 Deploy State — 2026-05-26
 
-**28/28 online, 0 restarts, 0 secret leaks, 0 :latest images**
+**28/28 online, 0 restarts, 0 secret leaks, 0 :latest images, 20/20 health**
 
 Supersedes [[pm2-deploy-state-20260525]] (was 27/27).
 
@@ -32,7 +32,7 @@ Supersedes [[pm2-deploy-state-20260525]] (was 27/27).
 | litellm | 356MB | healthy (:4049) |
 | openclaw-dashboard | 61MB | healthy |
 | paperless-agent-svc | 109MB | healthy |
-| pm2-logrotate | 82MB | healthy |
+| pm2-logrotate | 82MB | healthy (module, config: 10M/30retain/compress/midnight) |
 | prediction-radar-agent-svc | 111MB | healthy |
 | ravyn-agent-svc | 108MB | healthy |
 | repo-engine | 3MB | healthy |
@@ -48,10 +48,18 @@ Supersedes [[pm2-deploy-state-20260525]] (was 27/27).
 
 ## Docker
 
-44 containers, all healthy (prediction-radar-app-db-backup-1 fixed via listen_addresses=* + restart)
+44 containers: 42 healthy, 2 no-healthcheck (fincept + crowdsec, both running fine)
+
+## Resurrect Chain (survives reboot)
+
+- pm2-root systemd: **enabled** (boots on system start)
+- dump.pm2: 27 processes saved (pm2-logrotate is a PM2 module, persists separately)
+- pm2-logrotate module: configured (10M max, retain 30, compress, rotate at midnight)
 
 ## Verified
 
 - /slay audit: 20/20 health, 0 secret leaks, 0 :latest, network clean
 - Functional healthcheck: 20/20 passed
 - All critical endpoints responding
+- PM2 resurrect tested: processes restore from dump.pm2
+- Disk: 75G/338G (23%)
