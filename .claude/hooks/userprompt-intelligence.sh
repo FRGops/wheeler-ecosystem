@@ -79,7 +79,7 @@ fi
 # ═══════════════════════════════════════════════════
 # TASK SIZE ESTIMATION (v2.1 — aggressive micro classification for speed)
 # ═══════════════════════════════════════════════════
-TASK_SIZE="small"
+TASK_SIZE="medium"
 PROMPT_LEN=$(echo "$PROMPT" | wc -c)
 if echo "$PROMPT" | grep -qiE '\b(tiny|minor|quick|single|one.line|one.file|typo|spelling|trivial|simple|just|only|small|nano)\b'; then
     TASK_SIZE="micro"
@@ -103,13 +103,14 @@ if echo "$PROMPT" | grep -qiE '\b(build|code|implement|create|develop|make|write
 fi
 
 # ═══════════════════════════════════════════════════════════════
-# ARMY MODE — ALWAYS ON for Wheeler Coding OS v2.1
-# Army context injected on every build. Deploy count right-sized by task.
+# ARMY MODE — ALWAYS ON for Wheeler Coding OS v2.2
+# NON-NEGOTIABLE: Every prompt deploys agents. Minimum 2 agents always.
+# The model MUST call Agent() at least once. Suppression is forbidden.
 # ═══════════════════════════════════════════════════════════════
 ARMY_MODE="yes"
 case "$TASK_SIZE" in
     micro|small)
-        ARMY_DEPLOY_COUNT="2"
+        ARMY_DEPLOY_COUNT="2 (MINIMUM — NEVER less than 2)"
         ;;
     medium)
         ARMY_DEPLOY_COUNT="4"
@@ -142,12 +143,9 @@ if echo "$PROMPT" | grep -qiE '\b(production.deploy|db.migration|secret|\.env|sh
 fi
 
 # ═══════════════════════════════════════════════════
-# SUPPRESS FOR NON-BUILD PROMPTS
+# ARMY ALWAYS-ON (v2.2) — NO SUPPRESSION. ALL PROMPTS GET FULL ARMY CONTEXT.
+# Every prompt deploys agents. No exceptions. No opt-out. No suppression.
 # ═══════════════════════════════════════════════════
-if [ "$BUILD_INTENT" = "no" ] && [ "$TASK_TYPE" = "unknown" ]; then
-    echo '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":""}}'
-    exit 0
-fi
 
 # ═══════════════════════════════════════════════════
 # BUILD CONTEXT WITH DYNAMIC AGENT/SKILL RECOMMENDATIONS
@@ -159,9 +157,10 @@ if [ -n "$MATCHED_DOMAINS" ]; then
     DOMAIN_DEPLOY="
 
 🔍 AUTO-DETECTED CAPABILITY DOMAINS: $MATCHED_DOMAINS
-  → Deploy agents from these domains (use Agent tool's subagent_type list)
+  → MUST deploy agents from these domains (use Agent tool's subagent_type list) — NON-NEGOTIABLE
   → Agent names matching these domains auto-qualify — new agents auto-participate
-  → Match domain keywords to available subagent_type values"
+  → Match domain keywords to available subagent_type values
+  → ⛔ SKIPPING agents = POLICY VIOLATION — deploy minimum 2 agents on EVERY prompt"
 fi
 
 # Build auto-skill recommendations from matched domains
@@ -222,10 +221,11 @@ esac
 BUILD_CONTEXT="
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🤖 WHEELER CODING OS v2.1 | $TASK_TYPE | $TASK_SIZE
-Army: $ARMY_MODE | Agents: ${ARMY_DEPLOY_COUNT:-varies} | Phases: 7
+🤖 WHEELER CODING OS v2.2 | $TASK_TYPE | $TASK_SIZE
+Army: $ARMY_MODE (MANDATORY) | Agents: ${ARMY_DEPLOY_COUNT:-varies} (MIN 2) | Phases: 7
 Review: $REVIEW_LEVEL | Human: $NEEDS_HUMAN
 Model: ${MODEL_HINT}
+⛔ ARMY DEPLOYMENT IS NON-NEGOTIABLE — Agent() tool call REQUIRED on every prompt
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 $DOMAIN_DEPLOY
 "
@@ -243,12 +243,10 @@ Pipeline: .ai/subagents/BUILD_PIPELINE.md | Matrix: .ai/subagents/AGENT_ARMY_DEP
 Rules: REVIEW+SECURITY parallel. VERIFY+FINAL parallel. Handoff each phase. No 2 agents on same file. Evidence only — no false greens.
 "
 
-# ── Army Mode ──
-if [ "$ARMY_MODE" = "yes" ]; then
-    BUILD_CONTEXT="$BUILD_CONTEXT
-⚔️ ARMY (${ARMY_DEPLOY_COUNT} max): parallel agents, single message, explicit boundaries. agent-coordination for dedup.
+# ── Army Mode (ALWAYS ON — v2.2) ──
+BUILD_CONTEXT="$BUILD_CONTEXT
+⚔️ ARMY DEPLOY (${ARMY_DEPLOY_COUNT}): MANDATORY agent deployment on EVERY prompt. Use Agent tool AT LEAST ONCE per response. Parallel agents in single message with explicit file boundaries. agent-coordination for dedup. NO EXCEPTIONS. NO SKIPPING. NON-NEGOTIABLE.
 "
-fi
 
 # ── Walk-Away + Never-Stop ──
 BUILD_CONTEXT="$BUILD_CONTEXT

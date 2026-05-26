@@ -475,10 +475,19 @@ async def vector_search(req: VectorSearchRequest):
 @app.get("/api/v1/intelligence/qdrant/health")
 async def qdrant_health():
     """Check Qdrant health on COREDB."""
-    info = _qdrant("GET", "/readyz")
+    try:
+        import urllib.request
+        req = urllib.request.Request(f"{QDRANT_URL}/readyz")
+        req.add_header("api-key", QDRANT_API_KEY)
+        resp = urllib.request.urlopen(req, timeout=5)
+        body = resp.read().decode()
+        healthy = "all shards are ready" in body.lower()
+    except Exception:
+        healthy = False
+
     collections = _qdrant("GET", "/collections")
     return {
-        "qdrant": "reachable" if "ready" in str(info).lower() or info.get("result") else "degraded",
+        "qdrant": "healthy" if healthy else "degraded",
         "collections": [c.get("name") for c in collections.get("result", {}).get("collections", [])],
         "timestamp": datetime.now(timezone.utc).isoformat()
     }

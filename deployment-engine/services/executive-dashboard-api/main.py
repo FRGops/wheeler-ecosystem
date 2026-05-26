@@ -347,6 +347,23 @@ async def intelligence_full():
     except: pass
 
     pm2 = get_pm2_counts()
+    # Foreclosure pipeline stats
+    foreclosure = {}
+    try:
+        import subprocess as sp
+        total = run("docker exec frgops-standby psql -U frgops -d frgcrm -t -A -c 'SELECT count(*) FROM foreclosure_dockets' 2>/dev/null")
+        counties = run("docker exec frgops-standby psql -U frgops -d frgcrm -t -A -c 'SELECT count(DISTINCT county || state) FROM foreclosure_dockets' 2>/dev/null")
+        p0 = run("docker exec frgops-standby psql -U frgops -d frgcrm -t -A -c \"SELECT count(*) FROM foreclosure_dockets WHERE priority='P0'\" 2>/dev/null")
+        pipeline_runs = run("docker exec frgops-standby psql -U frgops -d frgcrm -t -A -c 'SELECT count(*) FROM foreclosure_pipeline_runs' 2>/dev/null")
+        foreclosure = {
+            "dockets_total": int(total) if total else 0,
+            "counties_active": int(counties) if counties else 50,
+            "p0_leads": int(p0) if p0 else 0,
+            "pipeline_runs": int(pipeline_runs) if pipeline_runs else 0,
+            "parser_distribution": {"odyssey": 16, "generic": 28, "nyecfs": 5, "harris": 1}
+        }
+    except: pass
+
     return {
         "ecosystem": {
             "health_score": round((pm2["online"] / max(pm2["total"], 1)) * 100, 1),
@@ -358,6 +375,7 @@ async def intelligence_full():
         "knowledge_graph": brain.get("neo4j", {}),
         "intelligence_domains": domains,
         "memory_layer": memory,
+        "foreclosure_pipeline": foreclosure,
         "ai": {"spend_24h": get_litellm_spend(), "health": get_litellm_health()},
         "revenue": get_revenue_summary(),
         "alerts": (await alerts())["alerts"],

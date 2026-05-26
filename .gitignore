@@ -24,3 +24,31 @@
 # File history
 .claude/file-history/
 .claude/history.jsonl
+
+# Session data (ephemeral)
+.claude/sessions/
+.claude/shell-snapshots/
+.claude/tasks/
+.ai/reports/sessions/
+
+# Credentials and auth
+.claude/.credentials.json
+.claude/mcp-needs-auth-cache.json
+
+# Plans (ephemeral)
+.claude/plans/
+
+# Plugin cache
+.claude/plugins/plugin-catalog-cache.json
+
+# Security warning state
+.claude/security_warnings_state_*.json
+
+# External tool configs / state
+.config/
+.docker/
+.local/
+.npm/
+.semgrep/
+.ai/repo-drop-zone.txt
+.ai/repo-processed.txt
