@@ -1,0 +1,33 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "command": "bash .claude/hooks/sessionstart-autobootstrap.sh",
+        "timeout": 10000
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "command": "bash .claude/hooks/pretooluse-safety.sh",
+        "timeout": 5000
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "",
+        "command": "bash .claude/hooks/posttooluse-log.sh",
+        "timeout": 3000
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "command": "bash .claude/hooks/stop-postflight.sh",
+        "timeout": 30000
+      }
+    ]
+  },
+  "_instructions": "Copy the hooks block above into your project's .claude/settings.json under the 'hooks' key. This does NOT replace your user-level ~/.claude/settings.json — project hooks merge with user hooks. See HOOKS_INSTALL_AND_ROLLBACK.md for details."
+}
