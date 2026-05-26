@@ -122,6 +122,44 @@ heal_high_resource() {
     return 0
 }
 
+heal_repo_engine() {
+    local issue="$1"
+    log "INFO" "Attempting repo-engine auto-heal for: $issue"
+
+    if $DRY_RUN; then
+        log "DRYRUN" "Would restart repo-engine PM2 daemon"
+        return 0
+    fi
+
+    # Check if repo-engine PM2 is running
+    if ! pm2 jlist 2>/dev/null | jq -e '.[] | select(.name == "repo-engine" and .pm2_env.status == "online")' > /dev/null 2>&1; then
+        log "HIGH" "repo-engine daemon down — restarting"
+        pm2 delete repo-engine 2>/dev/null || true
+        sleep 2
+        cd /opt/wheeler-ecosystem/repo-router
+        if env -i HOME=/root PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+           pm2 start repo-engine-ecosystem.config.js 2>/dev/null; then
+            pm2 save --force 2>/dev/null
+            log "OK" "repo-engine restarted"
+        else
+            log "CRITICAL" "repo-engine restart FAILED"
+            return 1
+        fi
+    fi
+
+    # Run self-heal script if available
+    if [ -x /opt/wheeler-ecosystem/repo-router/scripts/repo-engine-selfheal.sh ]; then
+        bash /opt/wheeler-ecosystem/repo-router/scripts/repo-engine-selfheal.sh 2>&1 | tee -a "$HEAL_LOG" || true
+    fi
+
+    # Fix git remotes if missing
+    if [ -x /opt/wheeler-ecosystem/repo-router/scripts/fix-git-remotes.sh ]; then
+        bash /opt/wheeler-ecosystem/repo-router/scripts/fix-git-remotes.sh 2>&1 | tee -a "$HEAL_LOG" || true
+    fi
+
+    return 0
+}
+
 # ─── Main ───────────────────────────────────────────
 
 log "INFO" "Auto-heal trigger starting $(if $DRY_RUN; then echo '(DRY RUN)'; fi)"
@@ -194,6 +232,9 @@ for p in json.load(sys.stdin):
             ;;
         resource-watchdog)
             heal_high_resource "system"
+            ;;
+        repo-watchdog)
+            heal_repo_engine "watchdog-alert"
             ;;
         *)
             log "INFO" "No auto-heal pattern for subsystem: $name"

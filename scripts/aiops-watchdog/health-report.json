@@ -1,29 +1,29 @@
 {
   "ecosystem_health": {
     "script": "ecosystem-health",
-    "timestamp": "2026-05-25T19:14:01Z",
+    "timestamp": "2026-05-26T02:00:01Z",
     "version": "1.0.0",
     "platform": "Wheeler Autonomous AI Ops"
   },
   "summary": {
-    "overall_score": 69,
-    "status": "CRITICAL",
-    "classification": "critical"
+    "overall_score": 96,
+    "status": "HEALTHY",
+    "classification": "healthy"
   },
   "subsystems": [
     {
       "name": "docker-watchdog",
-      "weight": 30,
-      "total": 47,
-      "pass": 47,
+      "weight": 25,
+      "total": 44,
+      "pass": 44,
       "fail": 0,
-      "score": 80
+      "score": 100
     },
     {
       "name": "pm2-watchdog",
-      "weight": 25,
-      "total": 27,
-      "pass": 27,
+      "weight": 20,
+      "total": 28,
+      "pass": 28,
       "fail": 0,
       "score": 100
     },
@@ -33,7 +33,7 @@
       "total": 1,
       "pass": 0,
       "fail": 1,
-      "score": 20
+      "score": 80
     },
     {
       "name": "resource-watchdog",
@@ -47,9 +47,17 @@
       "name": "exposure-watchdog",
       "weight": 10,
       "total": 1,
-      "pass": 0,
-      "fail": 1,
-      "score": 10
+      "pass": 1,
+      "fail": 0,
+      "score": 100
+    },
+    {
+      "name": "repo-watchdog",
+      "weight": 10,
+      "total": 7,
+      "pass": 7,
+      "fail": 0,
+      "score": 100
     }
   ],
   "alerts": []

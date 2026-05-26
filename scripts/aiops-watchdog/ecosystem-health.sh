@@ -3,7 +3,7 @@
 # ecosystem-health.sh
 # Wheeler Autonomous AI Ops Platform - Master Watchdog Orchestrator
 #
-# Runs all 5 watchdog scripts sequentially, aggregates results into a
+# Runs all 6 watchdog scripts sequentially, aggregates results into a
 # single health score (0-100), generates a consolidated JSON report, and
 # optionally triggers a webhook alert on failures.
 #
@@ -42,15 +42,17 @@ WATCHDOGS=(
     "port-watchdog.sh"
     "resource-watchdog.sh"
     "exposure-watchdog.sh"
+    "repo-watchdog.sh"
 )
 
 # Weights for each subsystem (must sum to 100)
 declare -A WEIGHTS
-WEIGHTS["docker-watchdog.sh"]=30
-WEIGHTS["pm2-watchdog.sh"]=25
+WEIGHTS["docker-watchdog.sh"]=25
+WEIGHTS["pm2-watchdog.sh"]=20
 WEIGHTS["port-watchdog.sh"]=20
 WEIGHTS["resource-watchdog.sh"]=15
 WEIGHTS["exposure-watchdog.sh"]=10
+WEIGHTS["repo-watchdog.sh"]=10
 
 # ---- Help ----
 show_help() {
@@ -325,6 +327,19 @@ main() {
                     fail=1; score=$(( 100 - exposed * 30 ))
                     [[ $score -lt 0 ]] && score=0
                 fi
+                ;;
+            repo-watchdog)
+                # Score from repo-watchdog JSON output
+                local repo_json repo_score
+                repo_json=$("${SCRIPT_DIR}/repo-watchdog.sh" --json 2>/dev/null || echo '{"score":100}')
+                repo_score=$(echo "$repo_json" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("score",100))' 2>/dev/null || echo 100)
+                total=7; pass=0; fail=0; score=${repo_score:-100}
+                # Count alerts from JSON
+                local alert_count
+                alert_count=$(echo "$repo_json" | python3 -c 'import json,sys; print(len(json.load(sys.stdin).get("alerts",[])))' 2>/dev/null || echo 0)
+                pass=$(( total - alert_count ))
+                fail=$(( alert_count ))
+                [[ $pass -lt 0 ]] && pass=0
                 ;;
         esac
 

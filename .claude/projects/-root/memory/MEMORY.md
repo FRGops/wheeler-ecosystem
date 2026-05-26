@@ -7,7 +7,8 @@
 - [PM2 Restart Commands](pm2-restart.md) — Wheeler ecosystem PM2 restart commands, safe procedure, danger thresholds
 - [PM2 Restart Safety Pattern](pm2_restart_pattern.md) — verify→act→verify pattern for safe PM2 process recovery
 - [PM2 Deploy State](pm2-deploy-state.md) — Previous PM2 state (2026-05-23) — 24 processes. Superseded by [[pm2-deploy-state-20260525]]
-- [PM2 Deploy State 2026-05-25](pm2-deploy-state-20260525.md) — Canonical 27-process baseline — 27/27 online, 0 restarts, full remediation complete
+- [PM2 Deploy State 2026-05-25](pm2-deploy-state-20260525.md) — Canonical 27-process baseline — 27/27 online, 0 restarts, full remediation complete. Superseded by [[pm2-deploy-state-20260526]]
+- [PM2 Deploy State 2026-05-26](pm2-deploy-state-20260526.md) — Canonical 28-process baseline — 28/28 online, 0 restarts, /slay A+ verified
 - [PM2 Env Var Update Pattern](pm2-restart-pattern-20260523.md) — env var changes in ecosystem.config.js require delete+start not restart; Docker HEALTHCHECK localhost vs 127.0.0.1 trap; PM2 crash investigation checklist
 - [PM2 Restart Canonical Skill](pm2-restart-canonical.md) — PM2 restart procedures now codified as a Claude Code skill at capabilities/skills/pm2-recovery/SKILL.md
 - [Hostinger Stage 2 Cleanup](hostinger-stage2-cleanup.md) — UFW reduced 95→64 rules, 8 admin panels closed to internet, node_exporter fixed (2026-05-24)
