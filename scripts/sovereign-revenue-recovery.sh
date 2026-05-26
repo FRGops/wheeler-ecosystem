@@ -145,7 +145,7 @@ for product_key in "${!REVENUE_PRODUCTS[@]}"; do
 
     IFS=":" read -r product_name pm2_name port health_path description <<< "${REVENUE_PRODUCTS[$product_key]}"
 
-    local pm2_status; pm2_status=$(echo "$PM2_JSON" | python3 -c "
+    pm2_status=$(echo "$PM2_JSON" | python3 -c "
 import sys,json
 data=json.load(sys.stdin)
 status='not_found'
@@ -155,7 +155,7 @@ for p in data:
         break
 print(status)" 2>/dev/null || echo "unknown")
 
-    local pm2_restarts; pm2_restarts=$(echo "$PM2_JSON" | python3 -c "
+    pm2_restarts=$(echo "$PM2_JSON" | python3 -c "
 import sys,json
 data=json.load(sys.stdin)
 restarts=0
@@ -220,8 +220,8 @@ for product_key in "${!REVENUE_PRODUCTS[@]}"; do
 
     IFS=":" read -r product_name pm2_name port health_path description <<< "${REVENUE_PRODUCTS[$product_key]}"
 
-    local url="http://127.0.0.1:${port}${health_path}"
-    local http_code; http_code=$(_http_code "$url")
+    url="http://127.0.0.1:${port}${health_path}"
+    http_code=$(_http_code "$url")
 
     if [[ "$http_code" == "200" ]]; then
         recovery_entry "OK" "$product_name" "Endpoint healthy" "HTTP 200 on :${port}${health_path}"
@@ -229,7 +229,7 @@ for product_key in "${!REVENUE_PRODUCTS[@]}"; do
         recovery_entry "HIGH" "$product_name" "Endpoint unreachable" "Connection refused on :${port}"
         if [[ "$AUTO_RECOVER" == "true" ]]; then
             # Check if PM2 process needs restart
-            local pm2_status; pm2_status=$(echo "$PM2_JSON" | python3 -c "
+            pm2_status=$(echo "$PM2_JSON" | python3 -c "
 import sys,json
 for p in json.load(sys.stdin):
     if p.get('name')=='${pm2_name}':
@@ -288,11 +288,11 @@ if [[ "$JSON_MODE" == "false" ]]; then
 fi
 
 if check_cmd docker && docker info &>/dev/null 2>&1; then
-    local revenue_containers; revenue_containers=$(docker ps --format '{{.Names}} {{.Status}}' 2>/dev/null | grep -iE "frg|surplus|insforge|prediction|ravyn|stripe|payment|billing" || echo "")
+    revenue_containers=$(docker ps --format '{{.Names}} {{.Status}}' 2>/dev/null | grep -iE "frg|surplus|insforge|prediction|ravyn|stripe|payment|billing" || echo "")
     if [[ -n "$revenue_containers" ]]; then
         while IFS= read -r line; do
             [[ -z "$line" ]] && continue
-            local c_name c_status
+            c_name="" c_status=""
             c_name=$(echo "$line" | awk '{print $1}')
             c_status=$(echo "$line" | awk '{$1=""; print $0}' | xargs)
             if echo "$c_status" | grep -qi "unhealthy"; then
@@ -303,7 +303,7 @@ if check_cmd docker && docker info &>/dev/null 2>&1; then
             fi
             echo "$c_name $c_status" >> "${OUTPUT_DIR}/revenue-containers.txt"
         done <<< "$revenue_containers"
-        local container_count; container_count=$(echo "$revenue_containers" | wc -l)
+        container_count=$(echo "$revenue_containers" | wc -l)
         recovery_entry "OK" "Docker" "${container_count} revenue containers" "All revenue containers identified"
     else
         recovery_entry "LOW" "Docker" "No revenue containers found" "Revenue services may be PM2-only"
