@@ -62,7 +62,6 @@ trap _cleanup EXIT INT TERM HUP
 if ! mkdir "$LOCK_FILE" 2>/dev/null; then
     # Lock directory exists — check if it's stale (owner PID dead)
     if [[ -f "$LOCK_FILE/pid" ]]; then
-        local locked_pid
         locked_pid=$(cat "${LOCK_FILE}/pid" 2>/dev/null)
         if [[ -n "$locked_pid" ]] && ! kill -0 "$locked_pid" 2>/dev/null; then
             # Stale lock — original PID is dead, reclaim it
