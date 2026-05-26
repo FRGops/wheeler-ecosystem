@@ -62,7 +62,27 @@ _cleanup() {
 trap _cleanup EXIT INT TERM HUP
 
 usage() {
-    sed -n '/^# =====/,/^# =====/p' "$0" | head -30 | sed 's/^# //'
+    cat <<EOF
+Usage: ${SCRIPT_NAME} [OPTIONS]
+
+Identifies and recovers missed/delinquent revenue across Wheeler products:
+  - PM2 revenue process health monitoring (FRGCRM, SurplusAI, InsForge)
+  - Revenue endpoint verification (APIs, payment webhooks)
+  - Stripe transaction health (if credentials available)
+  - Automated recovery actions (restart dead processes, alert on anomalies)
+  - Recovery action report with priority ranking
+
+Exit codes:
+  0 — All revenue systems healthy, no recovery needed
+  1 — Revenue systems have issues, recovery actions generated
+  2 — Fatal error or pre-flight check failure
+
+Options:
+  --auto-recover       Auto-apply safe fixes
+  --product <product>  Single product scan (frgcrm, surplusai, insforge)
+  --json               Machine-readable output
+  --help               Show this message
+EOF
     exit "${1:-0}"
 }
 
@@ -81,7 +101,12 @@ recovery_entry() {
     if [[ "$JSON_MODE" == "false" ]]; then
         printf "  %b %-15s %-40s %s\n" "$icon" "$product" "$action" "$detail"
     fi
-    JSON_RESULTS+=("{\"priority\":\"${priority}\",\"product\":\"${product}\",\"action\":\"${action}\",\"detail\":\"${detail}\"}")
+    local _p _pr _a _d
+    _p=$(echo "$priority" | sed 's/\\/\\\\/g; s/"/\\"/g')
+    _pr=$(echo "$product" | sed 's/\\/\\\\/g; s/"/\\"/g')
+    _a=$(echo "$action" | sed 's/\\/\\\\/g; s/"/\\"/g')
+    _d=$(echo "$detail" | sed 's/\\/\\\\/g; s/"/\\"/g')
+    JSON_RESULTS+=("{\"priority\":\"${_p}\",\"product\":\"${_pr}\",\"action\":\"${_a}\",\"detail\":\"${_d}\"}")
 }
 
 _http_code() {
@@ -101,7 +126,10 @@ while [[ $# -gt 0 ]]; do
 done
 
 mkdir -p "$OUTPUT_DIR"
-echo "$MY_PID" > "$LOCK_FILE" 2>/dev/null || true
+if ! echo "$MY_PID" > "$LOCK_FILE" 2>/dev/null; then
+    echo "Another instance is running (lock: $LOCK_FILE)" >&2
+    exit 1
+fi
 
 if [[ "$JSON_MODE" == "false" ]]; then
     echo ""

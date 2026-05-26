@@ -576,8 +576,12 @@ restore_backup() {
     local restore_ok=false
     if [[ "$backup_file" == *.dump.gz ]]; then
         # Custom format, compressed
-        zcat "$backup_file" 2>/dev/null | docker exec -i "$container_name" pg_restore -U postgres -d "$db_name" --no-owner --no-acl >/dev/null 2>&1
-        local dumpgz_rc=${PIPESTATUS[1]}
+        local dumpgz_rc=0
+        if zcat "$backup_file" 2>/dev/null | docker exec -i "$container_name" pg_restore -U postgres -d "$db_name" --no-owner --no-acl >/dev/null 2>&1; then
+            dumpgz_rc=0
+        else
+            dumpgz_rc=${PIPESTATUS[1]:-1}
+        fi
         if [[ "$dumpgz_rc" -eq 0 ]]; then
             restore_ok=true
         else
@@ -593,8 +597,12 @@ restore_backup() {
         fi
     elif [[ "$backup_file" == *.sql.gz ]]; then
         # SQL format, compressed
-        zcat "$backup_file" 2>/dev/null | docker exec -i "$container_name" psql -U postgres -d "$db_name" >/dev/null 2>&1
-        local sqlgz_rc=${PIPESTATUS[1]}
+        local sqlgz_rc=0
+        if zcat "$backup_file" 2>/dev/null | docker exec -i "$container_name" psql -U postgres -d "$db_name" >/dev/null 2>&1; then
+            sqlgz_rc=0
+        else
+            sqlgz_rc=${PIPESTATUS[1]:-1}
+        fi
         if [[ "$sqlgz_rc" -eq 0 ]] || [[ "$sqlgz_rc" -eq 141 ]]; then
             restore_ok=true
         else

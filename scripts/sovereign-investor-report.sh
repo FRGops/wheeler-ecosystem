@@ -57,7 +57,29 @@ _cleanup() {
 trap _cleanup EXIT INT TERM HUP
 
 usage() {
-    sed -n '/^# =====/,/^# =====/p' "$0" | head -30 | sed 's/^# //'
+    cat <<EOF
+Usage: ${SCRIPT_NAME} [OPTIONS]
+
+Generates board-ready financial packages from Wheeler ecosystem data:
+  - Revenue summary (PM2 revenue processes, Stripe data if available)
+  - Infrastructure health (Docker, PM2, endpoint status)
+  - Operational KPIs (uptime, incident count, deployment frequency)
+  - Growth metrics (MRR trend, new products, market expansion)
+  - Risk dashboard (security posture, backup health, compliance status)
+
+Output: Markdown report + JSON data bundle
+
+Exit codes:
+  0 — Report generated successfully
+  1 — Report generated with warnings
+  2 — Fatal error
+
+Options:
+  --period month     Monthly report (default: week)
+  --json             JSON data bundle only
+  --output /path/dir Custom output directory
+  --help             Show this message
+EOF
     exit "${1:-0}"
 }
 
@@ -103,7 +125,9 @@ collect_git_summary() {
     local branch; branch=$(git -C /root branch --show-current 2>/dev/null || echo "unknown")
     local commits_7d; commits_7d=$(git -C /root log --oneline --since="7 days ago" 2>/dev/null | wc -l || echo "0")
     local last_commit; last_commit=$(git -C /root log -1 --format="%ar: %s" 2>/dev/null | head -c 100 || echo "unknown")
-    echo "{\"branch\":\"${branch}\",\"commits_7d\":${commits_7d},\"last_commit\":\"$(echo "$last_commit" | sed 's/"/\\"/g')\"}"
+    local escaped_commit
+    escaped_commit=$(echo "$last_commit" | sed 's/\\/\\\\/g; s/"/\\"/g')
+    echo "{\"branch\":\"${branch}\",\"commits_7d\":${commits_7d},\"last_commit\":\"${escaped_commit}\"}"
 }
 
 collect_revenue_summary() {
@@ -150,7 +174,10 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-echo "$MY_PID" > "$LOCK_FILE" 2>/dev/null || true
+if ! echo "$MY_PID" > "$LOCK_FILE" 2>/dev/null; then
+    echo "Another instance is running (lock: $LOCK_FILE)" >&2
+    exit 1
+fi
 mkdir -p "$OUTPUT_DIR"
 
 # ─── Collect All Data ───────────────────────────────────────────────────────────

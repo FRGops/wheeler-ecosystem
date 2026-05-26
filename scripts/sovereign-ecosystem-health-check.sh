@@ -46,9 +46,9 @@ readonly MY_PID=$$
 
 _cleanup() {
     local rc=$?
-    # Release lock
-    if [[ -f "$LOCK_FILE" ]] && [[ "$(cat "$LOCK_FILE" 2>/dev/null)" == "$MY_PID" ]]; then
-        rm -f "$LOCK_FILE" 2>/dev/null || true
+    # Release lock: remove the lock directory if we own it
+    if [[ -d "$LOCK_FILE" ]] && [[ "$(cat "${LOCK_FILE}/pid" 2>/dev/null)" == "$MY_PID" ]]; then
+        rm -rf "$LOCK_FILE" 2>/dev/null || true
     fi
     # Clean any temp files we created
     if [[ -n "${TMPDIR:-}" ]] && [[ -d "$TMPDIR" ]]; then
@@ -58,10 +58,31 @@ _cleanup() {
 }
 trap _cleanup EXIT INT TERM HUP
 
-# Acquire lock: fail fast if another instance is running
+# Acquire lock: stale lock detection before honoring existing lock
 if ! mkdir "$LOCK_FILE" 2>/dev/null; then
-    echo "ERROR: Another instance is running (lock held by PID $(cat "${LOCK_FILE}/pid" 2>/dev/null || echo unknown))" >&2
-    exit 2
+    # Lock directory exists — check if it's stale (owner PID dead)
+    if [[ -f "$LOCK_FILE/pid" ]]; then
+        local locked_pid
+        locked_pid=$(cat "${LOCK_FILE}/pid" 2>/dev/null)
+        if [[ -n "$locked_pid" ]] && ! kill -0 "$locked_pid" 2>/dev/null; then
+            # Stale lock — original PID is dead, reclaim it
+            rm -rf "$LOCK_FILE" 2>/dev/null
+            if ! mkdir "$LOCK_FILE" 2>/dev/null; then
+                echo "ERROR: Cannot acquire lock (race after stale removal)" >&2
+                exit 2
+            fi
+        else
+            echo "ERROR: Another instance is running (lock held by PID ${locked_pid:-unknown})" >&2
+            exit 2
+        fi
+    else
+        # Lock directory exists but no PID file — stale, reclaim it
+        rm -rf "$LOCK_FILE" 2>/dev/null
+        if ! mkdir "$LOCK_FILE" 2>/dev/null; then
+            echo "ERROR: Cannot acquire lock (race after stale removal)" >&2
+            exit 2
+        fi
+    fi
 fi
 echo "$MY_PID" > "${LOCK_FILE}/pid" 2>/dev/null || true
 

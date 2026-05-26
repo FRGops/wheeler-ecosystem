@@ -63,7 +63,29 @@ _cleanup() {
 trap _cleanup EXIT INT TERM HUP
 
 usage() {
-    sed -n '/^# =====/,/^# =====/p' "$0" | head -30 | sed 's/^# //'
+    cat <<EOF
+Usage: ${SCRIPT_NAME} [OPTIONS]
+
+Collects and displays Key Performance Indicators across the Wheeler ecosystem:
+  - PM2 process health (29 processes)
+  - Docker container health (45 containers)
+  - System resources (disk, memory, CPU load)
+  - Service endpoint status (dashboard, Grafana, LiteLLM, revenue APIs)
+  - Revenue process status (FRGCRM, SurplusAI, InsForge)
+  - Git repository activity
+
+Output: Terminal KPI dashboard + JSON report
+
+Exit codes:
+  0 — KPI collection complete
+  1 — One or more critical KPI thresholds breached
+  2 — Usage error
+
+Options:
+  --json      Machine-readable JSON output
+  --quick     Skip slow checks
+  --help      Show this message
+EOF
     exit "${1:-0}"
 }
 
@@ -107,7 +129,10 @@ done
 
 mkdir -p "$LOG_DIR"
 TMPDIR="$(mktemp -d "/tmp/kpi-dashboard-XXXXXX")"
-echo "$MY_PID" > "$LOCK_FILE" 2>/dev/null || true
+if ! echo "$MY_PID" > "$LOCK_FILE" 2>/dev/null; then
+    echo "Another instance is running (lock: $LOCK_FILE)" >&2
+    exit 1
+fi
 
 if [[ "$JSON_MODE" == "false" ]]; then
     echo ""
@@ -291,21 +316,21 @@ if [[ "$QUICK_MODE" != "true" ]]; then
     fi
 
     declare -A ENDPOINTS=(
-        ["Executive Dashboard"]="http://127.0.0.1:8180/health:200"
-        ["Grafana"]="http://127.0.0.1:3002/api/health:200"
-        ["LiteLLM Proxy"]="http://127.0.0.1:4049/health:401"
-        ["FRGCRM API"]="http://127.0.0.1:8082/health:200"
-        ["SurplusAI API"]="http://127.0.0.1:8103/health:200"
-        ["Command Center"]="http://127.0.0.1:8100/api/health:200"
-        ["War Room"]="http://127.0.0.1:8091/api/health:200"
-        ["OpenCLAW Dashboard"]="http://127.0.0.1:8110:200"
-        ["Prometheus"]="http://127.0.0.1:9090/-/ready:200"
-        ["Loki"]="http://127.0.0.1:3100/ready:200"
-        ["Alertmanager"]="http://127.0.0.1:9093/-/ready:200"
+        ["Executive Dashboard"]="http://127.0.0.1:8180/health|200"
+        ["Grafana"]="http://127.0.0.1:3002/api/health|200"
+        ["LiteLLM Proxy"]="http://127.0.0.1:4049/health|401"
+        ["FRGCRM API"]="http://127.0.0.1:8082/health|200"
+        ["SurplusAI API"]="http://127.0.0.1:8103/health|200"
+        ["Command Center"]="http://127.0.0.1:8100/api/health|200"
+        ["War Room"]="http://127.0.0.1:8091/api/health|200"
+        ["OpenCLAW Dashboard"]="http://127.0.0.1:8110|200"
+        ["Prometheus"]="http://127.0.0.1:9090/-/ready|200"
+        ["Loki"]="http://127.0.0.1:3100/ready|200"
+        ["Alertmanager"]="http://127.0.0.1:9093/-/ready|200"
     )
 
     for svc in "${!ENDPOINTS[@]}"; do
-        IFS=":" read -r url expected <<< "${ENDPOINTS[$svc]}"
+        IFS="|" read -r url expected <<< "${ENDPOINTS[$svc]}"
         http_code=$(_http_code "$url")
         if [[ "$http_code" == "$expected" ]] || [[ "$http_code" == "200" && "$expected" == "401" ]]; then
             kpi_display "ok"   "${svc}"                      "HTTP ${http_code}"

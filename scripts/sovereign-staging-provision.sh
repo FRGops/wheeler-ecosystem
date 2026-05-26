@@ -120,7 +120,10 @@ while [[ $# -gt 0 ]]; do
 done
 
 mkdir -p "$LOG_DIR"
-echo "$MY_PID" > "$LOCK_FILE" 2>/dev/null || true
+if ! echo "$MY_PID" > "$LOCK_FILE" 2>/dev/null; then
+    echo "Another instance is running (lock: $LOCK_FILE)" >&2
+    exit 1
+fi
 
 if ! check_cmd docker; then
     echo -e "${C_RED}Error: Docker is required${C_RESET}" >&2
@@ -225,7 +228,8 @@ action_destroy() {
     fi
 
     # Remove orphan volumes
-    docker volume prune -f >/dev/null 2>&1 || true
+    # Only remove staging volumes, never production
+    docker volume ls --filter "name=${STAGING_PREFIX}" -q 2>/dev/null | xargs -r docker volume rm 2>/dev/null || true
     result "ok" "Staging cleanup complete" ""
 
     if [[ "$JSON_MODE" == "false" ]]; then
@@ -280,7 +284,7 @@ staging_config = {
 }
 
 for svc_name, svc in data['services'].items():
-    s = {'container_name': '${STAGING_PREFIX}-${stack_name}-\${svc_name}'[:63]}
+    s = {'container_name': ('${STAGING_PREFIX}-${stack_name}-' + svc_name)[:63]}
     if 'image' in svc:
         s['image'] = svc['image']
     elif 'build' in svc:

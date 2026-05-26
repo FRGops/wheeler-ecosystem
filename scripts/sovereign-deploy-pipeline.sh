@@ -72,7 +72,35 @@ _cleanup() {
 trap _cleanup EXIT INT TERM HUP
 
 usage() {
-    sed -n '/^# =====/,/^# =====/p' "$0" | head -36 | sed 's/^# //'
+    cat <<EOF
+Usage: ${SCRIPT_NAME} [OPTIONS]
+
+End-to-end deployment orchestrator: preflight, 7-gate, smoke-test,
+health-verify, rollback-ready. Integrates with repo-router and
+deployment-engine infrastructure.
+
+Gates:
+  1. PREFLIGHT   — Branch safety, env vars, lock check
+  2. BUILD       — Compile/validate artifacts
+  3. TEST        — Run test suites
+  4. STAGE       — Deploy to staging, verify health
+  5. SMOKE       — Critical path smoke tests
+  6. DEPLOY      — Production deployment
+  7. VERIFY      — Post-deploy health + rollback readiness
+
+Exit codes:
+  0 — All gates passed, deployment successful
+  1 — Gate failure (with rollback instructions)
+  2 — Preflight failure or usage error
+
+Options:
+  --repo /path/to/repo   Specific repo
+  --dry-run              Simulate only
+  --gate <gate>          Start from gate (preflight|build|test|stage|smoke|deploy|verify)
+  --rollback             Execute rollback
+  --json                 Machine-readable output
+  --help                 Show this message
+EOF
     exit "${1:-0}"
 }
 
@@ -124,7 +152,12 @@ while [[ $# -gt 0 ]]; do
 done
 
 mkdir -p "$LOG_DIR"
-echo "$MY_PID" > "$LOCK_FILE" 2>/dev/null || true
+set -o noclobber
+if ! echo "$MY_PID" > "$LOCK_FILE" 2>/dev/null; then
+    echo "Another instance is running (lock: $LOCK_FILE)" >&2
+    exit 1
+fi
+set +o noclobber
 
 if [[ -z "$TARGET_REPO" ]]; then
     TARGET_REPO="/root"
@@ -316,6 +349,7 @@ fi
 # ═══════════════════════════════════════════════════════════════════════════════
 
 CURRENT_GATE="stage"
+[[ "$SKIP_UNTIL" != "preflight" && "$SKIP_UNTIL" != "build" && "$SKIP_UNTIL" != "test" && "$SKIP_UNTIL" != "stage" ]] && { gate_skip "stage" "Skipped (start gate: ${START_GATE})"; } || {
 
 if [[ "$DRY_RUN" == "true" ]]; then
     gate_skip "stage" "Dry run — skipping staging deploy"
@@ -336,45 +370,51 @@ else
     fi
 fi
 
+}
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # GATE 5: SMOKE TESTS
 # ═══════════════════════════════════════════════════════════════════════════════
 
 CURRENT_GATE="smoke"
+[[ "$SKIP_UNTIL" != "preflight" && "$SKIP_UNTIL" != "build" && "$SKIP_UNTIL" != "test" && "$SKIP_UNTIL" != "stage" && "$SKIP_UNTIL" != "smoke" ]] && { gate_skip "smoke" "Skipped (start gate: ${START_GATE})"; } || {
 
 if [[ "$JSON_MODE" == "false" ]]; then
     echo ""
     echo -e "${C_BOLD}${C_BLUE}━━━ GATE 5: SMOKE TESTS ━━━${C_RESET}"
 fi
 
-declare -A SMOKE_ENDPOINTS=(
-    ["exec-dashboard"]="http://127.0.0.1:8180/health:200"
-    ["grafana"]="http://127.0.0.1:3002/api/health:200"
-    ["prometheus"]="http://127.0.0.1:9090/-/ready:200"
-    ["loki"]="http://127.0.0.1:3100/ready:200"
-    ["alertmanager"]="http://127.0.0.1:9093/-/ready:200"
-    ["command-center"]="http://127.0.0.1:8100/api/health:200"
-    ["war-room"]="http://127.0.0.1:8091/api/health:200"
-    ["openclaw"]="http://127.0.0.1:8110:200"
+ENDPOINT_CHECKS=(
+    "http://127.0.0.1:8180/health|200|exec-dashboard"
+    "http://127.0.0.1:3002/api/health|200|grafana"
+    "http://127.0.0.1:9090/-/ready|200|prometheus"
+    "http://127.0.0.1:3100/ready|200|loki"
+    "http://127.0.0.1:9093/-/ready|200|alertmanager"
+    "http://127.0.0.1:8100/api/health|200|command-center"
+    "http://127.0.0.1:8091/api/health|200|war-room"
+    "http://127.0.0.1:8110|200|openclaw"
 )
 
-for svc in "${!SMOKE_ENDPOINTS[@]}"; do
-    IFS=":" read -r url expected <<< "${SMOKE_ENDPOINTS[$svc]}"
+for entry in "${ENDPOINT_CHECKS[@]}"; do
+    IFS="|" read -r url expected label <<< "$entry"
     http_code=$(_http_code "$url")
     if [[ "$http_code" == "$expected" ]] || { [[ "$expected" == "401" ]] && [[ "$http_code" == "200" ]]; }; then
-        gate_pass "smoke-${svc}" "HTTP ${http_code}"
+        gate_pass "smoke-${label}" "HTTP ${http_code}"
     elif [[ "$http_code" == "000" ]]; then
-        gate_fail "smoke-${svc}" "Connection refused"
+        gate_fail "smoke-${label}" "Connection refused"
     else
-        gate_pass "smoke-${svc}" "HTTP ${http_code} (acceptable)"
+        gate_pass "smoke-${label}" "HTTP ${http_code} (acceptable)"
     fi
 done
+
+}
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # GATE 6: DEPLOY
 # ═══════════════════════════════════════════════════════════════════════════════
 
 CURRENT_GATE="deploy"
+[[ "$SKIP_UNTIL" != "preflight" && "$SKIP_UNTIL" != "build" && "$SKIP_UNTIL" != "test" && "$SKIP_UNTIL" != "stage" && "$SKIP_UNTIL" != "smoke" && "$SKIP_UNTIL" != "deploy" ]] && { gate_skip "deploy" "Skipped (start gate: ${START_GATE})"; } || {
 
 if [[ "$DRY_RUN" == "true" ]]; then
     gate_skip "deploy" "Dry run — skipping deployment"
@@ -405,11 +445,14 @@ else
     fi
 fi
 
+}
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # GATE 7: POST-DEPLOY VERIFY
 # ═══════════════════════════════════════════════════════════════════════════════
 
 CURRENT_GATE="verify"
+[[ "$SKIP_UNTIL" != "preflight" && "$SKIP_UNTIL" != "build" && "$SKIP_UNTIL" != "test" && "$SKIP_UNTIL" != "stage" && "$SKIP_UNTIL" != "smoke" && "$SKIP_UNTIL" != "deploy" && "$SKIP_UNTIL" != "verify" ]] && { gate_skip "verify" "Skipped (start gate: ${START_GATE})"; } || {
 
 if [[ "$JSON_MODE" == "false" ]]; then
     echo ""
@@ -458,13 +501,20 @@ Notes:
 EOF
 gate_pass "rollback-plan" "Saved to ${ROLLBACK_PLAN}"
 
+}
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # PIPELINE SUMMARY
 # ═══════════════════════════════════════════════════════════════════════════════
 
-PASS_COUNT=$(echo "${GATE_RESULTS[@]}" | grep -c '"PASS"' || echo "0")
-FAIL_COUNT=$(echo "${GATE_RESULTS[@]}" | grep -c '"FAIL"' || echo "0")
-SKIP_COUNT=$(echo "${GATE_RESULTS[@]}" | grep -c '"SKIP"' || echo "0")
+PASS_COUNT=0; FAIL_COUNT=0; SKIP_COUNT=0
+for result in "${GATE_RESULTS[@]}"; do
+    case "$result" in
+        *'"PASS"')* PASS_COUNT=$((PASS_COUNT + 1)) ;;
+        *'"FAIL"')* FAIL_COUNT=$((FAIL_COUNT + 1)) ;;
+        *'"SKIP"')* SKIP_COUNT=$((SKIP_COUNT + 1)) ;;
+    esac
+done
 TOTAL_COUNT=$(( PASS_COUNT + FAIL_COUNT + SKIP_COUNT ))
 
 if [[ "$JSON_MODE" == "false" ]]; then

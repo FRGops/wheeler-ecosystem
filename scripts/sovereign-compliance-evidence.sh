@@ -62,7 +62,29 @@ _cleanup() {
 trap _cleanup EXIT INT TERM HUP
 
 usage() {
-    sed -n '/^# =====/,/^# =====/p' "$0" | head -32 | sed 's/^# //'
+    cat <<EOF
+Usage: ${SCRIPT_NAME} [OPTIONS]
+
+Collects, snapshots, and packages compliance evidence for CC2/audit review:
+  - System configuration snapshots (UFW, SSH, nginx, PM2, Docker, cron)
+  - Health reports (ecosystem health check output)
+  - Security posture (secrets scan, port exposure, CVE status)
+  - Compliance gate results (Tier 3, Rule 5.4, UPL checks)
+  - Timestamped, checksummed evidence bundles
+
+Output: Compressed evidence bundle at /var/log/wheeler/compliance/
+
+Exit codes:
+  0 — Evidence collection complete, all checksums verified
+  1 — Collection had warnings (some artifacts missing, bundle still created)
+  2 — Fatal error, no bundle created
+
+Options:
+  --quick            Essential artifacts only
+  --json             Machine-readable output
+  --verify <bundle>  Verify existing bundle
+  --help             Show this message
+EOF
     exit "${1:-0}"
 }
 
@@ -79,7 +101,12 @@ artifact() {
     if [[ "$JSON_MODE" == "false" ]]; then
         printf "  %b %-45s %s\n" "$icon" "$name" "$path"
     fi
-    MANIFEST_ENTRIES+=("{\"status\":\"${status}\",\"name\":\"${name}\",\"path\":\"${path}\",\"checksum\":\"${checksum}\"}")
+    local _s _n _p _c
+    _s=$(echo "$status" | sed 's/\\/\\\\/g; s/"/\\"/g')
+    _n=$(echo "$name" | sed 's/\\/\\\\/g; s/"/\\"/g')
+    _p=$(echo "$path" | sed 's/\\/\\\\/g; s/"/\\"/g')
+    _c=$(echo "$checksum" | sed 's/\\/\\\\/g; s/"/\\"/g')
+    MANIFEST_ENTRIES+=("{\"status\":\"${_s}\",\"name\":\"${_n}\",\"path\":\"${_p}\",\"checksum\":\"${_c}\"}")
 }
 
 snapshot_cmd() {
@@ -136,7 +163,10 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-echo "$MY_PID" > "$LOCK_FILE" 2>/dev/null || true
+if ! echo "$MY_PID" > "$LOCK_FILE" 2>/dev/null; then
+    echo "Another instance is running (lock: $LOCK_FILE)" >&2
+    exit 1
+fi
 mkdir -p "$OUTPUT_DIR"
 
 if [[ "$JSON_MODE" == "false" ]]; then
@@ -283,10 +313,10 @@ if [[ "$QUICK_MODE" != "true" ]]; then
             local cs; cs=$(sha256sum "${OUTPUT_DIR}/ecosystem-health.json" 2>/dev/null | awk '{print $1}' || echo "unknown")
             artifact "collected" "ecosystem-health.json" "${OUTPUT_DIR}/ecosystem-health.json" "$cs"
         else
-            artifact "warning" "ecosystem-health.json" "Health check returned non-zero (some failures)"
+            artifact "warning" "ecosystem-health.json" "Health check returned non-zero (some failures)" ""
         fi
     else
-        artifact "missing" "ecosystem-health.json" "Health check script not found"
+        artifact "missing" "ecosystem-health.json" "Health check script not found" ""
     fi
 
     # Collect endpoint health
@@ -296,7 +326,7 @@ if [[ "$QUICK_MODE" != "true" ]]; then
         echo "${label}: HTTP ${code}" >> "${OUTPUT_DIR}/endpoint-health.txt" 2>/dev/null || true
     done
     if [[ -f "${OUTPUT_DIR}/endpoint-health.txt" ]]; then
-        local cs; cs=$(sha256sum "${OUTPUT_DIR}/endpoint-health.txt" 2>/dev/null | awk '{print $1}' || echo "unknown")
+        cs=$(sha256sum "${OUTPUT_DIR}/endpoint-health.txt" 2>/dev/null | awk '{print $1}' || echo "unknown")
         artifact "collected" "endpoint-health.txt" "${OUTPUT_DIR}/endpoint-health.txt" "$cs"
     fi
 fi
