@@ -221,75 +221,38 @@ esac
 
 BUILD_CONTEXT="
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🤖 WHEELER CODING OS — DYNAMIC INTELLIGENCE v2.1
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Task:         $TASK_TYPE | Size: $TASK_SIZE
-Domains:      ${MATCHED_DOMAINS:-auto-detect}
-Army Mode:    $ARMY_MODE | Pipeline: $PIPELINE_DEPTH | Agents: ${ARMY_DEPLOY_COUNT:-varies}
-Review:       $REVIEW_LEVEL | Human Gate: $NEEDS_HUMAN
-Skills:       ${SKILL_RECS:-none auto-detected}
-Model:        ${MODEL_HINT}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🤖 WHEELER CODING OS v2.1 | $TASK_TYPE | $TASK_SIZE
+Army: $ARMY_MODE | Agents: ${ARMY_DEPLOY_COUNT:-varies} | Phases: 7
+Review: $REVIEW_LEVEL | Human: $NEEDS_HUMAN
+Model: ${MODEL_HINT}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 $DOMAIN_DEPLOY
 "
 
 # ── Discovery Cache ──
 if [ "$DISCOVERY_CACHED" = "yes" ]; then
     BUILD_CONTEXT="$BUILD_CONTEXT
-
-📦 DISCOVERY CACHED ($(printf '%d' "$CACHE_AGE")s old, HEAD=$(git rev-parse --short HEAD 2>/dev/null || echo '?'))
-  Cached codebase map available. Skip DISCOVER phase unless task touches uncached areas.
+📦 DISCOVERY CACHED ($(printf '%d' "$CACHE_AGE")s, $(git rev-parse --short HEAD 2>/dev/null || echo '?')) — skip DISCOVER unless touching uncached areas.
 "
 fi
 
+# ── Compact rules (token-optimized) ──
 BUILD_CONTEXT="$BUILD_CONTEXT
-📋 BUILD PROTOCOL:
-  Pipeline:  .ai/subagents/BUILD_PIPELINE.md
-  Agents:    .ai/subagents/AGENT_ARMY_DEPLOYMENT_MATRIX.md
-  Contract:  .ai/prompts/DEFAULT_FUTURE_AGENT_RESPONSE_CONTRACT.md
-
-🔧 AUTO-DISCOVERY (zero config):
-  New agents matching domain keywords → auto-recommended
-  New skills matching domain keywords → auto-suggested
-  New plugins → auto-utilized by pipeline phases
-  Full catalog: .ai/capabilities/DYNAMIC_CAPABILITY_MATCHER.md
-
-📋 PHASE RULES:
-  - Each phase outputs a handoff summary before proceeding
-  - Auto-progress unless human gate triggered
-  - REVIEW+SECURITY: deploy ALL in PARALLEL (single message)
-  - VERIFY+FINAL BOSS: deploy ALL in PARALLEL (single message)
-  - Phases merged for speed: 7 phases (was 9)
-  - Zero false greens: verify with evidence, label unknowns UNVERIFIED
-  - NEVER assign two agents to the same file
+Pipeline: .ai/subagents/BUILD_PIPELINE.md | Matrix: .ai/subagents/AGENT_ARMY_DEPLOYMENT_MATRIX.md
+Rules: REVIEW+SECURITY parallel. VERIFY+FINAL parallel. Handoff each phase. No 2 agents on same file. Evidence only — no false greens.
 "
 
-# ── Army Mode (conditional — right-sized by task) ──
+# ── Army Mode ──
 if [ "$ARMY_MODE" = "yes" ]; then
     BUILD_CONTEXT="$BUILD_CONTEXT
-
-⚔️ ARMY MODE — MULTI-AGENT PARALLEL DEPLOYMENT (${ARMY_DEPLOY_COUNT} agents max)
-  - Deploy parallel agents for independent work (single message, multiple Agent calls)
-  - Use agent-coordination agent to prevent duplicate work
-  - Each agent: explicit file boundaries + change budget
-  - Cancel idle agents promptly — report utilization
+⚔️ ARMY (${ARMY_DEPLOY_COUNT} max): parallel agents, single message, explicit boundaries. agent-coordination for dedup.
 "
 fi
 
-# ── Walk-Away + Never-Stop Enforcement (ALWAYS ON for Wheeler Coding OS v2.1) ──
+# ── Walk-Away + Never-Stop ──
 BUILD_CONTEXT="$BUILD_CONTEXT
-
-🚀 WALK-AWAY MODE — builds to 100% without human input
-  - All phases auto-progress (only pause at explicit human gates)
-  - Report final scorecard when complete
-
-⛔ NEVER-STOP ENFORCEMENT — pipeline must reach 100% completion at 100/100 scoring:
-  - Phases have time budgets. If exceeded: escalate, don't stall.
-  - Same phase looping 3+ times → try alternative approach (different agent/model)
-  - 5 total attempts on same phase → escalate with structured blocker report
-  - Pipeline must end in one of: (a) 100/100 complete, (b) explicit UNVERIFIED list, or (c) blocker report
-  - Under NO CIRCUMSTANCES does the pipeline stop silently
+🚀 WALK-AWAY + ⛔ NEVER-STOP: auto-progress all phases. Time budgets per phase. 3x loop→alt approach. 5x→escalate. Must end: 100/100, UNVERIFIED list, or blocker report.
 "
 
 # ── Human Gate ──
