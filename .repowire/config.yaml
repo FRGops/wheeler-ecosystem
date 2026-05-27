@@ -1,0 +1,128 @@
+# =============================================================================
+# Wheeler Ecosystem — Repowire Agent Mesh Configuration
+# Generated: 2026-05-27 | Server: AIOPS (100.121.230.28)
+# 154 Wheeler agents, 10 domain peers, 1 orchestrator
+# =============================================================================
+
+daemon:
+  host: "127.0.0.1"
+  port: 8377
+  prune_max_age_hours: 48
+  mcp_http:
+    enabled: true
+    require_auth: false
+    allow_dangerous_tools: true
+  spawn:
+    commands:
+      claude-code: "claude --dangerously-skip-permissions"
+    profiles:
+      claude-code:
+        fast:
+          args: ["--model", "deepseek-chat"]
+        deep:
+          args: ["--model", "claude-sonnet-4-6"]
+    allowed_paths:
+      - /root
+      - /opt/wheeler
+      - /tmp
+
+# Wheeler Domain Peers — one per major domain
+peers:
+  wheeler-orchestrator:
+    name: "wheeler-orchestrator"
+    display_name: "Wheeler Orchestrator"
+    path: "/root"
+    circle: "wheeler-core"
+    metadata:
+      role: "Master Orchestrator — dispatches work to all 154 Wheeler agents"
+      domain: "orchestration"
+
+  wheeler-infra:
+    name: "wheeler-infra"
+    display_name: "Wheeler Infrastructure"
+    path: "/root"
+    circle: "wheeler-ops"
+    metadata:
+      role: "Infrastructure Agent — Docker, PM2, networking, UFW, system health"
+      domain: "infrastructure"
+
+  wheeler-security:
+    name: "wheeler-security"
+    display_name: "Wheeler Security"
+    path: "/root"
+    circle: "wheeler-ops"
+    metadata:
+      role: "Security Agent — secrets scanning, UFW audit, SSL, CVE monitoring"
+      domain: "security"
+
+  wheeler-deploy:
+    name: "wheeler-deploy"
+    display_name: "Wheeler Deploy"
+    path: "/root"
+    circle: "wheeler-ops"
+    metadata:
+      role: "Deploy Agent — 7-gate pipeline, pre-flight, rollback automation"
+      domain: "deployment"
+
+  wheeler-financial:
+    name: "wheeler-financial"
+    display_name: "Wheeler Financial"
+    path: "/root"
+    circle: "wheeler-finance"
+    metadata:
+      role: "Financial Agent — P&L, revenue, Stripe, treasury, cost intelligence"
+      domain: "financial"
+
+  wheeler-db:
+    name: "wheeler-db"
+    display_name: "Wheeler Database"
+    path: "/root"
+    circle: "wheeler-ops"
+    metadata:
+      role: "Database Agent — PostgreSQL, backups, replication, query analysis"
+      domain: "database"
+
+  wheeler-monitoring:
+    name: "wheeler-monitoring"
+    display_name: "Wheeler Monitoring"
+    path: "/root"
+    circle: "wheeler-ops"
+    metadata:
+      role: "Monitoring Agent — Prometheus, Loki, Grafana, Uptime Kuma, alerts"
+      domain: "monitoring"
+
+  wheeler-growth:
+    name: "wheeler-growth"
+    display_name: "Wheeler Growth Engine"
+    path: "/root"
+    circle: "wheeler-growth"
+    metadata:
+      role: "Growth Agent — SEO, content, distribution, conversion optimization"
+      domain: "growth"
+
+  wheeler-compliance:
+    name: "wheeler-compliance"
+    display_name: "Wheeler Compliance"
+    path: "/root"
+    circle: "wheeler-legal"
+    metadata:
+      role: "Compliance Agent — TCPA, CCPA, FCRA, surplus funds rules, state laws"
+      domain: "legal-compliance"
+
+  wheeler-revenue:
+    name: "wheeler-revenue"
+    display_name: "Wheeler Revenue"
+    path: "/root"
+    circle: "wheeler-finance"
+    metadata:
+      role: "Revenue Agent — MRR/ARR, Stripe, churn, subscription analytics"
+      domain: "revenue"
+
+# Relay (optional — for remote dashboard access)
+relay:
+  enabled: false
+
+# Logging
+logging:
+  level: "info"
+  file: "/var/log/repowire/repowire.log"
