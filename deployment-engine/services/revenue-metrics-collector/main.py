@@ -1,4 +1,5 @@
 """Revenue Metrics Collector — Aggregates MRR/ARR/churn/Stripe data for Wheeler ecosystem."""
+import logging
 import os
 import json
 import time
@@ -7,6 +8,8 @@ import hmac
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 import stripe
 from fastapi import FastAPI, HTTPException, Request, Query
@@ -143,6 +146,8 @@ async def health():
 async def get_mrr():
     state = load_state()
     stripe_mrr = _fetch_stripe_mrr()
+    if stripe_mrr <= 0:
+        logger.warning("Stripe MRR fetch returned 0 or failed — falling back to cached state MRR=%s", state["mrr"])
     mrr = stripe_mrr if stripe_mrr > 0 else state["mrr"]
     return {
         "mrr": mrr,
@@ -155,7 +160,10 @@ async def get_mrr():
 @app.get("/api/v1/revenue/summary")
 async def get_summary():
     state = load_state()
-    mrr = _fetch_stripe_mrr() or state["mrr"]
+    stripe_mrr = _fetch_stripe_mrr()
+    if not stripe_mrr:
+        logger.warning("Stripe MRR fetch failed in summary — falling back to cached state MRR=%s", state["mrr"])
+    mrr = stripe_mrr or state["mrr"]
     failures = _fetch_stripe_failures(24)
     return {
         "mrr": mrr,
@@ -183,7 +191,10 @@ async def get_stripe_failures(window: str = Query("1h", description="Time window
 async def get_anomalies():
     state = load_state()
     anomalies = []
-    mrr = _fetch_stripe_mrr() or state["mrr"]
+    stripe_mrr = _fetch_stripe_mrr()
+    if not stripe_mrr:
+        logger.warning("Stripe MRR fetch failed in anomalies — falling back to cached state MRR=%s", state["mrr"])
+    mrr = stripe_mrr or state["mrr"]
 
     if mrr < state["mrr"] * 0.9:
         anomalies.append(RevenueAnomaly(
@@ -210,13 +221,17 @@ async def stripe_webhook(request: Request):
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature", "")
 
-    if STRIPE_WEBHOOK_SECRET and sig_header:
-        try:
-            stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
-        except stripe.error.SignatureVerificationError:
-            raise HTTPException(status_code=400, detail="Invalid signature")
-    elif STRIPE_WEBHOOK_SECRET:
+    if not STRIPE_WEBHOOK_SECRET:
+        logger.critical("STRIPE_WEBHOOK_SECRET not configured — rejecting webhook event")
+        raise HTTPException(status_code=500, detail="Webhook secret not configured")
+
+    if not sig_header:
         raise HTTPException(status_code=400, detail="Missing stripe-signature header")
+
+    try:
+        stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
+    except stripe.error.SignatureVerificationError:
+        raise HTTPException(status_code=400, detail="Invalid signature")
 
     event = json.loads(payload)
     event_type = event.get("type", "unknown")
