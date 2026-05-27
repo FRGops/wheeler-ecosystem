@@ -242,6 +242,27 @@ for p in json.load(sys.stdin):
     esac
 done
 
+# ─── Run specialized healers ─────────────────────────────
+
+# Restart loop healer (only for PM2 issues)
+HEALER_SCRIPTS_DIR="${SCRIPT_DIR}"
+if [ -x "${HEALER_SCRIPTS_DIR}/restart-loop-healer.sh" ]; then
+    log "INFO" "Running restart-loop-healer..."
+    bash "${HEALER_SCRIPTS_DIR}/restart-loop-healer.sh" 2>&1 | tee -a "$HEAL_LOG" || true
+fi
+
+# Docker container healer (only when docker subsystem has failures)
+if [ -x "${HEALER_SCRIPTS_DIR}/docker-container-healer.sh" ]; then
+    log "INFO" "Running docker-container-healer..."
+    bash "${HEALER_SCRIPTS_DIR}/docker-container-healer.sh" 2>&1 | tee -a "$HEAL_LOG" || true
+fi
+
+# Tailscale mesh healer (run every cycle, but only if tailscale is available)
+if command -v tailscale &>/dev/null && [ -x "${HEALER_SCRIPTS_DIR}/tailscale-mesh-healer.sh" ]; then
+    log "INFO" "Running tailscale-mesh-healer..."
+    bash "${HEALER_SCRIPTS_DIR}/tailscale-mesh-healer.sh" 2>&1 | tee -a "$HEAL_LOG" || true
+fi
+
 # Re-run health check to verify
 if ! $DRY_RUN; then
     sleep 3
