@@ -1,11 +1,22 @@
 #!/usr/bin/env python3
-"""Generate Infisical access tokens for all machine identities."""
+"""Generate Infisical access tokens for all machine identities.
+
+Requires INFISICAL_ADMIN_TOKEN env var — obtain via:
+  infisical login --method=user --email=ops@fundsrecoverygroup.com --domain=http://localhost:8080
+  infisical user get token --domain=http://localhost:8080
+"""
+import os
 import urllib.request
 import json
 import sys
 
-ADMIN_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdXRoTWV0aG9kIjoiZW1haWwiLCJhdXRoVG9rZW5UeXBlIjoiYWNjZXNzVG9rZW4iLCJ1c2VySWQiOiI4MWMyZThjZi1jZGEyLTQ2MDUtYjliNC1mY2Y2MzIwOWI5YjEiLCJ0b2tlblZlcnNpb25JZCI6IjRmZjRlYTQzLTIxYTItNGZiMi1iNTdkLWQ5ZTEzNjU1MDE5OSIsImFjY2Vzc1ZlcnNpb24iOjEsIm9yZ2FuaXphdGlvbklkIjoiZjI4NGQwNTktODc5ZS00MmU2LThhOTMtYjkzOGNjMjkxNTMxIiwiaWF0IjoxNzc5ODU3MzAyLCJleHAiOjE3ODA3MjEzMDJ9.X5GDr-OB-q4qNA3aARo6hrKOrYP0bsFSu98CWN7OVxY"
-API = "http://localhost:8080"
+ADMIN_TOKEN = os.environ.get("INFISICAL_ADMIN_TOKEN", "")
+if not ADMIN_TOKEN:
+    print("ERROR: INFISICAL_ADMIN_TOKEN environment variable not set")
+    print("Run: infisical login && export INFISICAL_ADMIN_TOKEN=$(infisical user get token --plain)")
+    sys.exit(1)
+
+API = os.environ.get("INFISICAL_API_URL", "http://localhost:8080")
 
 def api_call(method, path, data=None):
     url = f"{API}{path}"
@@ -100,9 +111,11 @@ for idx, (identity_id, name) in enumerate(identities):
 print(f"\n{'='*60}")
 print(f"Total tokens created: {len(tokens)} / {len(identities)}")
 
-# Save tokens to file
-output_path = "/tmp/agent_tokens.json"
-with open(output_path, "w") as f:
+# Save tokens to file with secure permissions
+output_dir = "/root/.infisical"
+os.makedirs(output_dir, mode=0o700, exist_ok=True)
+output_path = os.path.join(output_dir, "agent_tokens.json")
+with open(os.open(output_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w") as f:
     json.dump(tokens, f, indent=2)
 print(f"Tokens saved to {output_path}")
 
