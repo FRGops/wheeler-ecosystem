@@ -4,20 +4,30 @@
 # into the repo-listener drop zone for automatic 14-phase ingestion.
 # Safe: only processes public GitHub URLs, never logs secrets.
 
-TOOL_NAME="$1"
 DROP_ZONE="/root/.ai/repo-drop-zone.txt"
 REPO_PATTERN='https://github\.com/[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+'
 
-# Only process WebFetch and WebSearch tools — they're the ones that hit GitHub
+# Read stdin JSON (Claude Code passes ALL tool data via stdin JSON)
+INPUT=$(cat 2>/dev/null)
+TOOL_NAME=$(echo "$INPUT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('tool_name',''))" 2>/dev/null || echo "")
+
+# Only process WebFetch and WebSearch tools
 if [[ "$TOOL_NAME" != "WebFetch" && "$TOOL_NAME" != "WebSearch" ]]; then
   exit 0
 fi
 
-# Read stdin JSON (Claude Code passes tool input/output via stdin)
-INPUT=$(cat)
-
-# Extract github.com URLs from the tool input
-URLS=$(echo "$INPUT" | grep -oP "$REPO_PATTERN" | sort -u)
+# Extract github.com URLs from the tool input JSON (robust against nested JSON)
+URLS=$(echo "$INPUT" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+ti = data.get('tool_input', {})
+# Concatenate all string values to search for URLs
+text = ' '.join(str(v) for v in ti.values() if isinstance(v, str))
+import re
+urls = re.findall(r'https://github\.com/[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+', text)
+for u in sorted(set(urls)):
+    print(u)
+" 2>/dev/null)
 
 if [[ -z "$URLS" ]]; then
   exit 0

@@ -1923,5 +1923,146 @@
     "file": "business-intelligence.md",
     "color": "",
     "routable": true
+  },
+  "local-seo-domination": {
+    "name": "local-seo-domination",
+    "description": "Local SEO Domination Agent \u2014 NAP validation across 6 regional hubs and 4 citation tiers (190+ directories), Google Business Profile optimization, review generation engine, and county landing page generation (3,000+ pages through 7 quality gates).",
+    "model": "deepseek-chat",
+    "tools": [
+      "WebFetch",
+      "WebSearch",
+      "Bash",
+      "Read",
+      "Write",
+      "Grep",
+      "Glob"
+    ],
+    "file": "local-seo-domination.md",
+    "color": "",
+    "routable": true
+  },
+  "nationwide-seo-engine": {
+    "name": "nationwide-seo-engine",
+    "description": "Nationwide SEO Engine Agent \u2014 programmatic page generation across 50 state hubs and 3,000+ county pages, keyword-to-page mapping for 18,700 keywords, JSON-LD schema automation, internal link graph automation via pgvector + PageRank, and Core Web Vitals monitoring.",
+    "model": "deepseek-chat",
+    "tools": [
+      "WebFetch",
+      "WebSearch",
+      "Bash",
+      "Read",
+      "Write",
+      "Grep",
+      "Glob"
+    ],
+    "file": "nationwide-seo-engine.md",
+    "color": "",
+    "routable": true
+  },
+  "content-authority-engine": {
+    "name": "content-authority-engine",
+    "description": "Content Authority Engine Agent \u2014 three-layer LLM prompt architecture (Research\u2192Draft\u2192Polish), five-tier author entity system, six-point fact verification, AI content pipeline with human review gates (Tier 0-4), and editorial governance across 8 content pillars for all Wheeler properties.",
+    "model": "deepseek-chat",
+    "tools": [
+      "WebFetch",
+      "WebSearch",
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Grep",
+      "Glob"
+    ],
+    "file": "content-authority-engine.md",
+    "color": "",
+    "routable": true
+  },
+  "distribution-systems-architecture": {
+    "name": "distribution-systems-architecture",
+    "description": "Distribution Systems Architecture Agent \u2014 8-channel distribution mix optimization, Claimant Referral Program with lifecycle tracking and fraud detection, Attorney Cross-Referral Network with matching algorithm and 4-hour SLA, Partner Referral Program across 5 categories, and Affiliate Program with CPA/revenue share/hybrid models and FTC compliance monitoring.",
+    "model": "deepseek-chat",
+    "tools": [
+      "WebFetch",
+      "WebSearch",
+      "Read",
+      "Write",
+      "Bash",
+      "Grep",
+      "Glob"
+    ],
+    "file": "distribution-systems-architecture.md",
+    "color": "",
+    "routable": true
+  },
+  "growth-orchestrator": {
+    "name": "growth-orchestrator",
+    "description": "Growth Orchestrator Agent \u2014 coordinates all 8 Phase 1 growth agents, sequences the content pipeline (keyword brief \u2192 draft \u2192 review \u2192 publish \u2192 distribute), monitors 35+ growth KPIs, detects pipeline bottlenecks, and escalates blockers to chief-of-staff.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Write",
+      "Bash",
+      "WebFetch",
+      "WebSearch",
+      "Grep",
+      "Glob",
+      "Agent"
+    ],
+    "file": "growth-orchestrator.md",
+    "color": "",
+    "routable": true
+  },
+  "seo-lead": {
+    "name": "seo-lead",
+    "description": "SEO Lead Agent \u2014 coordinates seo-intelligence, nationwide-seo-engine, and local-seo-domination into a unified search strategy. Tier 2 domain lead for the Wheeler Growth Engine SEO domain.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Write",
+      "Bash",
+      "WebFetch",
+      "WebSearch",
+      "Grep",
+      "Glob",
+      "Agent"
+    ],
+    "file": "seo-lead.md",
+    "color": "",
+    "routable": true
+  },
+  "content-lead": {
+    "name": "content-lead",
+    "description": "Content Lead Agent \u2014 coordinates content-authority-engine and autonomous-docs. Tier 2 domain lead managing the content pipeline from brief to publish with legal review gate enforcement.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Write",
+      "Bash",
+      "WebFetch",
+      "WebSearch",
+      "Grep",
+      "Glob",
+      "Agent"
+    ],
+    "file": "content-lead.md",
+    "color": "",
+    "routable": true
+  },
+  "conversion-lead": {
+    "name": "conversion-lead",
+    "description": "Conversion Lead Agent \u2014 coordinates distribution-systems-architecture, forecasting-intelligence, and trend-forecasting. Tier 2 domain lead optimizing traffic-to-revenue conversion across 8 distribution channels.",
+    "model": "sonnet",
+    "tools": [
+      "Read",
+      "Write",
+      "Bash",
+      "WebFetch",
+      "WebSearch",
+      "Grep",
+      "Glob",
+      "Agent"
+    ],
+    "file": "conversion-lead.md",
+    "color": "",
+    "routable": true
   }
 }

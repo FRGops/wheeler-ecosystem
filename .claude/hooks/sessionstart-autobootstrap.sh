@@ -16,5 +16,8 @@ else
   echo "[Wheeler OS] Bootstrap script not found or not executable — skipping"
 fi
 
+# ── PM2 state persistence (v2.2) ──
+pm2 save --force --silent 2>/dev/null && echo "  [OK] PM2 state saved for session" || echo "  [WARN] PM2 save skipped (non-fatal)"
+
 # Always succeed (fail-open)
 exit 0

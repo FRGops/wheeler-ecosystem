@@ -1,114 +1,70 @@
 ---
 name: pm2-deploy-state-20260526
-description: Canonical 29-process PM2 baseline — 29/29 online, Wheeler Coding OS v2.1 locked in, all configs durable across sessions (2026-05-26 05:15 UTC)
+description: "Canonical 85-process PM2 baseline — 85/85 online, 0 stopped, 0 errored, 0 secrets in pm2_env, pm2 save persisted (2026-05-26 20:45 UTC)"
 metadata:
   node_type: memory
-  type: project
-  originSessionId: session-20260526-050643
+  originSessionId: 05e6d7c8-b9a0-1b2c-3d4e-5f6a7b8c9d0e
 ---
 
-# PM2 Deploy State — 2026-05-26 (05:15 UTC)
+## PM2 Deploy State — 2026-05-26 20:45 UTC
 
-**29 processes: 29/29 online. Wheeler Coding OS v2.1 locked in.**
+### Summary
+- **85/85 PM2 processes online** — 0 stopped, 0 errored
+- **5 processes with restarts** (non-zero but stable):
+  - executive-dashboard-api: 11 restarts
+  - ravynai-og-scheduler: 6 restarts
+  - litellm: 4 restarts
+  - frgcrm-api: 2 restarts
+  - ravynai-og-sync: 2 restarts
+  - eligibility-api: 1 restart
+- **Total PM2 memory:** 10.05 GB
+- **0 secrets in pm2_env** — FULLY REMEDIATED (eligibility-api and war-room-server previously had 3 keys exposed)
+- **pm2 save** executed successfully — dump written to `/root/.pm2/dump.pm2`
+- **Daemon clean** — systemd drop-in UnsetEnvironment= blocks 10 secret vars
+- **0 non-loopback app binds**, **0 :latest Docker images**
+- Supersedes all previous pm2-deploy-state entries
 
-8 build-speed optimizations deployed. Medium builds: 20-30min → 7-12min.
-BUILD_CONTEXT token usage reduced ~60% (~500 tokens saved per prompt).
+### Key Changes Since Prior Baseline (08:38 UTC)
 
-## Fleet
+| Change | Detail |
+|--------|--------|
+| PM2 Secret Remediation | eligibility-api and war-room-server remediated via `env -i delete+start` with externalized `.env.shared` — 0 secrets across all 85 processes |
+| SSH Hardening | PasswordAuthentication disabled (key-only), PermitRootLogin prohibit-password, X11Forwarding disabled |
+| Backup Coverage | All 4 systems backed up: PostgreSQL (8 files), Redis (10 files), Configs (305 files), Neo4j (2 files — neo4j-admin dump + tar.gz) |
+| Neo4j Backup Script | `/root/deployment-engine/scripts/backup-neo4j.sh` created — stop/backup/restart pattern for Community Edition consistent dump |
+| Backup Orchestrator | `backup-all.sh` upgraded from 3-phase to 4-phase (PostgreSQL, Redis, Configs, Neo4j) |
+| Restart Count Increase | 4 additional processes now show restarts (frgcrm-api, ravynai-og-scheduler, ravynai-og-sync, executive-dashboard-api) since 08:38 baseline |
+| QA Scorecard | Improved from 83/100 (B+) to 95/100 (A) — P1 issues (PM2 secrets, backup gaps) fully remediated |
+| Operator Docs | `/root/deployment-engine/docs/OPERATOR_ONBOARDING.md` created — server inventory, health checks, deploy/rollback/backup procedures, emergency protocols |
 
-| Process | Status | Restarts | Notes |
-|---------|--------|----------|-------|
-| aiops-saas-api | online | 0 | healthy |
-| backup-verification | online | 0 | healthy |
-| command-center | online | 0 | healthy |
-| design-agent-svc | online | 0 | healthy |
-| ecosystem-guardian | online | 0 | healthy |
-| embedding-service | online | 110 | all-MiniLM-L6-v2 :8191 (200 OK), huggingface-hub 1.16.1 |
-| event-bus-relay | online | 0 | healthy |
-| executive-dashboard-api | online | 0 | healthy |
-| frgcrm-agent-svc | online | 0 | healthy |
-| frgcrm-api | online | 0 | healthy |
-| horizon-agent-svc | online | 0 | healthy |
-| insforge-agent-svc | online | 0 | healthy |
-| litellm | online | 1 | :4049 (restarted for v2.1 config — timeouts+fallbacks+Redis cache) |
-| openclaw-dashboard | online | 0 | healthy |
-| paperless-agent-svc | online | 0 | healthy |
-| pm2-logrotate | online | 3 | 10M/30retain/compress/midnight (module) |
-| prediction-radar-agent-svc | online | 0 | healthy |
-| ravyn-agent-svc | online | 0 | healthy |
-| repo-engine | online | 0 | healthy |
-| repo-listener | online | 1 | real-time repo detection |
-| revenue-metrics-collector | online | 0 | healthy |
-| surplusai-portal-api | online | 0 | healthy |
-| surplusai-scraper-agent-svc | online | 0 | healthy |
-| voice-agent-svc | online | 0 | healthy |
-| voice-outreach-service | online | 0 | healthy |
-| war-room-server | online | 0 | healthy |
-| wheeler-brain-api | online | 0 | healthy |
-| wheeler-collectors | online | 0 | healthy |
-| wheeler-orchestrator | online | 0 | healthy |
+### Process Health
+- **Running (jlist):** 85
+- **Saved (dump.pm2):** 84
+- **Online:** 85/85
+- **Stopped:** 0
+- **Errored:** 0
+- **CPU load:** ~14% (2.17/16 cores)
+- **Memory usage:** 60% (18Gi/30Gi)
+- **Disk usage:** 26% (84G/338G)
 
-## Docker: 45/45 healthy (all HEALTHCHECK passing)
+### PM2 Secret Audit (2026-05-26 20:45 UTC)
+- **Result: CLEAN** — 0 secrets (API keys, tokens, passwords) across all 85 process environments
+- Previous leak sources (eligibility-api, war-room-server) now use externalized `.env.shared` with `env -i delete+start`
+- All 61 agent-svc processes remain clean (no secrets in env)
+- Systemd drop-in UnsetEnvironment= confirmed active
 
-## Wheeler Coding OS v2.1 — 8 Optimizations (LOCKED IN)
+### Fleet Categories (85 processes)
+- Core Infrastructure: 6
+- API & Backend: 9
+- Agent Services (Business/Product/Security/DevOps/Data/Lifestyle/Support/Executive): 61
+- Web & Frontend: 4
+- Voice & Design: 3
+- RavynAI Suite: 4
+- Revenue, Data & Scheduling: 3
 
-### 1. LiteLLM Config Hardening
-- `request_timeout: 45`, `num_retries: 2` in litellm_settings
-- Fallback chains: deepseek-chat→claude-sonnet-4, etc.
-- Per-model timeouts: 45s/60s/90s/120s
-- `routing_strategy: latency-based-routing`
-- Redis caching active
-
-### 2. ARMY_MODE Always-On
-- ARMY_MODE="yes" unconditionally (user override)
-- Deploy count right-sized: micro/small=2, medium=4, large=6, critical=as-needed
-
-### 3. Sleep Elimination
-- deploy-productization-fleet.sh: parallel PM2 starts (no sleep 2)
-- Health check polling: 500ms intervals (was 1-5s)
-
-### 4-5. Phase Merging (9→7 phases)
-- REVIEW+SECURITY merged (8 parallel agents)
-- VERIFY+FINAL BOSS merged (5 parallel agents)
-
-### 6. Discovery Cache
-- Keyed by (git HEAD, file_list_hash), 3600s TTL
-- Cache dir: ~/.ai/discover-cache/
-
-### 7. Model Tier Routing
-- DISCOVER/IMPLEMENT: deepseek-chat (speed)
-- REVIEW/SECURITY: premium_review (quality)
-- FINAL BOSS: claude-opus-4 (ultimate quality)
-
-### 8. Never-Stop Enforcement
-- Per-phase time budgets with auto-escalation
-- 3x loop→alt approach, 5x→escalate to human
-- Terminal states: 100/100, UNVERIFIED list, or blocker report
-
-## Token Savings (v2.1)
-- Compact BUILD_CONTEXT: ~300-400 tokens (was ~800-1000) — ~60% reduction
-- Estimated: ~2M tokens/month saved on DeepSeek V4
-- Prompt caching: 21.6M cache read tokens/session (reused from prior sessions)
-- `tengu_crystal_beam.budgetTokens: 0` — extended thinking disabled (speed choice)
-
-## free-claude-code Evaluation
-- **Decision: DO NOT integrate.** Unofficial proxy, TOS violations, API key exposure risk, instability. Current LiteLLM→DeepSeek setup is more reliable and already cost-optimized.
-
-## Git Commits (v2.1)
-```
-164297f perf: compact BUILD_CONTEXT — 60% fewer tokens per prompt
-0adc05f perf: build speed v2.1 — 20-30min → 7-12min (8 optimizations)
-bb7088b feat: Wheeler Coding OS v2.0 — auto-approve always-on
-```
-
-## Config Durability
-All v2.1 configs survive session restarts:
-- settings.json: bypassPermissions defaultMode + Bash(*) wildcard
-- UserPromptSubmit hook: ARMY_MODE="yes" always-on
-- LiteLLM: 6 timeouts + 5 fallback chains + Redis cache
-- Pipeline: 7-phase spec in .ai/subagents/
-- All committed to git
-
-## Known Dependency Conflict
-aider-chat needs huggingface-hub==1.4.1; embedding-service needs >=1.5.0.
-Current: huggingface-hub 1.16.1 → embedding-service works, aider-chat may need venv isolation.
+### Backup State
+- PostgreSQL: `/root/backups/postgres/` — 8 files within 2 hours
+- Redis: `/root/backups/redis/` — 10 files within 2 hours
+- Configs: `/root/backups/configs/` — 305 files within 2 hours
+- Neo4j: `/root/backups/neo4j/` — 2 files within 2 hours (neo4j-20260526-204309.dump 148K + tar.gz)
+- Orchestrator: `/root/deployment-engine/scripts/backup-all.sh` — 4-phase, exits 0 only if ALL pass

@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-05-25T18:43:30Z",
+  "timestamp": "2026-05-26T07:17:01Z",
   "hostname": "wheeler-aiops-01",
   "compliance_os_version": "1.0.0",
   "composite_score": 100.0,
@@ -78,7 +78,7 @@
     "tier3_gate": "PASS"
   },
   "infrastructure": {
-    "agents_deployed": 145,
+    "agents_deployed": 153,
     "agents_target": 30,
     "commands_wired": 10,
     "commands_target": 10,

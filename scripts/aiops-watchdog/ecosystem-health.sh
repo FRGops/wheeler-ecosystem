@@ -287,7 +287,7 @@ main() {
                 ;;
             pm2-watchdog)
                 total=$(pm2 jlist 2>/dev/null | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))' 2>/dev/null | tr -d ' \n' || echo 0)
-                online=$(pm2 jlist 2>/dev/null | python3 -c 'import json,sys; print(sum(1 for p in json.load(sys.stdin) if p["pm2_env"]["status"]=="online"))' 2>/dev/null | tr -d ' \n' || echo 0)
+                online=$(pm2 jlist 2>/dev/null | python3 -c 'import json,sys; print(sum(1 for p in json.load(sys.stdin) if p["pm2_env"]["status"]=="online" and p["name"]!="frgcrm-agent-svc"))' 2>/dev/null | tr -d ' \n' || echo 0)
                 pass=$online
                 fail=$(( total - online ))
                 loops=$(pm2 jlist 2>/dev/null | python3 -c 'import json,sys; print(sum(1 for p in json.load(sys.stdin) if p["pm2_env"].get("restart_time",0)>5))' 2>/dev/null | tr -d ' \n' || echo 0)

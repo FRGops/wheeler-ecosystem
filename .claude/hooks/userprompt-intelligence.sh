@@ -1,5 +1,5 @@
 #!/bin/bash
-# Wheeler Coding OS — UserPromptSubmit Intelligence Hook v2.0
+# Wheeler Coding OS — UserPromptSubmit Intelligence Hook v2.2
 # Dynamic keyword-to-domain matching. New agents/skills/plugins auto-discover.
 # No hardcoded agent names — uses domain recommendations the model resolves.
 set -e
@@ -77,7 +77,7 @@ elif echo "$PROMPT" | grep -qiE '\b(deploy|release|ship|production|publish)\b'; 
 fi
 
 # ═══════════════════════════════════════════════════
-# TASK SIZE ESTIMATION (v2.1 — aggressive micro classification for speed)
+# TASK SIZE ESTIMATION (v2.2 — always-on army enforcement, no suppression)
 # ═══════════════════════════════════════════════════
 TASK_SIZE="medium"
 PROMPT_LEN=$(echo "$PROMPT" | wc -c)
@@ -182,7 +182,7 @@ done
 SKILL_RECS=$(echo "$SKILL_RECS" | xargs 2>/dev/null || true)
 
 # ═══════════════════════════════════════════════════
-# DISCOVERY CACHE (v2.1 — skip redundant codebase scans)
+# DISCOVERY CACHE (v2.2 — skip redundant codebase scans)
 # ═══════════════════════════════════════════════════
 DISCOVERY_CACHE_DIR="${HOME}/.ai/discover-cache"
 mkdir -p "$DISCOVERY_CACHE_DIR" 2>/dev/null || true
@@ -222,10 +222,11 @@ BUILD_CONTEXT="
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🤖 WHEELER CODING OS v2.2 | $TASK_TYPE | $TASK_SIZE
-Army: $ARMY_MODE (MANDATORY) | Agents: ${ARMY_DEPLOY_COUNT:-varies} (MIN 2) | Phases: 7
-Review: $REVIEW_LEVEL | Human: $NEEDS_HUMAN
+Army: $ARMY_MODE (MANDATORY) | Agents: ${ARMY_DEPLOY_COUNT:-varies} | Phases: 7
+Review: $REVIEW_LEVEL | Human: $NEEDS_HUMAN | Auto-Approve: YES
 Model: ${MODEL_HINT}
 ⛔ ARMY DEPLOYMENT IS NON-NEGOTIABLE — Agent() tool call REQUIRED on every prompt
+✅ AUTO-APPROVE LOCKED — Never call EnterPlanMode/ExitPlanMode/AskUserQuestion. Just build.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 $DOMAIN_DEPLOY
 "
@@ -250,7 +251,7 @@ BUILD_CONTEXT="$BUILD_CONTEXT
 
 # ── Walk-Away + Never-Stop ──
 BUILD_CONTEXT="$BUILD_CONTEXT
-🚀 WALK-AWAY + ⛔ NEVER-STOP: auto-progress all phases. Time budgets per phase. 3x loop→alt approach. 5x→escalate. Must end: 100/100, UNVERIFIED list, or blocker report.
+🚀 WALK-AWAY + ⛔ NEVER-STOP + ✅ AUTO-APPROVE: auto-progress all phases, never wait for human, never call EnterPlanMode/ExitPlanMode. Time budgets per phase. 3x loop→alt approach. 5x→escalate. Must end: 100/100, UNVERIFIED list, or blocker report.
 "
 
 # ── Human Gate ──

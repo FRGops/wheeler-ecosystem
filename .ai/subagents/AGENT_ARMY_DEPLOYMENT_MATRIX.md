@@ -1,4 +1,17 @@
-# Agent Army Deployment Matrix
+# Agent Army Deployment Matrix v2.2 — Always-On
+
+## Army Always-On Enforcement (v2.2 — NON-NEGOTIABLE)
+
+**Every prompt deploys agents. No exceptions. No opt-out. No suppression.**
+
+| Enforcement Rule | Detail |
+|-----------------|--------|
+| Minimum agents per prompt | 2 (NEVER less) |
+| Agent tool call | REQUIRED on every response |
+| Skipping agents | POLICY VIOLATION — escalate |
+| No-build prompts | Deploy Explore + general-purpose for situational awareness |
+| Suppression gate | REMOVED (was only blocker) |
+| Non-compliance | 3-strike escalation → chief-of-staff → human
 
 ## Autonomous Pipeline Integration
 
@@ -8,9 +21,9 @@ This matrix works with `.ai/subagents/BUILD_PIPELINE.md`. Every build task flows
 
 | Task Size | Files | Lines | Phases | Max Parallel Agents | Review Level |
 |-----------|-------|-------|--------|-------------------|-------------|
-| Micro | 1 | < 20 | 2 (IMPLEMENT→REVIEW+SECURITY) | 2 | Self |
+| Micro | 1 | < 20 | 2 (IMPLEMENT→REVIEW+SECURITY) | 2 (MINIMUM) | Self |
 | Small | 1-3 | < 100 | 4 (PLAN→IMPLEMENT→TEST→REVIEW+SECURITY) | 2 | Peer |
-| Medium | 3-10 | < 500 | 5 (DISCOVER→PLAN→IMPLEMENT→TEST→REVIEW+SEC→VERIFY+FINAL) | 4 | Final Boss |
+| Medium | 3-10 | < 500 | 6 (DISCOVER→PLAN→IMPLEMENT→TEST→REVIEW+SEC→VERIFY+FINAL) | 4 | Final Boss |
 | Large | 10-25 | < 2000 | 7 (full pipeline) | 6 | Final Boss + Human |
 | Critical | Any | Any | Full + human gates | As needed | Final Boss + Human |
 
@@ -133,9 +146,11 @@ This matrix works with `.ai/subagents/BUILD_PIPELINE.md`. Every build task flows
 | VERIFY (zero-false-green) | premium_review | Independent audit needs quality |
 | FINAL BOSS | claude-opus-4 | Ultimate quality gate |
 
-## Army Mode Triggers
+## Army Mode Triggers — ALWAYS ON (v2.2)
 
-Deploy multiple agents (3+ parallel) when:
+Army mode is **always active**. Every prompt deploys agents. The trigger list below now defines escalation (when to go ABOVE the minimum):
+
+Deploy 4+ agents (above minimum) when:
 - Multi-file feature implementation (3+ files)
 - Cross-cutting concern (auth, logging, error handling)
 - Database migration + API + frontend changes
@@ -144,16 +159,9 @@ Deploy multiple agents (3+ parallel) when:
 - Major version upgrade
 - New service/module creation
 
-## Solo Mode (1 Agent)
+## Solo Mode — DISABLED (v2.2)
 
-Single agent only for:
-- Single-file typo fix
-- Adding a comment
-- Updating a docstring
-- Running a linter
-- Formatting code
-- Simple variable rename
-- Adding a console.log for debugging
+Solo mode (1 agent) is **FORBIDDEN**. Minimum 2 agents on EVERY prompt, even micro tasks. If the task is genuinely trivial (typo, comment, lint), deploy 1 Explore agent for context awareness + 1 general-purpose agent for the fix. Never deploy fewer than 2 agents.
 
 ## Agent Selection Priority
 
@@ -172,12 +180,14 @@ Single agent only for:
 
 ## Anti-Patterns (BLOCKED)
 
+- **0-1 agents for ANY prompt — BLOCKED by army always-on enforcement (v2.2)**
 - 5 agents for a 20-line change — blocked by size detection
 - 2 agents editing the same file — blocked by parallel coordination
 - Agents without clear boundaries — blocked by pre-deployment check
 - Agents running unbounded — blocked by change budget enforcement
 - Skipping Final Boss on medium+ tasks — blocked by pipeline gate
 - Deploying agents and walking away without reviewing ALL outputs
+- Responding to user without deploying agents first — POLICY VIOLATION
 
 ## Agent Coordination
 

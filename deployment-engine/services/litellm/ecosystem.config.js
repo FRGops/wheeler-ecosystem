@@ -13,7 +13,7 @@ module.exports = {
     autorestart: true,
     max_restarts: 10,
     restart_delay: 5000,
-    max_memory_restart: '1G',
+    max_memory_restart: '2G',
     log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
     error_file: '/root/.pm2/logs/litellm-error.log',
     out_file: '/root/.pm2/logs/litellm-out.log',

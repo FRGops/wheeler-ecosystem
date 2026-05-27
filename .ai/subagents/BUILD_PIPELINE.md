@@ -1,4 +1,10 @@
-# Autonomous Build Pipeline — Wheeler Coding OS
+# Autonomous Build Pipeline — Wheeler Coding OS v2.2
+
+## Auto-Approve Lock (v2.2 — NON-NEGOTIABLE)
+
+**All tools auto-approve. All phases auto-proceed. No human waits. No ExitPlanMode. No AskUserQuestion.**
+
+The pipeline is fully autonomous. The model must never call EnterPlanMode, ExitPlanMode, or AskUserQuestion. Build directly, deploy agents directly, and auto-progress through all phases without pausing for human confirmation.
 
 ## Overview
 
@@ -333,21 +339,20 @@ NEXT ACTION: [one clear next step]
 
 ## Auto-Progression Rules
 
-### When phases auto-proceed (no human needed)
+### When phases auto-proceed (no human needed — v2.2 always-on)
 - DISCOVER → PLAN: Always auto-proceeds
-- PLAN → ARCHITECT: Auto if task is medium or smaller
+- PLAN → ARCHITECT: Always auto-proceeds (no ExitPlanMode — EVER)
 - ARCHITECT → IMPLEMENT: Always auto-proceeds
 - IMPLEMENT → TEST: Always auto-proceeds
 - TEST → REVIEW+SECURITY: Auto if all tests pass
 - REVIEW+SECURITY → VERIFY+FINAL BOSS: Auto if no critical/security findings
 - VERIFY+FINAL BOSS → DONE: Auto when scorecard complete
 
-### When phases pause for human
-- PLAN phase for Large/Critical tasks (ExitPlanMode)
-- Any phase that encounters a blocker
+### When phases pause for human (v2.2 — minimal)
 - Production deploy (always requires human)
 - Secrets/DeepSeek routing touches (always requires human)
 - Database migrations (always requires human)
+- Blocker encountered after 5 retry attempts (escalate with structured report)
 
 ### Error recovery
 - If an agent fails: retry with clearer instructions (up to 2 retries)

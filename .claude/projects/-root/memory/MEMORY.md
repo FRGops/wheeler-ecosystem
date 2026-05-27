@@ -1,5 +1,7 @@
 # Memory Index
 
+- [Infisical Agentic Secrets Platform](infisical-agentic-secrets-platform-20260527.md) — Infisical deployed on COREDB, admin created, machine identity with token auth, ready for 50+ agents (2026-05-27)
+- [COREDB Credential Rotation Complete](coredb-credential-rotation-complete-20260527.md) — FRGpassword1! fully removed from COREDB PostgreSQL, 4 services reconciled, 0/18 containers with old password (2026-05-27)
 - [Sovereign Scripts Data Loss](sovereign-scripts-data-loss-20260526.md) — 6 of 8 sovereign scripts lost to worktree isolation bug on 2026-05-26
 - [Wheeler Financial OS Deployment](wheeler-financial-os-deployment.md) — 39 new financial agents + 10 docs + 4 commands deployed 2026-05-25
 - [Intelligence Layer 100/100](intelligence-layer-100-readiness.md) — 27 services, 285 Neo4j nodes, 6-tier memory, Qdrant on COREDB, foreclosure pipeline, 90 memories (2026-05-25)
@@ -9,7 +11,8 @@
 - [PM2 Restart Safety Pattern](pm2_restart_pattern.md) — verify→act→verify pattern for safe PM2 process recovery
 - [PM2 Deploy State](pm2-deploy-state.md) — Previous PM2 state (2026-05-23) — 24 processes. Superseded by [[pm2-deploy-state-20260525]]
 - [PM2 Deploy State 2026-05-25](pm2-deploy-state-20260525.md) — Canonical 27-process baseline — 27/27 online, 0 restarts, full remediation complete. Superseded by [[pm2-deploy-state-20260526]]
-- [PM2 Deploy State 2026-05-26](pm2-deploy-state-20260526.md) — Canonical 28-process baseline — 28/28 online, 0 restarts, /slay A+ verified
+- [PM2 Deploy State 2026-05-26](pm2-deploy-state-20260526.md) — 40-process baseline. Superseded by [[pm2-deploy-state-20260527]]
+- [PM2 Deploy State 2026-05-27](pm2-deploy-state-20260527.md) — Canonical 85-process baseline — 85/85 online, 0 stopped, pm2 save persisted (2026-05-27)
 - [PM2 Env Var Update Pattern](pm2-restart-pattern-20260523.md) — env var changes in ecosystem.config.js require delete+start not restart; Docker HEALTHCHECK localhost vs 127.0.0.1 trap; PM2 crash investigation checklist
 - [PM2 Restart Canonical Skill](pm2-restart-canonical.md) — PM2 restart procedures now codified as a Claude Code skill at capabilities/skills/pm2-recovery/SKILL.md
 - [Hostinger Stage 2 Cleanup](hostinger-stage2-cleanup.md) — UFW reduced 95→64 rules, 8 admin panels closed to internet, node_exporter fixed (2026-05-24)
@@ -20,7 +23,11 @@
 - [PM2 env -i Delete+Start Pattern](pm2-env-i-pattern.md) — restart reuses stored pm2_env.env; only delete+start with env -i creates clean processes. Daemon auto-restart preserves state.
 - [PM2 process.env Leak Pattern](pm2-process-env-leak.md) — ecosystem.config.js `process.env.VAR || ""` captures shell secrets into PM2 stored env. Never reference process.env in env:{} blocks.
 - [PM2 Env Override Pattern](pm2-env-override-pattern.md) — env:{} block overrides .env files; hardcoded passwords in env:{} cause auth failures after secret rotation. Use env -i delete+start to clear.
+- [PM2 Daemon Secret Cleanup](pm2-daemon-secret-cleanup-20260526.md) — Systemd drop-in UnsetEnvironment= strips secrets from PM2 daemon, 10 vars blocked, P0/P1 classification in /slay (2026-05-26)
 - [PM2 Restart/Deploy Master](pm2-restart-deploy-master.md) — Canonical playbook: delete+start pattern, danger commands, auto-resurrect guard, 24-process config map, verification script
 - [QA Scorecard 100/100](qa-scorecard-100.md) — Wheeler ecosystem Stage 2 QA achieved A+ (100/100) on 2026-05-24. Scorecard at /root/STAGE2_QA_SCORECARD_FINAL.md.
 - [/slay](.claude/skills/slay/SKILL.md) — Full ecosystem health audit + auto-remediation. 20-endpoint check, PM2 jlist secret scan, Docker :latest audit, network bind verification. Fixes broken processes with env -i delete+start.
 - [Autonomous AI Ops Platform](autonomous-aiops-platform.md) — Wheeler Autonomous AI Ops + Self-Healing Engine architecture, 10 deliverables, watchdog scripts (2026-05-24)
+- [PostToolUse Hook Fix](posttooluse-hook-fix-20260526.md) — Both PostToolUse hooks fixed to parse stdin JSON for tool_name (Claude Code hook protocol), repo-drop-zone.txt detection enabled (2026-05-26)
+- [Agent Prompt Templates](agent-prompt-templates-20260526.md) — 6 prompt templates in wheeler-command-center/configs/prompts/, 2 rebuilt as full dispatch templates (agent-infra.md 45L, agent-security.md 46L) (2026-05-26)
+- [Wheeler Command Center 100/100](wheeler-command-center-100.md) — 130 files, 30 scripts, 18 runbooks, 8 AI wrappers, bootstrap package. 100/100 verified.

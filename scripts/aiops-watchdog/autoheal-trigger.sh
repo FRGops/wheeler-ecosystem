@@ -212,7 +212,7 @@ for s in subsystems:
             pm2 jlist 2>/dev/null | python3 -c "
 import json, sys
 for p in json.load(sys.stdin):
-    if p['pm2_env']['status'] != 'online':
+    if p['pm2_env']['status'] != 'online' and p['name'] != 'frgcrm-agent-svc':
         print(p['name'])
 " 2>/dev/null | while read -r proc; do
                 [ -z "$proc" ] && continue

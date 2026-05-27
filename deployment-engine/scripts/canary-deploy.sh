@@ -453,35 +453,31 @@ clone_canary_instance() {
     # Start the canary instance
     # We use the same script path and working directory but with a different name
     # and a port offset to avoid conflicts
-    local canary_env=()
     local stable_port
+    local canary_port=""
     stable_port=$(get_pm2_port "$svc")
     if [[ -n "$stable_port" ]] && [[ "$stable_port" != "0" ]] && [[ "$stable_port" != "null" ]]; then
-        local canary_port=$((stable_port + CANARY_PORT_OFFSET))
-        canary_env+=("--env" "PORT=${canary_port}")
+        canary_port=$((stable_port + CANARY_PORT_OFFSET))
         canary_log "INFO" "Canary port mapping: ${stable_port} -> ${canary_port} (offset: ${CANARY_PORT_OFFSET})"
     fi
 
-    # Collect env vars from stable process (sanitized — no secrets)
-    local env_json
-    env_json=$(echo "$stable_info" | jq -r '.pm2_env.env // {}')
-
-    # Start canary with the same interpreter and script
-    canary_log "INFO" "Starting canary instance: ${canary_name}"
+    # Start canary with the same interpreter, script, and working directory.
+    # Use env prefix (not PM2 --env) to pass PORT to the process.
+    canary_log "INFO" "Starting canary instance: ${canary_name} (cwd=${cwd})"
 
     if [[ -n "$interpreter" ]] && [[ "$interpreter" != "null" ]]; then
-        pm2 start "$script_path" \
+        env PORT="${canary_port}" pm2 start "$script_path" \
             --name "$canary_name" \
+            --cwd "$cwd" \
             --interpreter "$interpreter" \
-            ${canary_env[@]:+"${canary_env[@]}"} \
             2>&1 || {
             canary_log "FATAL" "Failed to start canary instance: ${canary_name}"
             return 1
         }
     else
-        pm2 start "$script_path" \
+        env PORT="${canary_port}" pm2 start "$script_path" \
             --name "$canary_name" \
-            ${canary_env[@]:+"${canary_env[@]}"} \
+            --cwd "$cwd" \
             2>&1 || {
             canary_log "FATAL" "Failed to start canary instance: ${canary_name}"
             return 1

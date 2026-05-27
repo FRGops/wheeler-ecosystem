@@ -1,7 +1,7 @@
 {
   "metadata": {
     "schema_version": "1.0.0",
-    "last_updated": "2026-05-26T20:05:00Z",
+    "last_updated": "2026-05-27T01:39:46Z",
     "description": "Repo Router pipeline state"
   },
   "system": {
@@ -9,16 +9,120 @@
     "node": "aiops",
     "mode": "active",
     "last_drift_check": null,
-    "last_dashboard_update": "2026-05-26T20:05:00Z",
-    "last_verification": "2026-05-26T20:05:00Z"
+    "last_dashboard_update": "2026-05-27T01:39:46Z",
+    "last_verification": "2026-05-27T01:39:46Z"
   },
   "active_runs": {
     "total_active": 0,
     "runs": []
   },
   "completed_runs": {
-    "total_completed": 13,
+    "total_completed": 17,
     "last_10": [
+      {
+        "run_id": "infisical-20260527013918",
+        "repo": "infisical",
+        "completed_at": "2026-05-27T01:39:46Z",
+        "started_at": "2026-05-27T01:39:18Z",
+        "duration_seconds": 28,
+        "result": "success",
+        "phases_completed": 13,
+        "phases_status": {
+          "01_intake": "passed",
+          "02_validate": "passed",
+          "03_scan": "passed",
+          "04_profile": "passed",
+          "05_allocate": "passed",
+          "06_generate": "passed",
+          "07_configure": "passed",
+          "08_build": "passed",
+          "09_deploy": "passed",
+          "10_zt_validate": "passed",
+          "11_health_check": "passed",
+          "12_qa_gate": "passed",
+          "13_register": "passed",
+          "14_finalize": "running"
+        },
+        "verified_at": "2026-05-27T01:39:46Z"
+      },
+      {
+        "run_id": "lesspass-20260527013732",
+        "repo": "lesspass",
+        "completed_at": "2026-05-27T01:37:40Z",
+        "started_at": "2026-05-27T01:37:32Z",
+        "duration_seconds": 8,
+        "result": "success",
+        "phases_completed": 13,
+        "phases_status": {
+          "01_intake": "passed",
+          "02_validate": "passed",
+          "03_scan": "passed",
+          "04_profile": "passed",
+          "05_allocate": "passed",
+          "06_generate": "passed",
+          "07_configure": "passed",
+          "08_build": "passed",
+          "09_deploy": "passed",
+          "10_zt_validate": "passed",
+          "11_health_check": "passed",
+          "12_qa_gate": "passed",
+          "13_register": "passed",
+          "14_finalize": "running"
+        },
+        "verified_at": "2026-05-27T01:37:40Z"
+      },
+      {
+        "run_id": "keeweb-20260527013622",
+        "repo": "keeweb",
+        "completed_at": "2026-05-27T01:37:18Z",
+        "started_at": "2026-05-27T01:36:22Z",
+        "duration_seconds": 56,
+        "result": "success",
+        "phases_completed": 13,
+        "phases_status": {
+          "01_intake": "passed",
+          "02_validate": "passed",
+          "03_scan": "passed",
+          "04_profile": "passed",
+          "05_allocate": "passed",
+          "06_generate": "passed",
+          "07_configure": "passed",
+          "08_build": "passed",
+          "09_deploy": "passed",
+          "10_zt_validate": "passed",
+          "11_health_check": "passed",
+          "12_qa_gate": "passed",
+          "13_register": "passed",
+          "14_finalize": "running"
+        },
+        "verified_at": "2026-05-27T01:37:18Z"
+      },
+      {
+        "run_id": "api-cli-20260526234031",
+        "repo": "api-cli",
+        "completed_at": "2026-05-26T23:40:34Z",
+        "started_at": "2026-05-26T23:40:31Z",
+        "duration_seconds": 3,
+        "result": "success",
+        "phases_completed": 13,
+        "phases_status": {
+          "01_intake": "passed",
+          "02_validate": "passed",
+          "03_scan": "passed",
+          "04_profile": "passed",
+          "05_allocate": "passed",
+          "06_generate": "passed",
+          "07_configure": "passed",
+          "08_build": "passed",
+          "09_deploy": "passed",
+          "10_zt_validate": "passed",
+          "11_health_check": "passed",
+          "12_qa_gate": "passed",
+          "13_register": "passed",
+          "14_finalize": "running"
+        },
+        "verified_at": "2026-05-26T23:40:34Z"
+      },
       {
         "run_id": "claude-code-20260526072940",
         "repo": "claude-code",
@@ -70,42 +174,6 @@
         "completed_at": "2026-05-26T03:14:09Z",
         "started_at": "2026-05-26T03:13:58Z",
         "duration_seconds": 11,
-        "result": "partial",
-        "historical_note": "pre-verification-gate"
-      },
-      {
-        "run_id": "Understand-Anything-20260526031022",
-        "repo": "Understand-Anything",
-        "completed_at": "2026-05-26T03:10:35Z",
-        "started_at": "2026-05-26T03:10:22Z",
-        "duration_seconds": 13,
-        "result": "partial",
-        "historical_note": "pre-verification-gate"
-      },
-      {
-        "run_id": "docker-agent-20260526030918",
-        "repo": "docker-agent",
-        "completed_at": "2026-05-26T03:09:21Z",
-        "started_at": "2026-05-26T03:09:18Z",
-        "duration_seconds": 2,
-        "result": "partial",
-        "historical_note": "pre-verification-gate"
-      },
-      {
-        "run_id": "gastown-20260526030918",
-        "repo": "gastown",
-        "completed_at": "2026-05-26T03:09:20Z",
-        "started_at": "2026-05-26T03:09:18Z",
-        "duration_seconds": 2,
-        "result": "partial",
-        "historical_note": "pre-verification-gate"
-      },
-      {
-        "run_id": "knowledge-work-plugins-20260526030918",
-        "repo": "knowledge-work-plugins",
-        "completed_at": "2026-05-26T03:09:20Z",
-        "started_at": "2026-05-26T03:09:18Z",
-        "duration_seconds": 2,
         "result": "partial",
         "historical_note": "pre-verification-gate"
       }
