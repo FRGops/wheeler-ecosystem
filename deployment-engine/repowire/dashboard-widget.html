@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Repowire Mesh Status</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0a;color:#e0e0e0;font-family:'JetBrains Mono','Courier New',monospace;padding:12px;min-height:100vh}
+/* ── Header ── */
+.header{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #00ff88;padding-bottom:10px;margin-bottom:12px}
+.header h1{color:#00ff88;font-size:15px;display:flex;align-items:center;gap:8px}
+.header .sub{color:#666;font-size:10px}
+.status-dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:4px;animation:pulse 2s infinite}
+.status-dot.online{background:#00ff88}
+.status-dot.degraded{background:#ffaa00}
+.status-dot.offline{background:#ff4444}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+.refresh-badge{font-size:10px;color:#555;padding:2px 8px;border:1px solid #222;border-radius:4px}
+/* ── Grid ── */
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px}
+.card{background:#111;border:1px solid #222;border-radius:6px;padding:12px;overflow:hidden}
+.card h3{color:#00ff88;font-size:11px;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;display:flex;justify-content:space-between;align-items:center}
+.card h3 .badge{font-size:9px;padding:1px 6px;border-radius:3px;background:#1a1a1a;color:#888;text-transform:none;letter-spacing:0}
+/* ── Metrics ── */
+.metric-row{display:flex;justify-content:space-between;padding:3px 0;font-size:11px;border-bottom:1px solid #1a1a1a}
+.metric-row:last-child{border-bottom:none}
+.metric-label{color:#888}.metric-value{color:#e0e0e0;font-weight:bold}
+.big-number{font-size:26px;font-weight:bold;color:#00ff88;margin:4px 0}
+.big-number.amber{color:#ffaa00}
+.big-number.red{color:#ff4444}
+.big-label{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:1px}
+/* ── Severity status ── */
+.status-ok{color:#00ff88}.status-warn{color:#ffaa00}.status-err{color:#ff4444}
+/* ── Schedule Item ── */
+.sched-item{padding:6px 8px;margin:4px 0;background:#0f0f0f;border-left:3px solid #00ff88;border-radius:3px;font-size:10px}
+.sched-item .sched-name{color:#00ff88;font-weight:bold;font-size:10px}
+.sched-item .sched-text{color:#aaa;margin:2px 0;line-height:1.3}
+.sched-item .sched-meta{color:#555;font-size:9px;display:flex;gap:12px;flex-wrap:wrap}
+.sched-item .sched-cron{color:#888;font-size:9px}
+/* ── Scheduled (countdown) ── */
+.sched-countdown{color:#ffaa00;font-weight:bold;font-size:9px}
+.sched-countdown.overdue{color:#ff4444}
+/* ── Event Item ── */
+.event-item{padding:5px 8px;margin:3px 0;background:#0f0f0f;border-left:3px solid #333;border-radius:3px;font-size:10px}
+.event-item .event-from{color:#00aaff;font-weight:bold;font-size:9px}
+.event-item .event-text{color:#ccc;margin:1px 0;line-height:1.3}
+.event-item .event-time{color:#555;font-size:9px}
+.event-item.event-broadcast{border-left-color:#00aaff}
+.event-item.event-notify{border-left-color:#ffaa00}
+/* ── Peer Row ── */
+.peer-row{display:flex;justify-content:space-between;align-items:center;padding:3px 6px;margin:2px 0;background:#0f0f0f;border-radius:3px;font-size:10px}
+.peer-row .peer-name{color:#e0e0e0;font-weight:bold;font-size:10px}
+.peer-row .peer-detail{color:#666;font-size:9px}
+.peer-row .peer-status{font-size:9px;font-weight:bold}
+.population-bar{display:flex;height:4px;border-radius:2px;overflow:hidden;margin:6px 0}
+.population-bar .seg{height:100%}
+.population-bar .seg-online{background:#00ff88;flex:var(--online-pct,0)}
+.population-bar .seg-busy{background:#ffaa00;flex:var(--busy-pct,0)}
+.population-bar .seg-offline{background:#ff4444;flex:var(--offline-pct,0)}
+/* ── Circle Tags ── */
+.circle-tag{display:inline-block;padding:1px 6px;border-radius:3px;font-size:9px;margin:2px 2px 0 0;background:#1a1a1a;color:#888;border:1px solid #333}
+.circle-tag.has-peers{background:#0a1a0a;color:#00ff88;border-color:#00ff88}
+/* ── Daemon Detail ── */
+.daemon-row{padding:3px 0;font-size:10px;display:flex;justify-content:space-between;border-bottom:1px solid #1a1a1a}
+.daemon-row:last-child{border-bottom:none}
+.daemon-label{color:#888}.daemon-val{color:#e0e0e0}
+.daemon-val.inactive{color:#555}.daemon-val.active{color:#00ff88}
+/* ── Loading / Error ── */
+.loading{text-align:center;padding:30px;color:#555;font-size:12px}
+.loading .spinner{width:24px;height:24px;border:2px solid #1a1a1a;border-top-color:#00ff88;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 10px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.error-msg{text-align:center;padding:20px;color:#ff4444;font-size:11px}
+.error-msg .retry-btn{background:transparent;border:1px solid #ff4444;color:#ff4444;padding:4px 14px;border-radius:4px;cursor:pointer;font-size:10px;margin-top:8px;font-family:inherit}
+.error-msg .retry-btn:hover{background:#ff4444;color:#0a0a0a}
+/* ── Footer ── */
+.footer{text-align:center;color:#333;font-size:9px;margin-top:12px;padding-top:8px;border-top:1px solid #1a1a1a}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>
+    <span class="status-dot online" id="globalDot"></span>
+    REPOWIRE MESH
+    <span class="sub" id="versionSpan">--</span>
+  </h1>
+  <span>
+    <span class="refresh-badge" id="refreshBadge">10s</span>
+    <span style="color:#444;font-size:10px;margin-left:6px" id="clock">--</span>
+  </span>
+</div>
+
+<div class="grid" id="grid">
+  <div class="loading" id="loadingState">
+    <div class="spinner"></div>
+    Connecting to repowire daemon...
+  </div>
+</div>
+
+<div class="footer">REPOWIRE v0.14.4 &middot; MESH STATUS WIDGET &middot; AUTO-REFRESH 10s &middot; EMBED-READY</div>
+
+<script>
+(function() {
+  'use strict';
+
+  var API_BASE = 'http://127.0.0.1:8377';
+  var POLL_MS = 10000;
+  var MAX_EVENTS = 8;
+  var MAX_PEERS_IN_LIST = 20;
+  var timer = null;
+  var clockTimer = null;
+
+  // ── DOM helpers ──
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
+  function textNode(text) { return document.createTextNode(text); }
+
+  // ── Clock ──
+  function updateClock() {
+    var now = new Date();
+    var s = now.toISOString().replace('T',' ').substring(0,19) + ' UTC';
+    var c = document.getElementById('clock');
+    if (c) c.textContent = s;
+  }
+
+  // ── Countdown helper ──
+  function countdownStr(iso) {
+    if (!iso) return '--';
+    var target = new Date(iso);
+    var now = new Date();
+    var diffMs = target.getTime() - now.getTime();
+    if (diffMs < 0) return 'overdue';
+    var totalMin = Math.floor(diffMs / 60000);
+    var h = Math.floor(totalMin / 60);
+    var m = totalMin % 60;
+    if (h > 24) { var d = Math.floor(h/24); return d + 'd ' + (h%24) + 'h'; }
+    return h + 'h ' + m + 'm';
+  }
+
+  function isOverdue(iso) {
+    if (!iso) return false;
+    return new Date(iso).getTime() < Date.now();
+  }
+
+  // ── Fetch wrapper ──
+  function apiFetch(path) {
+    return fetch(API_BASE + path, { cache: 'no-store' })
+      .then(function(r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      });
+  }
+
+  // ── Main render ──
+  function render() {
+    var startTime = Date.now();
+
+    Promise.all([
+      apiFetch('/health'),
+      apiFetch('/peers'),
+      apiFetch('/schedules'),
+      apiFetch('/events')
+    ]).then(function(results) {
+      var health = results[0];
+      var peers = results[1] || [];
+      var schedules = results[2] || [];
+      var events = results[3] || [];
+
+      var g = document.getElementById('grid');
+      var loadingEl = document.getElementById('loadingState');
+      if (loadingEl) loadingEl.style.display = 'none';
+      g.textContent = '';
+
+      // Update header
+      var dot = document.getElementById('globalDot');
+      if (health && health.status === 'ok') {
+        dot.className = 'status-dot online';
+      } else {
+        dot.className = 'status-dot degraded';
+      }
+      var vs = document.getElementById('versionSpan');
+      if (health && health.version) vs.textContent = 'v' + health.version;
+
+      // Compute peer stats
+      var online = peers.filter(function(p) { return p.status === 'online'; });
+      var busy = peers.filter(function(p) { return p.status === 'busy'; });
+      var offline = peers.filter(function(p) { return p.status === 'offline'; });
+      var unknown = peers.filter(function(p) { return ['online','busy','offline'].indexOf(p.status) === -1; });
+      var peerCount = peers.length;
+      var circles = {};
+      peers.forEach(function(p) {
+        var c = p.circle || 'default';
+        if (!circles[c]) circles[c] = 0;
+        circles[c]++;
+      });
+      var circleNames = Object.keys(circles).sort();
+
+      // ── Card 1: Daemon Status ──
+      var c1 = el('div','card');
+      c1.appendChild(el('h3','','DAEMON STATUS'));
+      if (health) {
+        addMetric(c1, 'Status', health.status || 'unknown', health.status === 'ok' ? 'status-ok' : 'status-warn');
+        addMetric(c1, 'Version', health.version || '--', '');
+        addMetric(c1, 'Relay Mode', health.relay_mode ? 'active' : 'off', health.relay_mode ? 'status-warn' : '');
+        var ch = health.channel || {};
+        addMetric(c1, 'Channel', ch.status || 'unknown', ch.status === 'active' ? 'status-ok' : '');
+        var acp = health.acp_broker || {};
+        addMetric(c1, 'ACP Broker', acp.status || 'unknown', acp.status === 'active' ? 'status-ok' : '');
+        addMetric(c1, 'ACP In-Flight', (acp.in_flight != null ? acp.in_flight : '--') + '', '');
+        addMetric(c1, 'ACP Clients', (acp.active_clients != null ? acp.active_clients : '--') + '', acp.active_clients > 0 ? 'status-ok' : '');
+      } else {
+        c1.appendChild(el('div','metric-row','No health data'));
+      }
+      g.appendChild(c1);
+
+      // ── Card 2: Peers ──
+      var c2 = el('div','card');
+      c2.appendChild(el('h3','', 'PEERS'));
+
+      var bn = el('div','big-number', peerCount + '');
+      if (offline.length > 0 && offline.length === peerCount) bn.className += ' red';
+      else if (offline.length > 0) bn.className += ' amber';
+      c2.appendChild(bn);
+
+      var bl = el('div','big-label', 'Total Peers');
+      c2.appendChild(bl);
+
+      // Population bar
+      if (peerCount > 0) {
+        var bar = el('div','population-bar');
+        var oPct = (online.length / peerCount * 100).toFixed(1);
+        var bPct = (busy.length / peerCount * 100).toFixed(1);
+        var fPct = (offline.length / peerCount * 100).toFixed(1);
+        var segO = el('div','seg seg-online'); segO.style.setProperty('--online-pct', oPct); bar.appendChild(segO);
+        var segB = el('div','seg seg-busy'); segB.style.setProperty('--busy-pct', bPct); bar.appendChild(segB);
+        var segF = el('div','seg seg-offline'); segF.style.setProperty('--offline-pct', fPct); bar.appendChild(segF);
+        c2.appendChild(bar);
+      }
+
+      // Summary row
+      var sumRow = el('div','metric-row');
+      sumRow.appendChild(el('span','metric-label', 'online'));
+      var onlineVal = el('span','metric-value status-ok', online.length + '');
+      sumRow.appendChild(onlineVal);
+      c2.appendChild(sumRow);
+
+      var busyRow = el('div','metric-row');
+      busyRow.appendChild(el('span','metric-label', 'busy'));
+      busyRow.appendChild(el('span','metric-value status-warn', busy.length + ''));
+      c2.appendChild(busyRow);
+
+      var offRow = el('div','metric-row');
+      offRow.appendChild(el('span','metric-label', 'offline'));
+      offRow.appendChild(el('span','metric-value ' + (offline.length > 0 ? 'status-err' : ''), offline.length + ''));
+      c2.appendChild(offRow);
+
+      // Circles
+      if (circleNames.length > 0) {
+        var circWrap = el('div','', '');
+        circWrap.style.cssText = 'margin-top:6px';
+        circleNames.forEach(function(c) {
+          var tag = el('span','circle-tag has-peers', c + ' (' + circles[c] + ')');
+          circWrap.appendChild(tag);
+          circWrap.appendChild(textNode(' '));
+        });
+        c2.appendChild(circWrap);
+      }
+
+      // Peer list (top N)
+      if (peers.length > 0) {
+        var peerTitle = el('div','metric-label', ''); peerTitle.style.cssText = 'margin-top:8px;font-size:9px;color:#555';
+        peerTitle.textContent = 'PEERS' + (peers.length > MAX_PEERS_IN_LIST ? ' (showing ' + MAX_PEERS_IN_LIST + ')' : '');
+        c2.appendChild(peerTitle);
+        var displayPeers = peers.slice(0, MAX_PEERS_IN_LIST);
+        displayPeers.forEach(function(p) {
+          var row = el('div','peer-row');
+          var nameWrap = el('div','', '');
+          var nameEl = el('span','peer-name', p.display_name || p.name || p.peer_id || '?');
+          nameWrap.appendChild(nameEl);
+          var detail = (p.circle ? p.circle : '') + (p.role ? ' / ' + p.role : '');
+          if (detail) { nameWrap.appendChild(textNode(' ')); nameWrap.appendChild(el('span','peer-detail', detail)); }
+          row.appendChild(nameWrap);
+          var statEl = el('span','peer-status', p.status || 'unknown');
+          if (p.status === 'online') statEl.className += ' status-ok';
+          else if (p.status === 'busy') statEl.className += ' status-warn';
+          else if (p.status === 'offline') statEl.className += ' status-err';
+          row.appendChild(statEl);
+          c2.appendChild(row);
+        });
+      }
+
+      g.appendChild(c2);
+
+      // ── Card 3: Schedules ──
+      var c3 = el('div','card');
+      c3.appendChild(el('h3','', 'AUTONOMOUS SCHEDULES'));
+
+      if (!schedules.schedules || schedules.schedules.length === 0) {
+        c3.appendChild(el('div','metric-row', 'No schedules configured'));
+      } else {
+        schedules.schedules.forEach(function(s) {
+          var item = el('div','sched-item');
+          var nameRow = el('div','', '');
+          nameRow.appendChild(el('span','sched-name', s.schedule_id || '?'));
+          nameRow.appendChild(textNode(' '));
+
+          // Next fire countdown
+          var cd = el('span','sched-countdown', countdownStr(s.fire_at));
+          if (isOverdue(s.fire_at)) cd.className += ' overdue';
+          nameRow.appendChild(cd);
+          item.appendChild(nameRow);
+
+          // Text description
+          var txt = el('div','sched-text', s.text || '');
+          item.appendChild(txt);
+
+          // Meta: cron, target
+          var meta = el('div','sched-meta', '');
+          if (s.cron) { meta.appendChild(el('span','sched-cron', s.cron)); }
+          if (s.to_peer) { meta.appendChild(el('span','sched-cron', 'to ' + s.to_peer)); }
+          if (s.kind) { meta.appendChild(el('span','sched-cron', s.kind)); }
+          if (s.fire_at) { meta.appendChild(el('span','sched-cron', s.fire_at.replace('T',' ').substring(0,16))); }
+          item.appendChild(meta);
+          c3.appendChild(item);
+        });
+      }
+      g.appendChild(c3);
+
+      // ── Card 4: Events ──
+      var c4 = el('div','card');
+      c4.appendChild(el('h3','', 'MESH EVENTS'));
+      if (!events || events.length === 0) {
+        c4.appendChild(el('div','metric-row', 'No recent events'));
+      } else {
+        events.slice(0, MAX_EVENTS).forEach(function(ev) {
+          var item = el('div','event-item');
+          if (ev.type === 'broadcast') item.className += ' event-broadcast';
+          else if (ev.type === 'notify') item.className += ' event-notify';
+          var fromRow = el('div','', '');
+          fromRow.appendChild(el('span','event-from', ev.from || ev.from_peer || 'system'));
+          fromRow.appendChild(textNode(' '));
+          fromRow.appendChild(el('span','event-time', ev.type || ''));
+          item.appendChild(fromRow);
+          var txt = el('div','event-text', ev.text || '');
+          item.appendChild(txt);
+          var timeEl = el('div','event-time', ev.timestamp ? ev.timestamp.replace('T',' ').substring(0,19) : '');
+          item.appendChild(timeEl);
+          c4.appendChild(item);
+        });
+      }
+      g.appendChild(c4);
+
+      // Update refresh badge
+      var rb = document.getElementById('refreshBadge');
+      if (rb) {
+        var elapsed = Date.now() - startTime;
+        rb.textContent = (elapsed / 1000).toFixed(1) + 's / ' + (POLL_MS / 1000) + 's';
+      }
+
+    }).catch(function(err) {
+      var g = document.getElementById('grid');
+      var loadingEl = document.getElementById('loadingState');
+      if (loadingEl) loadingEl.style.display = 'none';
+
+      g.textContent = '';
+      var errCard = el('div','card error-msg');
+      errCard.style.cssText = 'grid-column:1/-1;text-align:center;padding:24px';
+      errCard.appendChild(el('div','','REPOWIRE DAEMON UNREACHABLE'));
+      var errDetail = el('div','', '');
+      errDetail.style.cssText = 'color:#888;font-size:10px;margin:8px 0';
+      errDetail.textContent = 'Could not connect to ' + API_BASE + ' — ' + (err.message || 'unknown error');
+      errCard.appendChild(errDetail);
+      var retry = el('button','retry-btn', 'RETRY NOW');
+      retry.onclick = function() { render(); };
+      errCard.appendChild(retry);
+      g.appendChild(errCard);
+
+      var dot = document.getElementById('globalDot');
+      if (dot) dot.className = 'status-dot offline';
+      var vs2 = document.getElementById('versionSpan');
+      if (vs2) vs2.textContent = 'offline';
+    });
+  }
+
+  function addMetric(card, label, value, cls) {
+    var row = el('div','metric-row');
+    row.appendChild(el('span','metric-label', label));
+    row.appendChild(el('span','metric-value ' + (cls || ''), value));
+    card.appendChild(row);
+  }
+
+  // ── Poll loop ──
+  function startPoll() {
+    render();
+    if (timer) clearInterval(timer);
+    timer = setInterval(render, POLL_MS);
+  }
+
+  // ── Init ──
+  updateClock();
+  clockTimer = setInterval(updateClock, 1000);
+  startPoll();
+
+  // Expose for iframe parent communication
+  window.__repowireWidget = {
+    refresh: function() { render(); },
+    setPollInterval: function(ms) {
+      if (timer) clearInterval(timer);
+      POLL_MS = ms;
+      timer = setInterval(render, POLL_MS);
+    },
+    API_BASE: API_BASE
+  };
+})();
+</script>
+</body>
+</html>

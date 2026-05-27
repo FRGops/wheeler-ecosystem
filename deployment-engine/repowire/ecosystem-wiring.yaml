@@ -1,0 +1,102 @@
+# =============================================================================
+# Wheeler Ecosystem → Repowire Mesh — Master Wiring Configuration
+# =============================================================================
+# This file maps every Wheeler layer, engine, project, and repo to repowire.
+# All future builds auto-read this config to join the mesh.
+
+version: "1.0.0"
+mesh:
+  daemon: "http://127.0.0.1:8377"
+  orchestrator: "wheeler-orchestrator"
+
+# Every Wheeler layer gets a repowire peer
+layers:
+  infrastructure:
+    peer: "wheeler-infra"
+    circle: "wheeler-ops"
+    auto_wire_script: "deployment-engine/repowire/infra-wiring.sh"
+    pm2_auto_wire: "deployment-engine/repowire/pm2-auto-wire.sh"
+
+  deployment:
+    peer: "wheeler-deploy"
+    circle: "wheeler-ops"
+    auto_wire_script: "deployment-engine/repowire/deploy-hooks.sh"
+    pipeline_hook: "deployment-engine/repowire/auto-wire-build.sh"
+
+  security:
+    peer: "wheeler-security"
+    circle: "wheeler-ops"
+
+  database:
+    peer: "wheeler-db"
+    circle: "wheeler-ops"
+
+  monitoring:
+    peer: "wheeler-monitoring"
+    circle: "wheeler-ops"
+
+  financial:
+    peer: "wheeler-financial"
+    circle: "wheeler-finance"
+
+  revenue:
+    peer: "wheeler-revenue"
+    circle: "wheeler-finance"
+
+  growth:
+    peer: "wheeler-growth"
+    circle: "wheeler-growth"
+
+  compliance:
+    peer: "wheeler-compliance"
+    circle: "wheeler-legal"
+
+  docker:
+    peer: "wheeler-docker"
+    circle: "wheeler-ops"
+    auto_wire_script: "deployment-engine/repowire/docker-wiring.sh"
+
+  github:
+    peer: "wheeler-github"
+    circle: "wheeler-core"
+    auto_wire_script: "deployment-engine/repowire/github-wiring.sh"
+
+  dashboard:
+    peer: "wheeler-dashboard"
+    circle: "wheeler-core"
+    widget: "deployment-engine/repowire/dashboard-widget.html"
+
+# Auto-wire all future builds
+auto_build:
+  enabled: true
+  source_script: "deployment-engine/repowire/auto-wire-build.sh"
+  phases:
+    - DISCOVER
+    - PLAN
+    - ARCHITECT
+    - IMPLEMENT
+    - TEST
+    - REVIEW
+    - SECURITY
+    - VERIFY
+    - FINAL_BOSS
+
+# Autonomous schedules
+schedules:
+  - name: "wheeler-daily-health"
+    cron: "57 8 * * *"
+    target: "wheeler-monitoring"
+  - name: "wheeler-hourly-fleet"
+    cron: "13 * * * *"
+    target: "wheeler-infra"
+  - name: "wheeler-revenue-pulse"
+    cron: "23 */6 * * *"
+    target: "wheeler-revenue"
+  - name: "wheeler-security-sweep"
+    cron: "37 6,18 * * *"
+    target: "wheeler-security"
+
+# PM2 services
+pm2_services:
+  - repowire-daemon
+  - repowire-bridge
