@@ -32,6 +32,12 @@
 - [Autonomy Levels](autonomy/AUTONOMY_LEVELS.md)
 - [Human Approval Gates](autonomy/HUMAN_APPROVAL_GATES.md)
 
+## Ecosystem Integration Mesh (ANTI-DUPLICATION)
+- [Service Registry](/opt/wheeler/ecosystem-registry/registry.json) — Complete catalog of ALL services across AIOPS, hostinger, and COREDB
+- [Discovery API](http://localhost:8190/discovery/health) — PM2 `ecosystem-discovery` on :8190 — query before building anything
+- [Pre-Build Checker](/opt/wheeler/ecosystem-registry/scripts/prebuild-check.py) — `python3 prebuild-check.py "<capability>"`
+- [Server Map](CLAUDE.md#ecosystem-integration-mesh-immutable-anti-duplication) — Which server hosts what (in CLAUDE.md)
+
 ## Session Launchers
 - [Preflight Script](session-launchers/preflight-ai-session.sh)
 - [Postflight Script](session-launchers/postflight-ai-session.sh)

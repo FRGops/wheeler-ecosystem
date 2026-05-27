@@ -39,6 +39,57 @@ Phases auto-proceed without human intervention. Only pause for:
 | Large | Full 7-phase pipeline | 6 |
 | Critical | Full pipeline + human gates | As needed |
 
+## ECOSYSTEM INTEGRATION MESH (IMMUTABLE — ANTI-DUPLICATION)
+
+The Wheeler ecosystem spans **3 servers** connected via Tailscale mesh. Before building ANY new service, capability, or module, you MUST check the ecosystem registry to avoid duplicating work that already exists on another server.
+
+### Server Map
+
+| Server | Tailscale IP | Role | What Lives Here |
+|--------|-------------|------|-----------------|
+| **hostinger** | 100.98.163.17 | Production API Gateway | CRM API, Outreach Engine, Enrichment Pipeline, Skip Tracing, Attorney Marketplace, Firecrawl, Gotenberg |
+| **aiops** (this server) | 100.121.230.28 | Brain & Orchestrator | 85+ PM2 processes, 45 Docker containers, Monitoring, AI/LLM, Scrapers, Escheat Watchdog, Agent Army |
+| **coredb** | 100.118.166.117 | Database & Pipelines | PostgreSQL, Redis, Qdrant, MinIO, Infisical Secrets, Prediction Radar, Temporal Pipelines |
+
+### Mandatory Pre-Build Check (BEFORE DISCOVERY PHASE)
+
+**BEFORE creating any new service, module, or capability:**
+1. Query the Ecosystem Discovery API: `curl -s -X POST http://localhost:8190/discovery/prebuild-check -H "Content-Type: application/json" -d '{"capability": "<what you are building>", "description": "<one sentence description>"}' | python3 -m json.tool`
+2. If `should_build` is **false**: STOP. The capability already exists. Read the `integration_points` and integrate with the existing service instead.
+3. If `should_build` is **true**: Proceed, but deploy to the `recommended_target` server.
+
+**CLI tool**: `python3 /opt/wheeler/ecosystem-registry/scripts/prebuild-check.py "<capability>" --json`
+
+### Server Deployment Targets
+
+| If you're building... | Deploy to... | Reason |
+|----------------------|-------------|--------|
+| CRM APIs, Outreach, Skip Tracing | **hostinger** | Production API surface with Nginx + domain routing |
+| AI Agents, Monitoring, Scrapers | **aiops** | Brain node with LLM infra + observability stack |
+| Databases, Secrets, Pipelines | **coredb** | Dedicated DB server with Infisical |
+
+### Cross-Server API Call Pattern
+
+```
+Any server → Tailscale IP → INTERNAL_API_KEY header → target service
+```
+
+Example: AIOPS calling hostinger's skip tracing API:
+```
+curl -H "Authorization: Bearer $INTERNAL_API_KEY" http://100.98.163.17:8082/api/skip-trace/health
+```
+
+### Ecosystem Discovery API (:8190)
+
+Running on AIOPS as PM2 `ecosystem-discovery`. Endpoints:
+- `GET /discovery/health` — API health + server count
+- `GET /discovery/services?server=hostinger` — services by server
+- `GET /discovery/capability/{name}` — find capability by name
+- `GET /discovery/capabilities` — list all 12+ capability domains
+- `POST /discovery/prebuild-check` — "should I build this?"
+
+Registry: `/opt/wheeler/ecosystem-registry/registry.json` — comprehensive catalog of every service across all 3 servers.
+
 ## CORE RULES
 
 ### DeepSeek V4 Protection (IMMUTABLE)
