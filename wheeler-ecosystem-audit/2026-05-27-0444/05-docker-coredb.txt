@@ -1,0 +1,40 @@
+=== DOCKER PS ===
+NAMES                        STATUS                 PORTS
+infisical-nginx              Up 3 hours             127.0.0.1:8443->80/tcp
+infisical                    Up 3 hours (healthy)   443/tcp, 127.0.0.1:8089->8080/tcp
+prediction-radar-scheduler   Up 3 hours             
+postgres-exporter            Up 3 hours             9187/tcp
+usesend                      Up 3 hours             127.0.0.1:3007->3000/tcp
+wheeler-postgres             Up 3 hours (healthy)   100.118.166.117:5432->5432/tcp
+redis-exporter               Up 4 hours (healthy)   
+wheeler-redis                Up 4 hours (healthy)   100.118.166.117:6379->6379/tcp
+wheeler-minio                Up 4 hours (healthy)   127.0.0.1:9000-9001->9000-9001/tcp
+temporal-server              Up 4 hours (healthy)   6933-6935/tcp, 6939/tcp, 7234-7235/tcp, 7239/tcp, 127.0.0.1:7233->7233/tcp
+qdrant                       Up 5 hours             100.118.166.117:6333-6334->6333-6334/tcp, 127.0.0.1:6333->6333/tcp
+aiops-pushgateway            Up 5 hours             127.0.0.1:9092->9091/tcp
+promtail                     Up 5 hours (healthy)   
+temporal-pipeline-worker     Up 4 hours (healthy)   
+prediction-radar-worker      Up 5 hours (healthy)   
+node-exporter                Up 5 hours (healthy)   
+wheeler-uptime-kuma          Up 5 hours (healthy)   127.0.0.1:3001->3001/tcp
+temporal-ui                  Up 5 hours (healthy)   127.0.0.1:8080->8080/tcp
+wheeler-loki                 Up 5 hours (healthy)   127.0.0.1:3100->3100/tcp
+wheeler-prometheus           Up 5 hours (healthy)   
+wheeler-grafana              Up 5 hours (healthy)   
+
+=== PM2 PROCESSES ===
+
+=== DISK ===
+Filesystem      Size  Used Avail Use% Mounted on
+tmpfs           6.2G  2.9M  6.2G   1% /run
+/dev/sda1       338G   18G  306G   6% /
+tmpfs            16G     0   16G   0% /dev/shm
+tmpfs            16G  8.0K   16G   1% /tmp
+none            1.0M     0  1.0M   0% /run/credentials/systemd-journald.service
+none            1.0M     0  1.0M   0% /run/credentials/systemd-resolved.service
+/dev/sda15      253M  154K  252M   1% /boot/efi
+
+=== MEMORY ===
+               total        used        free      shared  buff/cache   available
+Mem:            30Gi       3.2Gi        21Gi       407Mi       7.2Gi        27Gi
+Swap:             0B          0B          0B

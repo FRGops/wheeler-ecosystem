@@ -1,0 +1,21 @@
+=== CONNECTIVITY MATRIX TESTS ===
+
+--- Tailscale ping to Hostinger (100.98.163.17) ---
+pong from srv1476866 (100.98.163.17) via [2a02:4780:5e:44c2::1]:41641 in 179ms
+
+--- Tailscale ping to CoreDB (100.118.166.117) ---
+pong from wheeler-core-db-01 (100.118.166.117) via 10.0.0.2:41641 in 1ms
+
+--- Tailscale ping to Mac (100.83.80.6) ---
+pong from wheelers-macbook-pro (100.83.80.6) via 47.148.242.105:52651 in 33ms
+
+--- SSH to Hostinger (100.98.163.17) ---
+root@100.98.163.17: Permission denied (publickey).
+
+--- SSH to CoreDB (100.118.166.117) ---
+wheeler-core-db-01
+up 5 hours, 1 minute
+
+--- SSH to Mac (100.83.80.6) ---
+root@100.83.80.6: Permission denied (publickey,password,keyboard-interactive).
+

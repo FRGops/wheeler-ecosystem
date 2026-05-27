@@ -1,0 +1,34 @@
+=== DATABASE & BACKUP AUDIT (COREDB) ===
+
+--- PostgreSQL ---
+
+--- Redis ---
+redis-exporter Up 4 hours (healthy)
+wheeler-redis Up 4 hours (healthy)
+
+--- Qdrant ---
+qdrant Up 5 hours
+
+--- MinIO ---
+wheeler-minio Up 4 hours (healthy)
+
+--- Backup files ---
+/root/wheeler-redis-inspect-backup-20260524-030623.json
+/root/wheeler-postgres-inspect-backup-20260524-030623.json
+/root/pg_config_backups
+
+--- Cron jobs ---
+0 3 * * * /opt/backups/backup-postgres.sh >> /var/log/postgres-backup.log 2>&1
+*/5 * * * * bash /opt/wheeler-ecosystem/enforcement/wheeler-lockdown-watchdog.sh >> /var/log/wheeler-watchdog.log 2>&1
+
+--- Docker volumes ---
+DRIVER    VOLUME NAME
+local     prediction-radar-app_prediction_radar_db
+local     prediction-radar-app_prediction_radar_redis
+local     wheeler-core_minio_data
+local     wheeler-core_postgres_data
+local     wheeler-core_redis_data
+local     wheeler-monitoring_grafana_data
+local     wheeler-monitoring_loki_data
+local     wheeler-monitoring_prometheus_data
+local     wheeler-monitoring_uptime_kuma_data

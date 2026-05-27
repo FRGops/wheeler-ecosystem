@@ -1,0 +1,26 @@
+=== PERFORMANCE & COST AUDIT ===
+
+--- Hetzner Resource Usage ---
+CPU: 18.5% user
+RAM used: 18Gi/30Gi
+Disk: 28%
+Load:  3.22, 2.92, 2.54
+
+--- PM2 memory usage (top consumers) ---
+
+--- Docker container memory (top consumers) ---
+aiops-clickhouse                   1.087GiB / 4GiB      4.16%
+ecosystem-graph                    513.3MiB / 1GiB      0.54%
+prediction-radar-app-api           308.3MiB / 2GiB      0.15%
+temporal-server                    235.9MiB / 2GiB      6.36%
+prediction-radar-app-db            117.8MiB / 2GiB      0.09%
+docuseal                           105.1MiB / 1GiB      0.18%
+aiops-changedetection              103.1MiB / 512MiB    0.31%
+aiops-prometheus                   96.28MiB / 1GiB      0.59%
+uptime-kuma                        91.18MiB / 512MiB    0.52%
+uptime-kuma-backup                 90.43MiB / 512MiB    0.51%
+aiops-grafana                      88.55MiB / 1GiB      4.04%
+prediction-radar-uptime-kuma       84.82MiB / 512MiB    0.48%
+langflow                           79.07MiB / 2GiB      31.66%
+netdata                            63.12MiB / 30.6GiB   0.92%
+promtail                           61.59MiB / 256MiB    0.38%

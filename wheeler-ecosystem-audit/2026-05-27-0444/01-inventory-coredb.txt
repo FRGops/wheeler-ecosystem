@@ -1,0 +1,79 @@
+=== INVENTORY: wheeler-core-db-01 ===
+Hostname: wheeler-core-db-01
+Public IP: 2a01:4ff:1f0:8839::1
+Tailscale IP: 100.118.166.117
+OS: PRETTY_NAME="Ubuntu 26.04 LTS"
+NAME="Ubuntu"
+VERSION_ID="26.04"
+Kernel: 7.0.0-15-generic
+CPU: 16 cores
+RAM: 30Gi
+Disk: 338G total, 18G used, 6% pct
+Uptime: up 5 hours, 1 minute
+Load: 0.58, 0.58, 0.54
+
+--- Docker ---
+Docker version 29.1.3, build 29.1.3-0ubuntu4.1
+Docker Compose version v5.1.4
+Containers: 21 running
+
+--- Tailscale ---
+100.118.166.117  wheeler-core-db-01    ron@  linux  -                                                           
+100.98.163.17    srv1476866            ron@  linux  idle, tx 42224 rx 60584                                     
+100.121.230.28   wheeler-aiops-01      ron@  linux  active; direct 10.0.0.3:41641, tx 1398437932 rx 1837813788  
+100.83.80.6      wheelers-macbook-pro  ron@  macOS  -                                                           
+
+--- SSH ---
+active
+
+--- UFW ---
+Status: active
+
+To                         Action      From
+--                         ------      ----
+22 on tailscale0           ALLOW       Anywhere                  
+22                         ALLOW       10.0.0.0/16               
+22/tcp                     ALLOW       Anywhere                  
+5432 on tailscale0         ALLOW       Anywhere                  
+6379 on tailscale0         ALLOW       Anywhere                  
+9000 on tailscale0         ALLOW       Anywhere                  
+9001 on tailscale0         ALLOW       Anywhere                  
+9090 on tailscale0         ALLOW       Anywhere                  
+3001 on tailscale0         ALLOW       Anywhere                  
+3100 on tailscale0         ALLOW       Anywhere                  
+22 (v6) on tailscale0      ALLOW       Anywhere (v6)             
+22/tcp (v6)                ALLOW       Anywhere (v6)             
+5432 (v6) on tailscale0    ALLOW       Anywhere (v6)             
+6379 (v6) on tailscale0    ALLOW       Anywhere (v6)             
+9000 (v6) on tailscale0    ALLOW       Anywhere (v6)             
+9001 (v6) on tailscale0    ALLOW       Anywhere (v6)             
+9090 (v6) on tailscale0    ALLOW       Anywhere (v6)             
+3001 (v6) on tailscale0    ALLOW       Anywhere (v6)             
+3100 (v6) on tailscale0    ALLOW       Anywhere (v6)             
+
+
+--- Listening Ports ---
+State  Recv-Q Send-Q               Local Address:Port  Peer Address:PortProcess                                                  
+LISTEN 0      4096                       0.0.0.0:22         0.0.0.0:*    users:(("sshd",pid=26550,fd=3),("systemd",pid=1,fd=297))
+LISTEN 0      4096                     127.0.0.1:8443       0.0.0.0:*    users:(("docker-proxy",pid=177155,fd=7))                
+LISTEN 0      4096                     127.0.0.1:9092       0.0.0.0:*    users:(("docker-proxy",pid=3378,fd=7))                  
+LISTEN 0      4096                     127.0.0.1:9001       0.0.0.0:*    users:(("docker-proxy",pid=80183,fd=7))                 
+LISTEN 0      4096                     127.0.0.1:9000       0.0.0.0:*    users:(("docker-proxy",pid=80161,fd=7))                 
+LISTEN 0      4096                     127.0.0.1:7233       0.0.0.0:*    users:(("docker-proxy",pid=64964,fd=7))                 
+LISTEN 0      4096                     127.0.0.1:8080       0.0.0.0:*    users:(("docker-proxy",pid=3762,fd=7))                  
+LISTEN 0      4096                     127.0.0.1:8089       0.0.0.0:*    users:(("docker-proxy",pid=175459,fd=7))                
+LISTEN 0      4096                     127.0.0.1:6333       0.0.0.0:*    users:(("docker-proxy",pid=59751,fd=7))                 
+LISTEN 0      4096               100.118.166.117:54060      0.0.0.0:*    users:(("tailscaled",pid=1510,fd=24))                   
+LISTEN 0      4096                 127.0.0.53%lo:53         0.0.0.0:*    users:(("systemd-resolve",pid=902,fd=17))               
+LISTEN 0      4096               100.118.166.117:5432       0.0.0.0:*    users:(("docker-proxy",pid=151405,fd=7))                
+LISTEN 0      4096                     127.0.0.1:3100       0.0.0.0:*    users:(("docker-proxy",pid=3547,fd=7))                  
+LISTEN 0      4096               100.118.166.117:6333       0.0.0.0:*    users:(("docker-proxy",pid=59744,fd=7))                 
+LISTEN 0      4096               100.118.166.117:6334       0.0.0.0:*    users:(("docker-proxy",pid=59765,fd=7))                 
+LISTEN 0      4096               100.118.166.117:6379       0.0.0.0:*    users:(("docker-proxy",pid=80136,fd=7))                 
+LISTEN 0      4096                    127.0.0.54:53         0.0.0.0:*    users:(("systemd-resolve",pid=902,fd=19))               
+LISTEN 0      4096                     127.0.0.1:3007       0.0.0.0:*    users:(("docker-proxy",pid=152232,fd=7))                
+LISTEN 0      4096                     127.0.0.1:3001       0.0.0.0:*    users:(("docker-proxy",pid=3645,fd=7))                  
+LISTEN 0      4096   [fd7a:115c:a1e0::b837:a675]:46299         [::]:*    users:(("tailscaled",pid=1510,fd=25))                   
+LISTEN 0      4096                          [::]:22            [::]:*    users:(("sshd",pid=26550,fd=4),("systemd",pid=1,fd=298))
+LISTEN 0      4096                             *:9100             *:*    users:(("node_exporter",pid=3226,fd=4))                 
+LISTEN 0      4096                             *:9121             *:*    users:(("redis_exporter",pid=83218,fd=4))               

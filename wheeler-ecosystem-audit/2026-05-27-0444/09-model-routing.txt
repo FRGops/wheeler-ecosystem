@@ -1,0 +1,15 @@
+=== AI MODEL ROUTING AUDIT ===
+
+--- Current env vars (redacted) ---
+ANTHROPIC_BASE_URL: https://api.deepseek.com/anthropic...
+ANTHROPIC_MODEL: deepseek-v4-pro
+ANTHROPIC_AUTH_TOKEN: sk-4ac726fce256...
+DEEPSEEK_API_KEY: sk-4ac726fce256...
+
+--- LiteLLM proxy status ---
+{"error":{"message":"Authentication Error, No api key passed in.","type":"auth_error","param":"None","code":"401"}}
+--- DeepSeek routing check ---
+
+--- Claude normal mode check ---
+WARNING: ANTHROPIC_BASE_URL is set - Claude is routing through proxy
+To use normal Claude: unset ANTHROPIC_BASE_URL ANTHROPIC_AUTH_TOKEN ANTHROPIC_MODEL

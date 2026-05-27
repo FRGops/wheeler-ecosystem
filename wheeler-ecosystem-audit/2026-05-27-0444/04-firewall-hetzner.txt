@@ -1,0 +1,360 @@
+=== FIREWALL & PUBLIC PORT AUDIT (Hetzner) ===
+
+--- All listening ports ---
+[::1]:6379
+[::]:22
+[::]:443
+[::]:80
+0.0.0.0:22
+127.0.0.53%lo:53
+127.0.0.54:53
+0.0.0.0:80
+[fd7a:115c:a1e0::b337:e61c]:41506
+0.0.0.0:443
+127.0.0.1:3000
+127.0.0.1:3001
+127.0.0.1:3002
+100.121.230.28:3007
+127.0.0.1:3007
+127.0.0.1:3010
+127.0.0.1:3100
+127.0.0.1:3130
+127.0.0.1:3200
+127.0.0.1:4049
+127.0.0.1:5000
+127.0.0.1:5433
+127.0.0.1:5434
+127.0.0.1:6379
+127.0.0.1:6399
+127.0.0.1:7233
+127.0.0.1:7474
+127.0.0.1:7687
+127.0.0.1:7860
+127.0.0.1:8003
+127.0.0.1:8005
+127.0.0.1:8006
+127.0.0.1:8007
+127.0.0.1:8008
+127.0.0.1:8009
+127.0.0.1:8011
+127.0.0.1:8013
+127.0.0.1:8014
+127.0.0.1:8020
+127.0.0.1:8021
+127.0.0.1:8022
+127.0.0.1:8023
+127.0.0.1:8024
+127.0.0.1:8025
+127.0.0.1:8026
+127.0.0.1:8027
+127.0.0.1:8028
+127.0.0.1:8029
+127.0.0.1:8030
+127.0.0.1:8031
+127.0.0.1:8032
+127.0.0.1:8033
+127.0.0.1:8034
+127.0.0.1:8035
+127.0.0.1:8036
+127.0.0.1:8037
+127.0.0.1:8038
+127.0.0.1:8039
+127.0.0.1:8040
+127.0.0.1:8041
+127.0.0.1:8042
+127.0.0.1:8043
+127.0.0.1:8044
+127.0.0.1:8045
+127.0.0.1:8046
+127.0.0.1:8047
+127.0.0.1:8048
+127.0.0.1:8049
+127.0.0.1:8050
+127.0.0.1:8051
+127.0.0.1:8052
+127.0.0.1:8053
+127.0.0.1:8054
+127.0.0.1:8055
+127.0.0.1:8056
+127.0.0.1:8057
+127.0.0.1:8058
+127.0.0.1:8059
+127.0.0.1:8060
+127.0.0.1:8061
+127.0.0.1:8062
+127.0.0.1:8063
+127.0.0.1:8064
+127.0.0.1:8065
+127.0.0.1:8066
+127.0.0.1:8067
+127.0.0.1:8068
+127.0.0.1:8069
+127.0.0.1:8070
+127.0.0.1:8071
+127.0.0.1:8072
+127.0.0.1:8082
+127.0.0.1:8085
+127.0.0.1:8088
+127.0.0.1:8089
+127.0.0.1:8090
+127.0.0.1:8091
+127.0.0.1:8095
+127.0.0.1:8096
+127.0.0.1:8098
+127.0.0.1:8100
+127.0.0.1:8103
+127.0.0.1:8110
+127.0.0.1:8123
+127.0.0.1:8150
+127.0.0.1:8160
+127.0.0.1:8170
+127.0.0.1:8180
+127.0.0.1:8181
+127.0.0.1:8191
+127.0.0.1:9090
+127.0.0.1:9091
+127.0.0.1:9092
+127.0.0.1:9093
+127.0.0.1:9099
+127.0.0.1:9100
+127.0.0.1:9323
+127.0.0.1:19999
+127.0.0.1:20241
+127.0.0.1:20242
+100.121.230.28:33512
+
+--- 0.0.0.0 bound ports (public exposure risk) ---
+100.121.230.28:3007 0.0.0.0:*
+127.0.0.53%lo:53 0.0.0.0:*
+127.0.0.1:9090 0.0.0.0:*
+127.0.0.1:9091 0.0.0.0:*
+127.0.0.1:9092 0.0.0.0:*
+127.0.0.1:9093 0.0.0.0:*
+127.0.0.1:9099 0.0.0.0:*
+127.0.0.1:9100 0.0.0.0:*
+100.121.230.28:33512 0.0.0.0:*
+127.0.0.1:9323 0.0.0.0:*
+127.0.0.1:3002 0.0.0.0:*
+127.0.0.1:3000 0.0.0.0:*
+127.0.0.1:3001 0.0.0.0:*
+127.0.0.1:3007 0.0.0.0:*
+127.0.0.1:3010 0.0.0.0:*
+127.0.0.1:19999 0.0.0.0:*
+127.0.0.54:53 0.0.0.0:*
+127.0.0.1:20242 0.0.0.0:*
+127.0.0.1:20241 0.0.0.0:*
+127.0.0.1:4049 0.0.0.0:*
+127.0.0.1:3130 0.0.0.0:*
+127.0.0.1:3100 0.0.0.0:*
+127.0.0.1:3200 0.0.0.0:*
+127.0.0.1:6379 0.0.0.0:*
+127.0.0.1:6399 0.0.0.0:*
+127.0.0.1:7687 0.0.0.0:*
+127.0.0.1:7860 0.0.0.0:*
+127.0.0.1:8034 0.0.0.0:*
+127.0.0.1:8035 0.0.0.0:*
+127.0.0.1:8032 0.0.0.0:*
+127.0.0.1:8033 0.0.0.0:*
+127.0.0.1:8038 0.0.0.0:*
+127.0.0.1:8039 0.0.0.0:*
+127.0.0.1:8036 0.0.0.0:*
+127.0.0.1:8037 0.0.0.0:*
+127.0.0.1:8042 0.0.0.0:*
+127.0.0.1:8043 0.0.0.0:*
+127.0.0.1:8040 0.0.0.0:*
+127.0.0.1:8041 0.0.0.0:*
+127.0.0.1:8046 0.0.0.0:*
+127.0.0.1:8047 0.0.0.0:*
+127.0.0.1:8044 0.0.0.0:*
+127.0.0.1:8045 0.0.0.0:*
+127.0.0.1:8050 0.0.0.0:*
+127.0.0.1:8051 0.0.0.0:*
+127.0.0.1:8048 0.0.0.0:*
+127.0.0.1:8049 0.0.0.0:*
+127.0.0.1:8054 0.0.0.0:*
+127.0.0.1:8055 0.0.0.0:*
+127.0.0.1:8052 0.0.0.0:*
+127.0.0.1:8053 0.0.0.0:*
+127.0.0.1:8058 0.0.0.0:*
+127.0.0.1:8059 0.0.0.0:*
+127.0.0.1:8056 0.0.0.0:*
+127.0.0.1:8057 0.0.0.0:*
+127.0.0.1:8062 0.0.0.0:*
+127.0.0.1:8063 0.0.0.0:*
+127.0.0.1:8060 0.0.0.0:*
+127.0.0.1:8061 0.0.0.0:*
+127.0.0.1:8003 0.0.0.0:*
+127.0.0.1:8006 0.0.0.0:*
+127.0.0.1:8007 0.0.0.0:*
+127.0.0.1:8005 0.0.0.0:*
+127.0.0.1:8011 0.0.0.0:*
+127.0.0.1:8008 0.0.0.0:*
+127.0.0.1:8009 0.0.0.0:*
+127.0.0.1:8014 0.0.0.0:*
+127.0.0.1:8013 0.0.0.0:*
+127.0.0.1:8022 0.0.0.0:*
+127.0.0.1:8023 0.0.0.0:*
+127.0.0.1:8020 0.0.0.0:*
+127.0.0.1:8021 0.0.0.0:*
+127.0.0.1:8026 0.0.0.0:*
+127.0.0.1:8027 0.0.0.0:*
+127.0.0.1:8024 0.0.0.0:*
+127.0.0.1:8025 0.0.0.0:*
+127.0.0.1:8030 0.0.0.0:*
+127.0.0.1:8031 0.0.0.0:*
+127.0.0.1:8028 0.0.0.0:*
+127.0.0.1:8029 0.0.0.0:*
+127.0.0.1:8098 0.0.0.0:*
+127.0.0.1:8096 0.0.0.0:*
+127.0.0.1:8103 0.0.0.0:*
+127.0.0.1:8100 0.0.0.0:*
+127.0.0.1:8110 0.0.0.0:*
+127.0.0.1:8123 0.0.0.0:*
+127.0.0.1:8066 0.0.0.0:*
+127.0.0.1:8067 0.0.0.0:*
+127.0.0.1:8064 0.0.0.0:*
+127.0.0.1:8065 0.0.0.0:*
+127.0.0.1:8070 0.0.0.0:*
+127.0.0.1:8071 0.0.0.0:*
+127.0.0.1:8068 0.0.0.0:*
+127.0.0.1:8069 0.0.0.0:*
+127.0.0.1:8072 0.0.0.0:*
+127.0.0.1:8082 0.0.0.0:*
+127.0.0.1:8085 0.0.0.0:*
+127.0.0.1:8090 0.0.0.0:*
+127.0.0.1:8091 0.0.0.0:*
+127.0.0.1:8088 0.0.0.0:*
+127.0.0.1:8089 0.0.0.0:*
+127.0.0.1:8095 0.0.0.0:*
+127.0.0.1:8160 0.0.0.0:*
+127.0.0.1:8170 0.0.0.0:*
+127.0.0.1:8180 0.0.0.0:*
+127.0.0.1:8181 0.0.0.0:*
+127.0.0.1:8191 0.0.0.0:*
+127.0.0.1:8150 0.0.0.0:*
+127.0.0.1:7233 0.0.0.0:*
+127.0.0.1:7474 0.0.0.0:*
+0.0.0.0:22 0.0.0.0:*
+0.0.0.0:80 0.0.0.0:*
+0.0.0.0:443 0.0.0.0:*
+127.0.0.1:5000 0.0.0.0:*
+127.0.0.1:5434 0.0.0.0:*
+127.0.0.1:5433 0.0.0.0:*
+
+--- Docker published ports (all) ---
+coredb-redis-exporter: 9121/tcp
+coredb-postgres-exporter: 9187/tcp
+aiops-node-exporter: 127.0.0.1:9100->9100/tcp
+prediction-radar-fincept: 6080/tcp
+prediction-radar-crowdsec: 
+node-service-redis: 6379/tcp
+prediction-radar-app-api: 
+prediction-radar-app-db: 5432/tcp
+netdata: 127.0.0.1:19999->19999/tcp
+aiops-prometheus: 127.0.0.1:9090->9090/tcp
+aiops-cadvisor: 127.0.0.1:9099->8080/tcp
+ecosystem-graph: 127.0.0.1:7474->7474/tcp, 7473/tcp, 127.0.0.1:7687->7687/tcp
+aiops-pushgateway: 127.0.0.1:9092->9091/tcp
+docuseal: 127.0.0.1:3010->3000/tcp
+aiops-superset: 127.0.0.1:8088->8088/tcp
+open-webui: 127.0.0.1:3000->8080/tcp
+aiops-ravynai-app: 127.0.0.1:8007->8007/tcp
+prediction-radar-app-worker: 
+prediction-radar-app-scheduler: 
+usesend: 100.121.230.28:3007->3007/tcp, 127.0.0.1:3007->3007/tcp
+prediction-radar-app-db-backup-1: 5432/tcp
+temporal-server: 6933-6935/tcp, 6939/tcp, 7234-7235/tcp, 7239/tcp, 127.0.0.1:7233->7233/tcp
+prediction-radar-grafana: 3000/tcp
+prediction-radar-prometheus: 9090/tcp
+prediction-radar-alertmanager: 9093/tcp
+prediction-radar-app-web: 127.0.0.1:8098->80/tcp
+aiops-healthchecks: 127.0.0.1:3130->8000/tcp
+promtail: 
+prediction-radar-fail2ban: 
+prediction-radar-uptime-kuma: 3001/tcp
+prediction-radar-dashboard-v2: 3000/tcp
+prediction-radar-app-redis: 6379/tcp
+aiops-changedetection: 127.0.0.1:5000->5000/tcp
+frgops-standby: 127.0.0.1:5433->5432/tcp
+aiops-webhook-relay: 127.0.0.1:8085->8080/tcp
+uptime-kuma-backup: 3001/tcp
+aiops-clickhouse: 9000/tcp, 127.0.0.1:8123->8123/tcp, 9009/tcp
+uptime-kuma: 127.0.0.1:3001->3001/tcp
+netdata-backup: 19999/tcp
+aiops-ravynai-postgres: 127.0.0.1:5434->5432/tcp
+docuseal-redis: 6379/tcp
+aiops-loki: 127.0.0.1:3100->3100/tcp
+aiops-alertmanager: 127.0.0.1:9093->9093/tcp
+hostinger-health-exporter: 127.0.0.1:9091->9091/tcp
+aiops-grafana: 127.0.0.1:3002->3000/tcp
+temporal-ui: 127.0.0.1:8089->8080/tcp
+langflow: 127.0.0.1:7860->7860/tcp
+
+--- UFW full rules ---
+Status: active
+Logging: on (low)
+Default: deny (incoming), allow (outgoing), deny (routed)
+New profiles: skip
+
+To                         Action      From
+--                         ------      ----
+443/tcp                    ALLOW IN    Anywhere                  
+19999/tcp on tailscale0    ALLOW IN    Anywhere                  
+3001/tcp on tailscale0     ALLOW IN    Anywhere                  
+3002/tcp on tailscale0     ALLOW IN    Anywhere                  
+5000/tcp on tailscale0     ALLOW IN    Anywhere                  
+8088/tcp on tailscale0     ALLOW IN    Anywhere                  
+8098/tcp on tailscale0     ALLOW IN    Anywhere                  
+8007/tcp on tailscale0     ALLOW IN    Anywhere                  
+8123/tcp on tailscale0     ALLOW IN    Anywhere                  
+9000/tcp on tailscale0     ALLOW IN    Anywhere                  
+8090/tcp on tailscale0     ALLOW IN    Anywhere                  
+9090/tcp on tailscale0     ALLOW IN    Anywhere                  
+3130/tcp on tailscale0     ALLOW IN    Anywhere                  
+5434/tcp on tailscale0     ALLOW IN    Anywhere                  
+9000/tcp                   DENY IN     Anywhere                  
+9090/tcp                   DENY IN     Anywhere                  
+9091/tcp on docker0        ALLOW IN    Anywhere                  
+9091/tcp                   ALLOW IN    172.17.0.0/16             
+5432/tcp                   ALLOW IN    100.64.0.0/10             
+5433/tcp                   ALLOW IN    100.64.0.0/10             
+6379/tcp                   ALLOW IN    100.64.0.0/10             
+22/tcp                     LIMIT IN    Anywhere                  
+5433/tcp                   DENY IN     Anywhere                  
+5433/tcp on tailscale0     ALLOW IN    Anywhere                  
+8103/tcp on tailscale0     ALLOW IN    Anywhere                  
+3007/tcp on tailscale0     ALLOW IN    Anywhere                  
+8089/tcp on tailscale0     ALLOW IN    Anywhere                   # temporal-ui (Tailscale only)
+8005/tcp on tailscale0     ALLOW IN    Anywhere                   # usesend (Tailscale only)
+8089/tcp                   DENY IN     Anywhere                  
+8005/tcp                   DENY IN     Anywhere                  
+22/tcp on tailscale0       ALLOW IN    Anywhere                  
+8199 on enp7s0             ALLOW IN    10.0.0.0/16               
+80/tcp (v6)                ALLOW IN    Anywhere (v6)             
+443/tcp (v6)               ALLOW IN    Anywhere (v6)             
+19999/tcp (v6) on tailscale0 ALLOW IN    Anywhere (v6)             
+3001/tcp (v6) on tailscale0 ALLOW IN    Anywhere (v6)             
+3002/tcp (v6) on tailscale0 ALLOW IN    Anywhere (v6)             
+5000/tcp (v6) on tailscale0 ALLOW IN    Anywhere (v6)             
+8088/tcp (v6) on tailscale0 ALLOW IN    Anywhere (v6)             
+8098/tcp (v6) on tailscale0 ALLOW IN    Anywhere (v6)             
+8007/tcp (v6) on tailscale0 ALLOW IN    Anywhere (v6)             
+8123/tcp (v6) on tailscale0 ALLOW IN    Anywhere (v6)             
+9000/tcp (v6) on tailscale0 ALLOW IN    Anywhere (v6)             
+8090/tcp (v6) on tailscale0 ALLOW IN    Anywhere (v6)             
+9090/tcp (v6) on tailscale0 ALLOW IN    Anywhere (v6)             
+3130/tcp (v6) on tailscale0 ALLOW IN    Anywhere (v6)             
+5434/tcp (v6) on tailscale0 ALLOW IN    Anywhere (v6)             
+9000/tcp (v6)              DENY IN     Anywhere (v6)             
+9090/tcp (v6)              DENY IN     Anywhere (v6)             
+9091/tcp (v6) on docker0   ALLOW IN    Anywhere (v6)             
+22/tcp (v6)                LIMIT IN    Anywhere (v6)             
+5433/tcp (v6)              DENY IN     Anywhere (v6)             
+5433/tcp (v6) on tailscale0 ALLOW IN    Anywhere (v6)             
+8103/tcp (v6) on tailscale0 ALLOW IN    Anywhere (v6)             
+8089/tcp (v6) on tailscale0 ALLOW IN    Anywhere (v6)              # temporal-ui (Tailscale only)
+8005/tcp (v6) on tailscale0 ALLOW IN    Anywhere (v6)              # usesend (Tailscale only)
+8089/tcp (v6)              DENY IN     Anywhere (v6)             
+8005/tcp (v6)              DENY IN     Anywhere (v6)             
+22/tcp (v6) on tailscale0  ALLOW IN    Anywhere (v6)             
+

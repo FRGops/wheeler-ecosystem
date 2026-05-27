@@ -1,0 +1,35 @@
+=== COREDB SECURITY POSTURE ===
+--- Public ports (non-loopback) ---
+LISTEN 0      4096                       0.0.0.0:22         0.0.0.0:*    users:(("sshd",pid=26550,fd=3),("systemd",pid=1,fd=297))
+LISTEN 0      4096               100.118.166.117:54060      0.0.0.0:*    users:(("tailscaled",pid=1510,fd=24))                   
+LISTEN 0      4096                 127.0.0.53%lo:53         0.0.0.0:*    users:(("systemd-resolve",pid=902,fd=17))               
+LISTEN 0      4096               100.118.166.117:5432       0.0.0.0:*    users:(("docker-proxy",pid=151405,fd=7))                
+LISTEN 0      4096               100.118.166.117:6333       0.0.0.0:*    users:(("docker-proxy",pid=59744,fd=7))                 
+LISTEN 0      4096               100.118.166.117:6334       0.0.0.0:*    users:(("docker-proxy",pid=59765,fd=7))                 
+LISTEN 0      4096               100.118.166.117:6379       0.0.0.0:*    users:(("docker-proxy",pid=80136,fd=7))                 
+LISTEN 0      4096                    127.0.0.54:53         0.0.0.0:*    users:(("systemd-resolve",pid=902,fd=19))               
+LISTEN 0      4096   [fd7a:115c:a1e0::b837:a675]:46299         [::]:*    users:(("tailscaled",pid=1510,fd=25))                   
+LISTEN 0      4096                          [::]:22            [::]:*    users:(("sshd",pid=26550,fd=4),("systemd",pid=1,fd=298))
+LISTEN 0      4096                             *:9100             *:*    users:(("node_exporter",pid=3226,fd=4))                 
+LISTEN 0      4096                             *:9121             *:*    users:(("redis_exporter",pid=83218,fd=4))               
+
+--- User accounts with shells ---
+root
+
+--- fail2ban status ---
+Status for the jail: sshd
+|- Filter
+|  |- Currently failed:	3
+|  |- Total failed:	467
+|  `- Journal matches:	_SYSTEMD_UNIT=ssh.service + _COMM=sshd
+`- Actions
+   |- Currently banned:	6
+   |- Total banned:	75
+   `- Banned IP list:	103.143.12.253 82.22.175.192 46.101.216.224 41.242.115.83 220.119.37.141 45.148.10.141
+
+--- Docker socket ---
+srw-rw---- 1 root docker 0 May 26 23:52 /var/run/docker.sock
+
+--- Infisical status ---
+infisical-nginx Up 3 hours
+infisical Up 3 hours (healthy)

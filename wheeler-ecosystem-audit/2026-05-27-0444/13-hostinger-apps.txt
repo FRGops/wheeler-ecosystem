@@ -1,0 +1,77 @@
+=== HOSTINGER APP HEALTH DEEP DIVE ===
+
+--- Nginx sites configured ---
+attorney-fundsrecoverygroup
+attorneys-frgops-io
+backstage
+changes
+claimant-frgops-io
+client-fundsrecoverygroup
+crm-fundsrecoverygroup
+deals-ravyncapital-io
+docs-frgops-io
+email-frgops-io
+frg-ai-gateway
+frgcrm
+fundsrecoverygroup
+getsurplus-ai
+healthchecks-frgops-io
+insforge
+netdata-frgops-io
+nocobase
+opendesign-frgops-io
+openfang
+ops-frgops-io
+paralegal-frgcrm
+partner-fundsrecoverygroup
+plausible-frgops-io
+prediction-radar
+status-frgops-io
+superset
+surplusai-ai
+surplusai-io
+twenty
+voice-frgops-io
+wheeler-bypass
+wheeler-frgops-io
+
+--- Nginx error check ---
+2026/05/27 04:54:54 [error] 3269600#3269600: *63930 no live upstreams while connecting to upstream, client: 162.158.186.190, server: predictionradar.app, request: "GET /key.json HTTP/2.0", upstream: "http://localhost/key.json", host: "predictionradar.app", referrer: "https://www.predictionradar.app/key.json"
+2026/05/27 04:54:54 [error] 3269600#3269600: *63939 no live upstreams while connecting to upstream, client: 172.64.217.220, server: predictionradar.app, request: "GET /gcp-credentials.json HTTP/2.0", upstream: "http://localhost/gcp-credentials.json", host: "predictionradar.app", referrer: "https://www.predictionradar.app/gcp-credentials.json"
+2026/05/27 04:54:54 [error] 3269600#3269600: *63943 no live upstreams while connecting to upstream, client: 172.70.207.82, server: predictionradar.app, request: "GET /secrets.json HTTP/2.0", upstream: "http://localhost/secrets.json", host: "predictionradar.app", referrer: "https://www.predictionradar.app/secrets.json"
+2026/05/27 04:54:54 [error] 3269600#3269600: *63944 no live upstreams while connecting to upstream, client: 172.70.207.81, server: predictionradar.app, request: "GET /appsettings.json HTTP/2.0", upstream: "http://localhost/appsettings.json", host: "predictionradar.app", referrer: "https://www.predictionradar.app/appsettings.json"
+2026/05/27 04:54:54 [error] 3269600#3269600: *63945 no live upstreams while connecting to upstream, client: 104.23.251.32, server: predictionradar.app, request: "GET /google-credentials.json HTTP/2.0", upstream: "http://localhost/google-credentials.json", host: "predictionradar.app", referrer: "https://www.predictionradar.app/google-credentials.json"
+2026/05/27 04:54:54 [error] 3269600#3269600: *63946 no live upstreams while connecting to upstream, client: 172.70.206.90, server: predictionradar.app, request: "GET /robots.txt HTTP/2.0", upstream: "http://localhost/robots.txt", host: "predictionradar.app", referrer: "https://www.predictionradar.app/robots.txt"
+2026/05/27 04:54:55 [error] 3269600#3269600: *63930 no live upstreams while connecting to upstream, client: 162.158.186.190, server: predictionradar.app, request: "GET /actuator/env HTTP/2.0", upstream: "http://localhost/actuator/env", host: "predictionradar.app", referrer: "https://www.predictionradar.app/actuator/env"
+2026/05/27 04:54:55 [error] 3269600#3269600: *63949 no live upstreams while connecting to upstream, client: 172.70.214.242, server: predictionradar.app, request: "GET /keyfile.json HTTP/2.0", upstream: "http://localhost/keyfile.json", host: "predictionradar.app", referrer: "https://www.predictionradar.app/keyfile.json"
+2026/05/27 04:54:55 [error] 3269600#3269600: *63948 no live upstreams while connecting to upstream, client: 104.23.251.32, server: predictionradar.app, request: "GET /service-account.json HTTP/2.0", upstream: "http://localhost/service-account.json", host: "predictionradar.app", referrer: "https://www.predictionradar.app/service-account.json"
+2026/05/27 04:54:55 [error] 3269603#3269603: *63950 no live upstreams while connecting to upstream, client: 172.70.214.242, server: predictionradar.app, request: "GET /firebase-adminsdk.json HTTP/2.0", upstream: "http://localhost/firebase-adminsdk.json", host: "predictionradar.app", referrer: "https://www.predictionradar.app/firebase-adminsdk.json"
+
+--- OpenClaw Gateway routes ---
+{"ok":true,"status":"live"}
+--- Quick status of key apps ---
+  fundsrecoverygroup: HTTP 200 (via nginx)
+  frgcrm: HTTP 307 (via nginx)
+  surplusai-io: HTTP 307 (via nginx)
+  getsurplus-ai: HTTP 307 (via nginx)
+  insforge: HTTP 307 (via nginx)
+  prediction-radar: HTTP 307 (via nginx)
+
+--- PM2 processes ---
+
+--- Process list (non-container apps) ---
+     21 postgres:
+     10 nginx:
+      3 next-server
+      2 sort
+      2 sh
+      2 npm
+      2 node
+      2 /usr/sbin/netdata
+      1 uniq
+      1 python3
+      1 ps
+      1 postgres
+      1 openclaw-gateway
+      1 head
+      1 bash

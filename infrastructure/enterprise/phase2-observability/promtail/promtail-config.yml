@@ -15,7 +15,7 @@ server:
 # Loki push endpoint — uses Docker DNS (loki service name) when deployed via compose.
 # Falls back to direct IP for standalone docker run deployments.
 clients:
-  - url: http://loki:3100/loki/api/v1/push
+  - url: http://aiops-loki:3100/loki/api/v1/push
     batchwait: 1s
     batchsize: 1048576      # 1MB batches — balances latency vs throughput
     timeout: 10s

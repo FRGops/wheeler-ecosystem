@@ -1,0 +1,237 @@
+=== AGENTIC WORKFLOW INVENTORY (Hetzner) ===
+
+--- Claude Code agents registered ---
+acquisition-intelligence
+agent-coordination
+ai-cfo
+ai-ecosystem-governance
+ai-governance
+aiops-integration
+ai-research
+ai-routing
+ai-spending-governance
+ai-token-cost
+alert-correlation
+api-cost-intelligence
+api-terms
+attorney-network-compliance
+audit-trail
+automation-recommendation
+autonomous-docs
+autonomous-execution-engine
+autonomous-financial-optimization
+autonomous-optimization
+billing-intelligence
+budget-automation
+business-intelligence
+capital-allocation
+cashflow-forecasting
+ceo-command-console
+chief-of-staff
+claims-workflow-compliance
+client-consent
+competitor-intelligence
+compliance-mapping
+content-authority-engine
+content-lead
+context-routing
+contract-automation
+conversion-lead
+cost-intelligence
+county-intelligence
+credit-strategy
+cybersecurity-compliance
+database-rls-auditor
+data-licensing
+data-privacy
+data-quality
+deployment-intelligence
+devops-smoke-tester
+dispute-management
+distribution-systems-architecture
+docker-expert
+docker-intelligence
+document-review
+drift-detection
+ecosystem-health-scoring
+ecosystem-memory
+ecosystem-relationship-mapper
+embedding-pipeline
+engineering-code-reviewer
+engineering-sre
+enterprise-kpi-intelligence
+executive-dashboard
+executive-reporting
+executive-workflow
+financial-dashboard
+financial-governance
+financial-reporting
+forecasting-intelligence
+foreclosure-intelligence
+fraud-prevention
+funding-strategy
+gateway-intelligence
+github-intelligence
+government-contracting-compliance
+growth-orchestrator
+incident-response-agent
+infra-graph
+infra-intelligence
+infrastructure-cost
+infrastructure-optimization
+investment-opportunity
+knowledge-governance
+kpi-intelligence
+kyc-identity
+lead-intelligence
+legal-ops
+local-seo-domination
+long-term-capital-strategy
+long-term-learning
+long-term-scaling
+marketing-compliance
+market-intelligence
+marketplace-compliance
+marketplace-kpi
+mcp-intelligence
+monetization-orchestrator
+monitoring-intelligence
+multi-server-coordination
+nationwide-seo-engine
+no-false-greens-legal
+no-false-greens-qa
+observability-intelligence
+operational-finance
+operational-forecasting
+oss-intelligence
+pm2-intelligence
+predictive-intelligence
+privacy-policy
+production-readiness-agent
+profitability-intelligence
+rag-architecture
+real-estate-compliance
+real-estate-financial-intelligence
+real-estate-intelligence
+records-retention
+repo-intelligence
+research-automation
+resource-allocation
+revenue-forecasting
+revenue-intelligence
+risk-scoring
+roi-optimization
+rollback-intelligence
+saas-kpi
+saas-terms
+scaling-cost-forecast
+securities-compliance
+security-intelligence
+seo-intelligence
+seo-lead
+sms-email-compliance
+state-rules
+strategic-planning
+stripe-revenue
+subscription-analytics
+surplus-funds-compliance
+tailscale-mesh
+tax-strategy-intelligence
+treasury-intelligence
+trend-forecasting
+vector-database
+vendor-optimization
+vendor-risk
+wealth-infrastructure
+wheeler-brain-core
+wheeler-brain-dashboard
+wheeler-brain-financial-integration
+wheeler-brain-integration
+wheeler-db-agent
+wheeler-deploy-agent
+wheeler-infra-agent
+wheeler-mac-agent
+wheeler-security-agent
+wheeler-worker-agent
+zero-false-green-auditor
+
+--- Agent count ---
+Agent MD files: 153
+Agent registry entries: 142
+
+--- PM2 Agent Services (agent-svc) ---
+  design-agent-svc                              online
+  horizon-agent-svc                             online
+  paperless-agent-svc                           online
+  ravyn-agent-svc                               online
+  surplusai-scraper-agent-svc                   online
+  voice-agent-svc                               online
+  insforge-agent-svc                            online
+  prediction-radar-agent-svc                    online
+  home-automation-agent-svc                     online
+  content-marketing-agent-svc                   online
+  social-media-agent-svc                        online
+  logistics-coordinator-agent-svc               online
+  property-manager-agent-svc                    online
+  conversion-optimization-agent-svc             online
+  ad-management-agent-svc                       online
+  link-building-agent-svc                       online
+  brand-management-agent-svc                    online
+  email-marketing-agent-svc                     online
+  analytics-agent-svc                           online
+  product-manager-agent-svc                     online
+  feature-prioritization-agent-svc              online
+  user-research-agent-svc                       online
+  competitive-analysis-agent-svc                online
+  security-operations-center-agent-svc          online
+  vulnerability-scanner-agent-svc               online
+  penetration-testing-agent-svc                 online
+  incident-forensics-agent-svc                  online
+  threat-intelligence-agent-svc                 online
+  customer-support-agent-svc                    online
+  helpdesk-agent-svc                            online
+  customer-success-agent-svc                    online
+  onboarding-agent-svc                          online
+  feedback-collection-agent-svc                 online
+  production-readiness-agent-svc                online
+  incident-response-agent-svc                   online
+  monitoring-intelligence-agent-svc             online
+  ecosystem-health-scoring-agent-svc            online
+  ceo-command-console-agent-svc                 online
+  data-pipeline-agent-svc                       online
+  data-quality-monitor-agent-svc                online
+  etl-orchestrator-agent-svc                    online
+  data-warehouse-agent-svc                      online
+  ml-training-agent-svc                         online
+  model-registry-agent-svc                      online
+  experiment-tracker-agent-svc                  online
+  database-rls-auditor-agent-svc                online
+  wheeler-brain-core-agent-svc                  online
+  rollback-intelligence-agent-svc               online
+  deployment-intelligence-agent-svc             online
+  docker-intelligence-agent-svc                 online
+  infrastructure-optimization-agent-svc         online
+  wealth-personal-agent-svc                     online
+  calendar-ai-agent-svc                         online
+  productivity-coach-agent-svc                  online
+  health-tracker-agent-svc                      online
+  network-manager-agent-svc                     online
+  nutrition-advisor-agent-svc                   online
+  fitness-coach-agent-svc                       online
+  travel-planner-agent-svc                      online
+  learning-coach-agent-svc                      online
+  frgcrm-agent-svc                              online
+
+--- Self-healing scripts ---
+/root/scripts/aiops-watchdog/port-watchdog.sh
+/root/scripts/aiops-watchdog/docker-watchdog.sh
+/root/scripts/aiops-watchdog/exposure-watchdog.sh
+/root/scripts/aiops-watchdog/health-report.json
+/root/scripts/aiops-watchdog/resource-watchdog.sh
+/root/scripts/aiops-watchdog/ecosystem-health.sh
+/root/scripts/aiops-watchdog/port-baseline.txt
+/root/scripts/aiops-watchdog/autoheal-trigger.sh
+/root/scripts/aiops-watchdog/compliance-health.json
+/root/scripts/aiops-watchdog/pm2-watchdog.sh
+/root/scripts/aiops-watchdog/autoheal-trigger.sh
+/root/infrastructure/enterprise/phase5-self-healing/autoheal.sh

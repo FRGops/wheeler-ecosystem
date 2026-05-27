@@ -1,0 +1,50 @@
+=== INVENTORY: wheeler-aiops-01 ===
+Hostname: wheeler-aiops-01
+Public IP: 2a01:4ff:1f0:7add::1
+Tailscale IP: 100.121.230.28
+OS: PRETTY_NAME="Ubuntu 24.04.4 LTS"
+NAME="Ubuntu"
+VERSION_ID="24.04"
+Kernel: 6.8.0-117-generic
+CPU: 16 cores / AMD EPYC-Rome Processor NotSpecified CPU @ 2.0GHz
+RAM: 30Gi
+Disk: 338G total, 91G used, 28% pct
+Uptime: up 3 days, 9 hours, 7 minutes
+Load: 2.34, 2.60, 2.36
+
+--- Docker ---
+Docker version 29.5.2, build 79eb04c
+Docker Compose version v5.1.4
+Containers: 47 running
+
+--- Tailscale ---
+100.121.230.28   wheeler-aiops-01      ron@  linux  -                                                                    
+100.98.163.17    srv1476866            ron@  linux  active; direct [2a02:4780:5e:44c2::1]:41641, tx 4700396 rx 42227732  
+100.118.166.117  wheeler-core-db-01    ron@  linux  active; direct 10.0.0.2:41641, tx 1917871040 rx 1328628372           
+100.83.80.6      wheelers-macbook-pro  ron@  macOS  -                                                                    
+
+--- SSH ---
+inactive
+sshd status unknown
+
+--- UFW ---
+Status: active
+
+To                         Action      From
+--                         ------      ----
+443/tcp                    ALLOW       Anywhere                  
+19999/tcp on tailscale0    ALLOW       Anywhere                  
+3001/tcp on tailscale0     ALLOW       Anywhere                  
+3002/tcp on tailscale0     ALLOW       Anywhere                  
+5000/tcp on tailscale0     ALLOW       Anywhere                  
+8088/tcp on tailscale0     ALLOW       Anywhere                  
+8098/tcp on tailscale0     ALLOW       Anywhere                  
+8007/tcp on tailscale0     ALLOW       Anywhere                  
+8123/tcp on tailscale0     ALLOW       Anywhere                  
+9000/tcp on tailscale0     ALLOW       Anywhere                  
+8090/tcp on tailscale0     ALLOW       Anywhere                  
+9090/tcp on tailscale0     ALLOW       Anywhere                  
+3130/tcp on tailscale0     ALLOW       Anywhere                  
+5434/tcp on tailscale0     ALLOW       Anywhere                  
+9000/tcp                   DENY        Anywhere                  
+9090/tcp                   DENY        Anywhere                  

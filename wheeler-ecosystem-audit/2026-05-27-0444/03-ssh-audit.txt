@@ -1,0 +1,24 @@
+=== SSH HARDENING AUDIT ===
+
+--- HETZNER (self) ---
+sshd status: inactive
+sshd not running
+Password auth: PasswordAuthentication no
+Root login: PermitRootLogin prohibit-password
+Pubkey auth: 
+Authorized keys count: 2
+Authorized keys:
+  wheeler-aiops
+  wheeler-aiops-cross-server
+
+--- COREDB ---
+sshd status: active
+Password auth: not set
+Root login: not set
+Pubkey auth: not set
+Authorized keys count: 3
+Authorized keys:
+  wheeler-aiops-cross-server
+  Wheeler-AIOps-Bot
+  wheeler-mesh-automation
+fail2ban: active
