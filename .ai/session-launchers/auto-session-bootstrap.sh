@@ -70,6 +70,18 @@ if [ -f "$CAPABILITY_SCANNER" ] && [ -x "$CAPABILITY_SCANNER" ]; then
   bash "$CAPABILITY_SCANNER" || true
 fi
 
+# ── Wheeler Jarvis Command Center health pulse ──
+WHEELER_BIN="$HOME/WheelerCommandCenter/bin/wheeler"
+if [ -x "$WHEELER_BIN" ]; then
+  echo ""
+  echo "  ───── WHEELER JARVIS COMMAND CENTER ─────"
+  export WHEELER_HOME="$HOME/WheelerCommandCenter"
+  export PATH="$WHEELER_HOME/bin:$PATH"
+  { "$WHEELER_BIN" health 2>/dev/null || true; } | head -35
+  echo "  Type /wheeler for the command center"
+  echo "  ─────────────────────────────────────────"
+fi
+
 echo ""
 echo "============================================"
 echo " Bootstrap complete — session ready"

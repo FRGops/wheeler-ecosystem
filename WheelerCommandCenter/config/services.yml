@@ -1,0 +1,154 @@
+# Wheeler Ecosystem Service Registry
+# =====================================
+# Populated: 2026-05-27 — from PM2 jlist + Docker ps + discovery
+
+services:
+  # ── Public Sites ──
+  - name: "frg-public-site"
+    server: "hostinger"
+    type: "docker"
+    health_url: "https://fundsrecoverygroup.com"
+    log_command: "ssh hostinger 'docker compose -f /opt/apps/frg-site/docker-compose.yml logs --tail 100'"
+
+  - name: "prediction-radar"
+    server: "coredb"
+    type: "docker"
+    health_url: "https://predictionradar.app"
+    log_command: "ssh coredb 'docker compose -f /opt/apps/prediction-radar-app/docker-compose.yml logs --tail 100'"
+
+  # ── Core APIs ──
+  - name: "wheeler-brain-api"
+    server: "hetzner"
+    type: "pm2"
+    health_url: "TODO"
+    log_command: "pm2 logs wheeler-brain-api --lines 100 --nostream"
+
+  - name: "aiops-saas-api"
+    server: "hetzner"
+    type: "pm2"
+    health_url: "http://localhost:8180"
+    log_command: "pm2 logs aiops-saas-api --lines 100 --nostream"
+
+  - name: "frgcrm-api"
+    server: "hetzner"
+    type: "pm2"
+    health_url: "TODO"
+    log_command: "pm2 logs frgcrm-api --lines 100 --nostream"
+
+  - name: "surplusai-portal-api"
+    server: "hetzner"
+    type: "pm2"
+    health_url: "TODO"
+    log_command: "pm2 logs surplusai-portal-api --lines 100 --nostream"
+
+  - name: "eligibility-api"
+    server: "hetzner"
+    type: "pm2"
+    health_url: "TODO"
+    log_command: "pm2 logs eligibility-api --lines 100 --nostream"
+
+  - name: "executive-dashboard-api"
+    server: "hetzner"
+    type: "pm2"
+    health_url: "http://localhost:8180"
+    log_command: "pm2 logs executive-dashboard-api --lines 100 --nostream"
+
+  # ── AI Infrastructure ──
+  - name: "litellm"
+    server: "hetzner"
+    type: "pm2"
+    health_url: "http://localhost:4049/health"
+    log_command: "pm2 logs litellm --lines 100 --nostream"
+
+  - name: "embedding-service"
+    server: "hetzner"
+    type: "pm2"
+    health_url: "http://localhost:8191/health"
+    log_command: "pm2 logs embedding-service --lines 100 --nostream"
+
+  - name: "open-webui"
+    server: "hetzner"
+    type: "docker"
+    health_url: "http://localhost:3000"
+    log_command: "docker logs open-webui --tail 100"
+
+  # ── Monitoring Stack ──
+  - name: "grafana"
+    server: "hetzner"
+    type: "docker"
+    health_url: "http://localhost:3002"
+    log_command: "docker logs aiops-grafana --tail 100"
+
+  - name: "prometheus"
+    server: "hetzner"
+    type: "docker"
+    health_url: "http://localhost:9090"
+    log_command: "docker logs aiops-prometheus --tail 100"
+
+  - name: "uptime-kuma"
+    server: "hetzner"
+    type: "docker"
+    health_url: "http://localhost:3001"
+    log_command: "docker logs uptime-kuma --tail 100"
+
+  - name: "netdata"
+    server: "hetzner"
+    type: "docker"
+    health_url: "http://localhost:19999"
+    log_command: "docker logs netdata --tail 100"
+
+  # ── Databases ──
+  - name: "core-db"
+    server: "coredb"
+    type: "docker"
+    health_url: "TODO"
+    log_command: "ssh coredb 'docker logs wheeler-postgres --tail 100'"
+
+  - name: "redis"
+    server: "coredb"
+    type: "docker"
+    health_url: "TODO"
+    log_command: "ssh coredb 'docker logs wheeler-redis --tail 100'"
+
+  - name: "qdrant"
+    server: "coredb"
+    type: "docker"
+    health_url: "TODO"
+    log_command: "ssh coredb 'docker logs qdrant --tail 100'"
+
+  # ── Infrastructure ──
+  - name: "temporal-server"
+    server: "coredb"
+    type: "docker"
+    health_url: "TODO"
+    log_command: "ssh coredb 'docker logs temporal-server --tail 100'"
+
+  - name: "infisical"
+    server: "coredb"
+    type: "docker"
+    health_url: "TODO"
+    log_command: "ssh coredb 'docker logs infisical --tail 100'"
+
+  - name: "nginx"
+    server: "hetzner"
+    type: "docker"
+    health_url: "TODO"
+    log_command: "docker logs nginx --tail 100 2>/dev/null || echo 'nginx container name may vary'"
+
+  - name: "wheeler-prometheus"
+    server: "coredb"
+    type: "docker"
+    health_url: "TODO"
+    log_command: "ssh coredb 'docker logs wheeler-prometheus --tail 100'"
+
+  - name: "wheeler-loki"
+    server: "coredb"
+    type: "docker"
+    health_url: "TODO"
+    log_command: "ssh coredb 'docker logs wheeler-loki --tail 100'"
+
+  - name: "wheeler-uptime-kuma"
+    server: "coredb"
+    type: "docker"
+    health_url: "TODO"
+    log_command: "ssh coredb 'docker logs wheeler-uptime-kuma --tail 100'"

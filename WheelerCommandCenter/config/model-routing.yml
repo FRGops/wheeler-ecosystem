@@ -1,0 +1,43 @@
+# Wheeler Ecosystem AI Model Routing
+# =====================================
+# Controls which AI backend is active
+# Never store API keys here
+
+models:
+  claude_normal:
+    description: "Standard Claude Code via Anthropic API"
+    env_checks:
+      - "ANTHROPIC_BASE_URL should be https://api.anthropic.com"
+      - "ANTHROPIC_AUTH_TOKEN should be set"
+      - "ANTHROPIC_MODEL should be set"
+    launch: "claude"
+    cost_tier: "standard"
+
+  deepseek_v4:
+    description: "DeepSeek V4 via LiteLLM proxy (:4049)"
+    env_checks:
+      - "ANTHROPIC_BASE_URL should point to LiteLLM proxy"
+      - "DEEPSEEK_API_KEY should be set"
+      - "LITELLM_MASTER_KEY should be set"
+    launch: "claude"
+    cost_tier: "low"
+
+  kimi:
+    description: "Kimi moonshot model"
+    env_checks:
+      - "MOONSHOT_API_KEY should be set"
+    launch: "TODO"
+    cost_tier: "medium"
+
+  reset:
+    description: "Clear all AI routing env vars to avoid contamination"
+    unset_vars:
+      - "ANTHROPIC_BASE_URL"
+      - "ANTHROPIC_AUTH_TOKEN"
+      - "ANTHROPIC_MODEL"
+      - "ANTHROPIC_DEFAULT_OPUS_MODEL"
+      - "ANTHROPIC_DEFAULT_SONNET_MODEL"
+      - "ANTHROPIC_DEFAULT_HAIKU_MODEL"
+      - "DEEPSEEK_API_KEY"
+      - "OPENROUTER_API_KEY"
+    warning: "This will clear your AI routing. Run 'wheeler ai claude' or 'wheeler ai deepseek' to restore a mode."

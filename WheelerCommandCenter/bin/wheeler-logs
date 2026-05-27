@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# ============================================
+# wheeler-logs — View service logs
+# ============================================
+set -euo pipefail
+
+SERVICE="${1:-}"
+FOLLOW=false
+LINES=100
+
+for arg in "$@"; do
+  case "$arg" in
+    --follow|-f) FOLLOW=true ;;
+  esac
+done
+
+if [ -z "$SERVICE" ]; then
+  echo "Usage: wheeler logs <service> [--follow]"
+  echo ""
+  echo "Known services:"
+  if [ -f "$HOME/WheelerCommandCenter/config/services.yml" ]; then
+    python3 -c "
+import yaml
+with open('$HOME/WheelerCommandCenter/config/services.yml') as f:
+    data = yaml.safe_load(f)
+for s in data.get('services', []):
+    print(f\"  {s['name']:25s} -> {s.get('server','?'):12s}  ({s.get('type','?')})\")
+" 2>/dev/null || echo "  (config parse error)"
+  fi
+  echo ""
+  echo "Examples:"
+  echo "  wheeler logs aiops"
+  echo "  wheeler logs frg-public-site"
+  echo "  wheeler logs nginx --follow"
+  exit 1
+fi
+
+# Look up service in config
+SERVICE_INFO=""
+if [ -f "$HOME/WheelerCommandCenter/config/services.yml" ]; then
+  SERVICE_INFO=$(python3 -c "
+import yaml
+with open('$HOME/WheelerCommandCenter/config/services.yml') as f:
+    data = yaml.safe_load(f)
+for s in data.get('services', []):
+    if s['name'] == '$SERVICE':
+        print(f\"{s.get('server','?')}|{s.get('log_command','?')}|{s.get('type','?')}\")
+        break
+" 2>/dev/null || echo "")
+fi
+
+if [ -z "$SERVICE_INFO" ]; then
+  echo "  [WARN] Service '$SERVICE' not found in config/services.yml"
+  echo "  Add it or check available services with: wheeler logs"
+  exit 1
+fi
+
+IFS='|' read -r SERVER LOG_CMD SVC_TYPE <<< "$SERVICE_INFO"
+
+echo "  Service: $SERVICE"
+echo "  Server:  $SERVER"
+echo "  Type:    $SVC_TYPE"
+echo ""
+
+if [ "$LOG_CMD" = "TODO" ] || [ -z "$LOG_CMD" ]; then
+  echo "  [WARN] Log command not configured for this service."
+  echo "  Update config/services.yml with a proper log_command."
+  exit 1
+fi
+
+if [ "$FOLLOW" = true ]; then
+  echo "  Following logs (Ctrl+C to stop)..."
+  echo ""
+  eval "$LOG_CMD --follow" 2>/dev/null || eval "$LOG_CMD -f" 2>/dev/null || {
+    echo "  [WARN] --follow not supported for this service. Showing last $LINES lines:"
+    eval "$LOG_CMD"
+  }
+else
+  echo "  Last $LINES lines:"
+  echo ""
+  eval "$LOG_CMD"
+fi

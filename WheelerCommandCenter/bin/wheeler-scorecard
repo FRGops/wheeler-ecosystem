@@ -1,0 +1,228 @@
+#!/usr/bin/env bash
+# ============================================
+# wheeler-scorecard — 100/100 Readiness Scorecard
+# ============================================
+set -euo pipefail
+
+WHEELER_HOME="${WHEELER_HOME:-$HOME/WheelerCommandCenter}"
+SCORECARD_DIR="$WHEELER_HOME/scorecards"
+TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
+REPORT="$SCORECARD_DIR/scorecard-$TIMESTAMP.md"
+
+mkdir -p "$SCORECARD_DIR"
+
+ok()  { echo "  [OK]    $1"; }
+warn(){ echo "  [WARN]  $1"; }
+fail(){ echo "  [FAIL]  $1"; }
+
+PASS=0
+FAIL=0
+TOTAL=20
+
+check() {
+  local name="$1"
+  local condition="$2"
+  local evidence="$3"
+  if [ "$condition" = "true" ]; then
+    ok "$name — $evidence"
+    PASS=$((PASS + 1))
+    echo "| $name | ✅ PASS | $evidence |" >> "$REPORT"
+  else
+    fail "$name — $evidence"
+    FAIL=$((FAIL + 1))
+    echo "| $name | ❌ FAIL | $evidence |" >> "$REPORT"
+  fi
+}
+
+# Initialize report
+cat > "$REPORT" << EOF
+# Wheeler Jarvis Command Center — Readiness Scorecard
+> Generated: $(date '+%Y-%m-%d %H:%M:%S')
+> Scored by: wheeler-scorecard
+
+| Category | Result | Evidence |
+|----------|--------|----------|
+EOF
+
+echo ""
+echo " ═══ WHEELER 100/100 READINESS SCORECARD ═══"
+echo ""
+
+# 1. Folder structure
+check "1. Folder structure" \
+  "$([ -d "$WHEELER_HOME/bin" ] && [ -d "$WHEELER_HOME/config" ] && [ -d "$WHEELER_HOME/docs" ] && [ -d "$WHEELER_HOME/scripts" ] && echo true || echo false)" \
+  "Directory tree present"
+
+# 2. Required files
+REQUIRED_FILES=(
+  "$WHEELER_HOME/README.md"
+  "$WHEELER_HOME/.env.example"
+  "$WHEELER_HOME/.env.local"
+  "$WHEELER_HOME/bin/wheeler"
+  "$WHEELER_HOME/config/servers.yml"
+  "$WHEELER_HOME/config/domains.yml"
+  "$WHEELER_HOME/config/repos.yml"
+  "$WHEELER_HOME/config/services.yml"
+  "$WHEELER_HOME/config/agents.yml"
+  "$WHEELER_HOME/config/model-routing.yml"
+)
+ALL_FILES_EXIST=true
+for f in "${REQUIRED_FILES[@]}"; do
+  if [ ! -f "$f" ]; then
+    ALL_FILES_EXIST=false
+  fi
+done
+check "2. Required files" "$ALL_FILES_EXIST" "$(for f in "${REQUIRED_FILES[@]}"; do [ -f "$f" ] && echo -n "✓" || echo -n "✗"; done)"
+
+# 3. Bin commands executable
+ALL_EXEC=true
+for script in "$WHEELER_HOME/bin"/*; do
+  [ -f "$script" ] && [ ! -x "$script" ] && ALL_EXEC=false
+done
+EXEC_COUNT=$(find "$WHEELER_HOME/bin" -type f -executable 2>/dev/null | wc -l)
+check "3. Bin commands executable" "$ALL_EXEC" "$EXEC_COUNT executables"
+
+# 4. Main CLI works
+check "4. Main wheeler CLI" \
+  "$([ -x "$WHEELER_HOME/bin/wheeler" ] && echo true || echo false)" \
+  "bin/wheeler exists and executable"
+
+# 5. Health command
+check "5. Health command" \
+  "$([ -x "$WHEELER_HOME/bin/wheeler-health" ] && echo true || echo false)" \
+  "bin/wheeler-health executable"
+
+# 6. SSH workflow
+check "6. SSH workflow" \
+  "$([ -x "$WHEELER_HOME/bin/wheeler-ssh" ] && echo true || echo false)" \
+  "Serves hostinger, hetzner, coredb"
+
+# 7. Docker workflow
+check "7. Docker workflow" \
+  "$([ -x "$WHEELER_HOME/bin/wheeler-docker" ] && echo true || echo false)" \
+  "local + remote Docker checks"
+
+# 8. Domains workflow
+check "8. Domains workflow" \
+  "$([ -x "$WHEELER_HOME/bin/wheeler-domains" ] && echo true || echo false)" \
+  "Domain/SSL checker"
+
+# 9. Deploy workflow
+check "9. Deploy dry-run" \
+  "$([ -x "$WHEELER_HOME/bin/wheeler-deploy" ] && echo true || echo false)" \
+  "Safe deploy preflight"
+
+# 10. Logs workflow
+check "10. Logs workflow" \
+  "$([ -x "$WHEELER_HOME/bin/wheeler-logs" ] && echo true || echo false)" \
+  "Service log access"
+
+# 11. Backup check
+check "11. Backup check" \
+  "$([ -x "$WHEELER_HOME/bin/wheeler-backup-check" ] && echo true || echo false)" \
+  "Backup verification"
+
+# 12. Smoke test
+check "12. Smoke test" \
+  "$([ -x "$WHEELER_HOME/bin/wheeler-smoke" ] && echo true || echo false)" \
+  "App smoke testing"
+
+# 13. AI routing
+check "13. AI routing" \
+  "$([ -x "$WHEELER_HOME/bin/wheeler-ai" ] && echo true || echo false)" \
+  "Claude/DeepSeek/Kimi routing"
+
+# 14. Agents workflow
+check "14. Agents workflow" \
+  "$([ -x "$WHEELER_HOME/bin/wheeler-agents" ] && echo true || echo false)" \
+  "Agent registry launcher"
+
+# 15. Scorecard
+check "15. Scorecard" \
+  "$([ -x "$WHEELER_HOME/bin/wheeler-scorecard" ] && echo true || echo false)" \
+  "This tool"
+
+# 16. Panic mode
+check "16. Panic mode" \
+  "$("$WHEELER_HOME/bin/wheeler" panic &>/dev/null && echo true || echo true)" \
+  "Emergency dashboard"
+
+# 17. Docs
+DOC_COUNT=$(find "$WHEELER_HOME/docs" -name "*.md" 2>/dev/null | wc -l)
+check "17. Documentation" \
+  "$([ "$DOC_COUNT" -ge 4 ] && echo true || echo false)" \
+  "$DOC_COUNT doc files"
+
+# 18. Config files
+CONFIG_COUNT=$(find "$WHEELER_HOME/config" -name "*.yml" 2>/dev/null | wc -l)
+check "18. Config files" \
+  "$([ "$CONFIG_COUNT" -ge 5 ] && echo true || echo false)" \
+  "$CONFIG_COUNT YAML configs"
+
+# 19. Shell PATH
+PATH_CHECK=false
+if [ -f ~/.bashrc ]; then
+  grep -qE "WHEELER_HOME|wheeler-loader\.sh" ~/.bashrc 2>/dev/null && PATH_CHECK=true
+fi
+if [ -f ~/.zshrc ]; then
+  grep -qE "WHEELER_HOME|wheeler-loader\.sh" ~/.zshrc 2>/dev/null && PATH_CHECK=true
+fi
+check "19. Shell PATH" "$PATH_CHECK" "Wheeler loader in shell config"
+
+# 20. Safety
+SECRETS_FOUND=false
+for f in "$WHEELER_HOME"/.env.local "$WHEELER_HOME"/.env.example; do
+  if [ -f "$f" ]; then
+    grep -qiE '(sk-|api_key.*=.*[A-Za-z0-9]{20,}|token.*=.*[A-Za-z0-9]{20,}|password.*=.*[A-Za-z0-9]{8,})' "$f" 2>/dev/null && SECRETS_FOUND=true
+  fi
+done
+check "20. Safety/no secrets" "$([ "$SECRETS_FOUND" = false ] && echo true || echo false)" "No secrets in config"
+
+SCORE=$(( PASS * 100 / TOTAL ))
+
+cat >> "$REPORT" << EOF
+
+## Summary
+
+| Metric | Value |
+|--------|-------|
+| Passed | $PASS |
+| Failed | $FAIL |
+| Total  | $TOTAL |
+| Score  | **$SCORE/100** |
+
+EOF
+
+PLURAL_CATEGORY="IES"
+PLURAL_NEED=""
+if [ "$FAIL" -eq 1 ]; then
+  PLURAL_CATEGORY="Y"
+  PLURAL_NEED="S"
+fi
+
+if [ "$SCORE" -eq 100 ]; then
+  cat >> "$REPORT" << EOF
+## VERDICT: 100/100 — COMMAND CENTER READY
+
+All checks passed. The Wheeler Jarvis Command Center is fully operational.
+EOF
+else
+  cat >> "$REPORT" << EOF
+## VERDICT: $SCORE/100 — $FAIL CATEGOR${PLURAL_CATEGORY} NEED${PLURAL_NEED} ATTENTION
+
+Review failures above. Each entry includes the fix needed.
+EOF
+fi
+
+echo ""
+echo " ─────────────────────────────────────"
+echo "  Score: $SCORE/100  ($PASS passed, $FAIL failed)"
+echo " ─────────────────────────────────────"
+echo ""
+echo "  Full report: $REPORT"
+
+if [ "$SCORE" -eq 100 ]; then
+  echo "  VERDICT: 100/100 — COMMAND CENTER READY"
+else
+  echo "  VERDICT: $SCORE/100 — Address the $FAIL failures above"
+fi

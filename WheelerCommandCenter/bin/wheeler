@@ -1,0 +1,178 @@
+#!/usr/bin/env bash
+# ============================================
+# Wheeler Jarvis Command Center — Main CLI
+# ============================================
+set -euo pipefail
+
+WHEELER_HOME="${WHEELER_HOME:-$HOME/WheelerCommandCenter}"
+BIN_DIR="$WHEELER_HOME/bin"
+CONFIG_DIR="$WHEELER_HOME/config"
+
+show_menu() {
+  cat << 'EOF'
+
+ ╔══════════════════════════════════════════════╗
+ ║     WHEELER JARVIS COMMAND CENTER           ║
+ ╚══════════════════════════════════════════════╝
+
+  1. Ecosystem Health ........... wheeler health
+  2. Server Mesh ................ wheeler mesh
+  3. Docker Status .............. wheeler docker <server|all>
+  4. Domain/SSL Status .......... wheeler domains
+  5. Repo Status ................ wheeler repos
+  6. Deploy App ................. wheeler deploy <app>
+  7. View Logs .................. wheeler logs <service>
+  8. Run Smoke Tests ............ wheeler smoke <app|all>
+  9. Backup Verification ........ wheeler backups
+ 10. AI Model Mode .............. wheeler ai <status|claude|deepseek|kimi|reset>
+ 11. Agent Workflows ............ wheeler agents
+ 12. Incident/Panic Mode ........ wheeler panic
+ 13. 100/100 Scorecard .......... wheeler scorecard
+ 14. Daily CEO Dashboard ........ wheeler today
+ 15. Docs ....................... wheeler docs
+
+ Run 'wheeler help' for detailed usage.
+
+EOF
+}
+
+show_help() {
+  cat << 'EOF'
+WHEELER JARVIS COMMAND CENTER — Help
+======================================
+
+COMMANDS:
+  wheeler                  Show the main menu
+  wheeler help             Show this help
+  wheeler health           Ecosystem health dashboard
+  wheeler ssh <server>     SSH into a server (hostinger|hetzner|coredb)
+  wheeler mesh             Tailscale mesh status
+  wheeler docker <s|all>   Docker status (local|hostinger|hetzner|coredb|all)
+  wheeler domains          Domain/SSL health checks
+  wheeler repos            Repository status
+  wheeler services         Service registry status
+  wheeler logs <service>   View service logs (last 100 lines)
+  wheeler deploy <app>     Deployment preflight (default: dry-run)
+  wheeler smoke <app|all>  Run smoke tests
+  wheeler backups          Backup verification
+  wheeler ai <mode>        AI model routing (status|claude|deepseek|kimi|reset)
+  wheeler agents           Agent workflow launcher
+  wheeler scorecard        Generate readiness scorecard
+  wheeler panic            Emergency incident response dashboard
+  wheeler doctor           Full system diagnostic
+  wheeler today            Daily CEO dashboard
+  wheeler docs             Open documentation
+
+SERVER ALIASES:
+  hostinger    Public production/revenue server
+  hetzner      AIops/build/automation server (this server)
+  coredb       Private database/storage server
+
+EXAMPLES:
+  wheeler health
+  wheeler docker all
+  wheeler ssh hostinger
+  wheeler deploy frgops --dry-run
+  wheeler smoke all
+  wheeler ai status
+  wheeler panic
+
+EOF
+}
+
+# Route to helper scripts
+case "${1:-}" in
+  ""|menu)
+    show_menu
+    ;;
+  help|-h|--help)
+    show_help
+    ;;
+  health)
+    exec "$BIN_DIR/wheeler-health"
+    ;;
+  ssh)
+    exec "$BIN_DIR/wheeler-ssh" "${@:2}"
+    ;;
+  mesh|tailscale)
+    exec "$BIN_DIR/wheeler-health" "--mesh-only"
+    ;;
+  docker)
+    exec "$BIN_DIR/wheeler-docker" "${@:2}"
+    ;;
+  domains)
+    exec "$BIN_DIR/wheeler-domains"
+    ;;
+  repos)
+    exec "$BIN_DIR/wheeler-health" "--repos-only"
+    ;;
+  services)
+    echo "Service registry: $CONFIG_DIR/services.yml"
+    if command -v python3 &>/dev/null; then
+      python3 -c "
+import yaml
+with open('$CONFIG_DIR/services.yml') as f:
+    data = yaml.safe_load(f)
+for s in data.get('services', []):
+    print(f\"  {s['name']:25s} -> {s.get('server','?'):12s} [{s.get('type','?')}]\")
+" 2>/dev/null || cat "$CONFIG_DIR/services.yml"
+    else
+      cat "$CONFIG_DIR/services.yml"
+    fi
+    ;;
+  logs)
+    exec "$BIN_DIR/wheeler-logs" "${@:2}"
+    ;;
+  deploy)
+    exec "$BIN_DIR/wheeler-deploy" "${@:2}"
+    ;;
+  smoke)
+    exec "$BIN_DIR/wheeler-smoke" "${@:2}"
+    ;;
+  backups|backup)
+    exec "$BIN_DIR/wheeler-backup-check"
+    ;;
+  ai)
+    exec "$BIN_DIR/wheeler-ai" "${@:2}"
+    ;;
+  agents)
+    exec "$BIN_DIR/wheeler-agents" "${@:2}"
+    ;;
+  scorecard)
+    exec "$BIN_DIR/wheeler-scorecard"
+    ;;
+  panic)
+    echo ""
+    echo " ╔══════════════════════════════════════════════╗"
+    echo " ║     🚨 WHEELER PANIC MODE                   ║"
+    echo " ╚══════════════════════════════════════════════╝"
+    echo ""
+    echo " Running emergency diagnostics..."
+    echo ""
+    exec "$BIN_DIR/wheeler-health" "--panic"
+    ;;
+  doctor)
+    exec "$BIN_DIR/wheeler-health" "--doctor"
+    ;;
+  today)
+    echo ""
+    echo " ╔══════════════════════════════════════════════╗"
+    echo " ║     WHEELER DAILY CEO DASHBOARD             ║"
+    echo " ╚══════════════════════════════════════════════╝"
+    echo ""
+    exec "$BIN_DIR/wheeler-health" "--ceo"
+    ;;
+  docs)
+    echo "Documentation: $WHEELER_HOME/docs/"
+    ls -la "$WHEELER_HOME/docs/" 2>/dev/null || echo "  (docs directory empty)"
+    echo ""
+    echo "Quick reads:"
+    echo "  cat $WHEELER_HOME/docs/DAILY_CEO_COMMANDS.md"
+    echo "  cat $WHEELER_HOME/docs/INCIDENT_RESPONSE.md"
+    ;;
+  *)
+    echo "Unknown command: $1"
+    echo "Run 'wheeler help' for available commands."
+    exit 1
+    ;;
+esac

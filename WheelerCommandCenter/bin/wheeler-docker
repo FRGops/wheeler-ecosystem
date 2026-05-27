@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+# ============================================
+# wheeler-docker — Docker status across servers
+# ============================================
+set -euo pipefail
+
+TARGET="${1:-}"
+
+usage() {
+  echo "Usage: wheeler docker <local|hostinger|hetzner|coredb|all>"
+  echo ""
+  echo "  local      — Docker on this machine"
+  echo "  hostinger  — Docker on Hostinger via SSH"
+  echo "  hetzner    — Docker on Hetzner via SSH"
+  echo "  coredb     — Docker on CoreDB via SSH"
+  echo "  all        — All servers (local + remote)"
+}
+
+check_local() {
+  echo ""
+  echo " ═══ DOCKER: local ($(hostname)) ═══"
+  echo ""
+  if ! command -v docker &>/dev/null; then
+    echo "  [FAIL] Docker not installed"
+    return
+  fi
+  if ! docker info &>/dev/null 2>&1; then
+    echo "  [FAIL] Docker daemon not accessible"
+    return
+  fi
+  echo "  [OK] Docker running"
+  echo ""
+  echo "  --- docker ps ---"
+  docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null || echo "  (no containers)"
+  echo ""
+  echo "  --- docker system df ---"
+  docker system df 2>/dev/null || true
+  echo ""
+  echo "  --- unhealthy containers ---"
+  local unhealthy
+  unhealthy=$(docker ps --filter "health=unhealthy" -q 2>/dev/null | wc -l || echo 0)
+  if [ "$unhealthy" -eq 0 ]; then
+    echo "  [OK] No unhealthy containers"
+  else
+    echo "  [FAIL] $unhealthy unhealthy containers:"
+    docker ps --filter "health=unhealthy" --format "    {{.Names}} {{.Status}}" 2>/dev/null
+  fi
+}
+
+check_remote() {
+  local server="$1"
+  echo ""
+  echo " ═══ DOCKER: $server ═══"
+  echo ""
+  if ! ssh -G "$server" &>/dev/null 2>&1; then
+    echo "  [WARN] SSH alias '$server' not configured"
+    echo "  Run: wheeler ssh $server  (to see config instructions)"
+    return
+  fi
+  if ! ssh -o BatchMode=yes -o ConnectTimeout=5 "$server" "hostname" &>/dev/null 2>&1; then
+    echo "  [WARN] Cannot connect to $server (SSH key or network issue)"
+    return
+  fi
+  echo "  [OK] Connected to $server"
+  echo ""
+  echo "  --- docker ps ---"
+  ssh "$server" "docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'" 2>/dev/null || echo "  (no containers or error)"
+  echo ""
+  echo "  --- docker system df ---"
+  ssh "$server" "docker system df" 2>/dev/null || true
+  echo ""
+  echo "  --- unhealthy containers ---"
+  ssh "$server" "docker ps --filter 'health=unhealthy' --format '{{.Names}} {{.Status}}'" 2>/dev/null || echo "  (check error)"
+}
+
+if [ -z "$TARGET" ]; then
+  usage
+  exit 1
+fi
+
+case "$TARGET" in
+  local)    check_local ;;
+  all)
+    check_local
+    check_remote "hostinger"
+    check_remote "hetzner"
+    check_remote "coredb"
+    ;;
+  hostinger|hetzner|coredb)
+    check_remote "$TARGET"
+    ;;
+  *)
+    usage
+    exit 1
+    ;;
+esac

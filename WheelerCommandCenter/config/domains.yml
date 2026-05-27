@@ -1,0 +1,29 @@
+# Wheeler Ecosystem Domain Registry
+# =====================================
+# Each domain maps to an app, server, and health check path
+# TODO: Fill in missing server assignments
+
+domains:
+  - domain: "fundsrecoverygroup.com"
+    app: "Funds Recovery Group"
+    server: "hostinger"
+    expected_public: true
+    health_path: "/"
+
+  - domain: "www.fundsrecoverygroup.com"
+    app: "Funds Recovery Group"
+    server: "hostinger"
+    expected_public: true
+    health_path: "/"
+
+  - domain: "horizonfederalservices.com"
+    app: "Horizon Federal Services"
+    server: "TODO"
+    expected_public: true
+    health_path: "/"
+
+  - domain: "predictionradar.app"
+    app: "Prediction Radar OS"
+    server: "TODO"
+    expected_public: true
+    health_path: "/"

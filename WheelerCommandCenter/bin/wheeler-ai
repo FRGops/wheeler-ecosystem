@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+# ============================================
+# wheeler-ai — AI model routing control
+# ============================================
+set -euo pipefail
+
+MODE="${1:-status}"
+
+AI_VARS=(
+  "ANTHROPIC_BASE_URL"
+  "ANTHROPIC_AUTH_TOKEN"
+  "ANTHROPIC_MODEL"
+  "ANTHROPIC_DEFAULT_OPUS_MODEL"
+  "ANTHROPIC_DEFAULT_SONNET_MODEL"
+  "ANTHROPIC_DEFAULT_HAIKU_MODEL"
+  "DEEPSEEK_API_KEY"
+  "OPENROUTER_API_KEY"
+  "ANTHROPIC_API_KEY"
+  "OPENAI_API_KEY"
+  "LITELLM_MASTER_KEY"
+  "LITELLM_ENDPOINT"
+)
+
+show_status() {
+  echo ""
+  echo " ═══ AI MODEL ROUTING STATUS ═══"
+  echo ""
+  echo "  Environment variable presence (values NEVER shown):"
+  echo ""
+  for var in "${AI_VARS[@]}"; do
+    if [ -n "${!var:-}" ]; then
+      echo "  [SET]    $var"
+    else
+      echo "  [unset]  $var"
+    fi
+  done
+  echo ""
+  echo "  Current routing:"
+  if [ "${ANTHROPIC_BASE_URL:-}" = "https://api.anthropic.com" ] || [ -z "${ANTHROPIC_BASE_URL:-}" ]; then
+    echo "    → Likely standard Claude (clean Anthropic route)"
+  elif echo "${ANTHROPIC_BASE_URL:-}" | grep -q "4049"; then
+    echo "    → Likely DeepSeek V4 via LiteLLM proxy (:4049)"
+  else
+    echo "    → Custom/unknown routing"
+  fi
+  echo ""
+  echo "  Commands:"
+  echo "    wheeler ai claude    — Launch clean Claude session"
+  echo "    wheeler ai deepseek  — Show DeepSeek setup"
+  echo "    wheeler ai kimi      — Show Kimi setup"
+  echo "    wheeler ai reset     — Print unset commands to clear all AI vars"
+}
+
+show_reset() {
+  echo ""
+  echo " ═══ AI MODEL ROUTING RESET ═══"
+  echo ""
+  echo "  To clear all AI routing env vars, run these commands:"
+  echo ""
+  cat << 'EOF'
+  unset ANTHROPIC_BASE_URL
+  unset ANTHROPIC_AUTH_TOKEN
+  unset ANTHROPIC_MODEL
+  unset ANTHROPIC_DEFAULT_OPUS_MODEL
+  unset ANTHROPIC_DEFAULT_SONNET_MODEL
+  unset ANTHROPIC_DEFAULT_HAIKU_MODEL
+  unset DEEPSEEK_API_KEY
+  unset OPENROUTER_API_KEY
+  unset ANTHROPIC_API_KEY
+  unset OPENAI_API_KEY
+  unset LITELLM_MASTER_KEY
+  unset LITELLM_ENDPOINT
+EOF
+  echo ""
+  echo "  After reset, restore a mode:"
+  echo "    wheeler ai claude    — Standard Claude Code"
+  echo "    wheeler ai deepseek  — DeepSeek V4 via proxy"
+}
+
+show_claude() {
+  echo ""
+  echo "  Claude mode: launching with clean Anthropic routing..."
+  echo "  (This just shows the command — run it in your terminal)"
+  echo ""
+  echo "  # Ensure clean Anthropic routing:"
+  echo "  export ANTHROPIC_BASE_URL=\"https://api.anthropic.com\""
+  echo "  unset DEEPSEEK_API_KEY"
+  echo "  unset OPENROUTER_API_KEY"
+  echo "  claude"
+}
+
+show_deepseek() {
+  echo ""
+  echo "  DeepSeek V4 mode: routing through LiteLLM proxy..."
+  echo "  Ensure LiteLLM is running (check :4049/health)"
+  echo ""
+  echo "  Discovery: curl -s http://localhost:4049/health"
+  echo ""
+  if curl -s http://localhost:4049/health 2>/dev/null | head -1; then
+    echo "  [OK] LiteLLM proxy is reachable"
+  else
+    echo "  [WARN] LiteLLM proxy not reachable at :4049"
+  fi
+}
+
+show_kimi() {
+  echo ""
+  echo "  Kimi mode: Moonshot AI"
+  echo ""
+  echo "  Setup:"
+  echo "    export MOONSHOT_API_KEY=\"your_key\""
+  echo "    export ANTHROPIC_BASE_URL=\"https://api.moonshot.cn/anthropic\""
+  echo ""
+  echo "  [INFO] Kimi integration requires manual setup."
+}
+
+case "$MODE" in
+  status)  show_status ;;
+  reset)   show_reset ;;
+  claude)  show_claude ;;
+  deepseek) show_deepseek ;;
+  kimi)    show_kimi ;;
+  *)
+    echo "Usage: wheeler ai <status|claude|deepseek|kimi|reset>"
+    exit 1
+    ;;
+esac

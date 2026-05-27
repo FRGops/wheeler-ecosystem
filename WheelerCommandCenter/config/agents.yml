@@ -1,0 +1,95 @@
+# Wheeler Ecosystem Agent Registry
+# =====================================
+# Agents follow: detect → classify → propose → backup → patch → test → verify → rollback → document
+# Agents NEVER blindly mutate production
+
+agents:
+  - name: "infra-health-agent"
+    description: "Monitors server health across all 4 Wheeler servers"
+    schedule: "hourly"
+    actions: ["health_check", "alert", "report"]
+    safety: "read-only"
+
+  - name: "dns-ssl-monitor-agent"
+    description: "Checks DNS resolution and SSL certificate validity for all domains"
+    schedule: "daily"
+    actions: ["dns_check", "ssl_expiry_check", "alert"]
+    safety: "read-only"
+
+  - name: "docker-monitor-agent"
+    description: "Monitors Docker container health across all servers"
+    schedule: "every_5min"
+    actions: ["container_status", "restart_detection", "disk_usage", "alert"]
+    safety: "read-only"
+
+  - name: "repo-freshness-agent"
+    description: "Checks all repos for staleness, uncommitted changes, drift"
+    schedule: "daily"
+    actions: ["git_status", "branch_check", "drift_detection", "alert"]
+    safety: "read-only"
+
+  - name: "deployment-preflight-agent"
+    description: "Runs preflight checks before any deployment"
+    trigger: "on_deploy_command"
+    actions: ["branch_check", "test_run", "backup_verify", "approval_gate"]
+    safety: "read-only until approval"
+
+  - name: "smoke-test-agent"
+    description: "Runs smoke tests against deployed apps"
+    schedule: "daily"
+    actions: ["http_check", "health_endpoint", "login_page", "alert"]
+    safety: "read-only"
+
+  - name: "backup-verifier-agent"
+    description: "Verifies backups exist and are recent across all servers"
+    schedule: "daily"
+    actions: ["backup_check", "age_check", "integrity_check", "alert"]
+    safety: "read-only"
+
+  - name: "error-log-triage-agent"
+    description: "Scans logs for critical errors and patterns"
+    schedule: "hourly"
+    actions: ["log_scan", "pattern_match", "severity_classify", "escalate"]
+    safety: "read-only"
+
+  - name: "security-drift-agent"
+    description: "Detects security configuration drift (UFW, SSH, Docker, secrets)"
+    schedule: "daily"
+    actions: ["drift_scan", "compare_baseline", "alert", "propose_fix"]
+    safety: "propose-fix-only"
+
+  - name: "cost-token-monitor-agent"
+    description: "Monitors AI API token costs and infrastructure expenses"
+    schedule: "daily"
+    actions: ["token_count", "cost_estimate", "budget_alert"]
+    safety: "read-only"
+
+  - name: "frg-revenue-monitor-agent"
+    description: "Monitors FRG public site revenue and uptime"
+    schedule: "hourly"
+    actions: ["site_check", "revenue_pulse", "alert"]
+    safety: "read-only"
+
+  - name: "surplusai-data-pipeline-agent"
+    description: "Monitors SurplusAI data pipeline health"
+    schedule: "hourly"
+    actions: ["pipeline_check", "data_freshness", "alert"]
+    safety: "read-only"
+
+  - name: "wheeler-brain-sync-agent"
+    description: "Ensures Wheeler Brain OS is synced across all agents"
+    schedule: "every_30min"
+    actions: ["sync_check", "consistency_verify", "repair_propose"]
+    safety: "propose-fix-only"
+
+  - name: "prediction-radar-feed-agent"
+    description: "Monitors Prediction Radar data feeds"
+    schedule: "hourly"
+    actions: ["feed_check", "freshness", "alert"]
+    safety: "read-only"
+
+  - name: "self-healing-proposal-agent"
+    description: "Analyzes issues and proposes self-healing actions"
+    schedule: "every_15min"
+    actions: ["issue_scan", "heal_propose", "safety_check", "report"]
+    safety: "propose-fix-only -- NEVER auto-execute"

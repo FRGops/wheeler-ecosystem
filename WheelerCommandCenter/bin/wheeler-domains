@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+# ============================================
+# wheeler-domains — Domain/SSL health checks
+# ============================================
+set -euo pipefail
+
+ok()  { echo "  [OK]    $1"; }
+warn(){ echo "  [WARN]  $1"; }
+fail(){ echo "  [FAIL]  $1"; }
+
+echo ""
+echo " ═══ DOMAIN & SSL HEALTH CHECK ═══"
+echo ""
+
+# Built-in domain list (also try to read from config)
+DOMAINS=(
+  "fundsrecoverygroup.com"
+  "www.fundsrecoverygroup.com"
+  "horizonfederalservices.com"
+  "predictionradar.app"
+)
+
+check_domain() {
+  local domain="$1"
+  echo " ── $domain ──"
+
+  # DNS
+  local ip
+  if ip=$(dig +short "$domain" 2>/dev/null | head -1); then
+    if [ -n "$ip" ]; then
+      ok "DNS resolves → $ip"
+    else
+      fail "DNS does not resolve"
+      return
+    fi
+  else
+    warn "DNS check failed (dig not available?)"
+  fi
+
+  # HTTP
+  local http_code http_url
+  http_code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 -L "http://$domain" 2>/dev/null || echo "000")
+  http_url=$(curl -s -o /dev/null -w '%{url_effective}' --max-time 10 -L "http://$domain" 2>/dev/null || echo "N/A")
+  if [ "$http_code" = "200" ] || [ "$http_code" = "301" ] || [ "$http_code" = "302" ]; then
+    ok "HTTP $http_code → $http_url"
+  elif [ "$http_code" = "000" ]; then
+    warn "HTTP unreachable (timeout or connection refused)"
+  else
+    warn "HTTP $http_code → $http_url"
+  fi
+
+  # HTTPS
+  local https_code https_url
+  https_code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 -L "https://$domain" 2>/dev/null || echo "000")
+  https_url=$(curl -s -o /dev/null -w '%{url_effective}' --max-time 10 -L "https://$domain" 2>/dev/null || echo "N/A")
+  if [ "$https_code" = "200" ]; then
+    ok "HTTPS $https_code → $https_url"
+  elif [ "$https_code" = "000" ]; then
+    fail "HTTPS unreachable"
+  else
+    warn "HTTPS $https_code → $https_url"
+  fi
+
+  # SSL
+  if command -v openssl &>/dev/null; then
+    local ssl_expiry
+    if ssl_expiry=$(echo | openssl s_client -servername "$domain" -connect "$domain:443" 2>/dev/null | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2); then
+      if [ -n "$ssl_expiry" ]; then
+        local expiry_epoch now_epoch days_left
+        expiry_epoch=$(date -d "$ssl_expiry" +%s 2>/dev/null || echo 0)
+        now_epoch=$(date +%s)
+        if [ "$expiry_epoch" -gt 0 ]; then
+          days_left=$(( (expiry_epoch - now_epoch) / 86400 ))
+          if [ "$days_left" -gt 30 ]; then
+            ok "SSL valid — $days_left days left"
+          elif [ "$days_left" -gt 7 ]; then
+            warn "SSL expiring in $days_left days"
+          else
+            fail "SSL expiring in $days_left days — RENEW NOW"
+          fi
+        fi
+      fi
+    else
+      warn "SSL check failed"
+    fi
+  fi
+}
+
+for domain in "${DOMAINS[@]}"; do
+  check_domain "$domain"
+done
+
+echo ""
+echo "Done. Run 'wheeler smoke all' for deeper application-layer checks."

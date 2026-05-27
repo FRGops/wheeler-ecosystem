@@ -1,0 +1,86 @@
+# Wheeler Ecosystem Server Registry
+# =====================================
+# Populated: 2026-05-27 — full discovery complete
+
+servers:
+  mac:
+    role: "CEO/dev/operator command center"
+    hostname: "wheelers-macbook-pro"
+    ssh_alias: "mac"
+    tailscale_ip: "100.83.80.6"
+    allowed_workloads:
+      - "command center"
+      - "dev orchestration"
+      - "repo management"
+      - "ai model launcher"
+    forbidden_workloads:
+      - "production database"
+      - "critical public app hosting"
+
+  hostinger:
+    role: "public production/revenue apps"
+    hostname: "187.77.148.88"
+    ssh_alias: "hostinger"
+    tailscale_ip: "100.98.163.17"
+    allowed_workloads:
+      - "fundsrecoverygroup.com"
+      - "public websites"
+      - "revenue funnels"
+      - "public portals"
+    forbidden_workloads:
+      - "heavy AI builds"
+      - "private core database"
+    services:
+      - "cadvisor"
+      - "temporal"
+      - "promtail"
+      - "shared-postgres"
+      - "pushgateway"
+
+  hetzner:
+    role: "AIops/build/automation/internal control plane"
+    hostname: "5.78.140.118"
+    ssh_alias: "hetzner"
+    tailscale_ip: "100.121.230.28"
+    allowed_workloads:
+      - "AIops"
+      - "build workers"
+      - "agents"
+      - "scrapers"
+      - "automation"
+    forbidden_workloads:
+      - "public database exposure"
+    services:
+      - "85 PM2 processes"
+      - "47 Docker containers"
+      - "LiteLLM (:4049)"
+      - "Prometheus (:9090)"
+      - "Grafana (:3002)"
+      - "Uptime Kuma (:3001)"
+      - "Netdata (:19999)"
+
+  coredb:
+    role: "private database/storage/memory layer"
+    hostname: "5.78.210.123"
+    ssh_alias: "coredb"
+    tailscale_ip: "100.118.166.117"
+    allowed_workloads:
+      - "database"
+      - "redis"
+      - "backups"
+      - "private storage"
+      - "memory/vector stores"
+    forbidden_workloads:
+      - "public marketing websites"
+      - "unprotected admin panels"
+    services:
+      - "PostgreSQL (:5433)"
+      - "Redis (:6379)"
+      - "MinIO (S3)"
+      - "Qdrant (vector DB)"
+      - "Infisical (secrets)"
+      - "Prediction Radar worker"
+      - "Temporal worker"
+      - "Prometheus"
+      - "Loki"
+      - "Uptime Kuma"

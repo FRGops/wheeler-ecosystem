@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# ============================================
+# wheeler-ssh — SSH into Wheeler servers
+# ============================================
+set -euo pipefail
+
+TARGET="${1:-}"
+
+if [ -z "$TARGET" ]; then
+  echo "Usage: wheeler ssh <hostinger|hetzner|coredb>"
+  echo ""
+  echo "Available servers:"
+  echo "  hostinger  — Public production/revenue server"
+  echo "  hetzner    — AIops/build/automation server"
+  echo "  coredb     — Private database/storage server"
+  exit 1
+fi
+
+case "$TARGET" in
+  hostinger|hetzner|coredb)
+    if ssh -G "$TARGET" &>/dev/null 2>&1; then
+      echo "Connecting to $TARGET..."
+      exec ssh "$TARGET"
+    else
+      echo ""
+      echo "  [WARN]  SSH alias '$TARGET' not configured."
+      echo ""
+      echo "  Add this to ~/.ssh/config:"
+      echo ""
+      echo "  Host $TARGET"
+      echo "    HostName TODO_SERVER_IP_OR_TAILSCALE_IP"
+      echo "    User root"
+      echo "    IdentityFile ~/.ssh/TODO_KEY"
+      echo "    IdentitiesOnly yes"
+      echo ""
+      echo "  Discovery commands:"
+      echo "    tailscale status                          # find Tailscale IPs"
+      echo "    ssh root@<ip> 'hostname'                  # test connectivity"
+      echo "    ls ~/.ssh/                                # find your keys"
+      exit 1
+    fi
+    ;;
+  *)
+    echo "Unknown server: $TARGET"
+    echo "Valid servers: hostinger, hetzner, coredb"
+    exit 1
+    ;;
+esac

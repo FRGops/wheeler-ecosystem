@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+# ============================================
+# wheeler-deploy — Safe deployment preflight
+# ============================================
+set -euo pipefail
+
+APP="${1:-}"
+DRY_RUN=true
+
+for arg in "$@"; do
+  case "$arg" in
+    --execute) DRY_RUN=false ;;
+    --dry-run) DRY_RUN=true ;;
+  esac
+done
+
+if [ -z "$APP" ]; then
+  echo "Usage: wheeler deploy <app> [--dry-run|--execute]"
+  echo ""
+  echo "Known apps (from config/repos.yml):"
+  if [ -f "$HOME/WheelerCommandCenter/config/repos.yml" ]; then
+    python3 -c "
+import yaml
+with open('$HOME/WheelerCommandCenter/config/repos.yml') as f:
+    data = yaml.safe_load(f)
+for r in data.get('repos', []):
+    print(f\"  {r['name']:30s} -> {r.get('server','?'):12s}\")
+" 2>/dev/null || echo "  (config parse error — check repos.yml)"
+  fi
+  echo ""
+  echo "Default mode is --dry-run (safe). Use --execute for real deployment."
+  exit 1
+fi
+
+echo ""
+echo " ═══ DEPLOYMENT PREFLIGHT: $APP ═══"
+echo ""
+
+if [ "$DRY_RUN" = true ]; then
+  echo "  MODE: DRY RUN (safe — use --execute for real deployment)"
+else
+  echo "  MODE: ⚠️  LIVE DEPLOYMENT ⚠️"
+fi
+
+# Find app in config
+APP_INFO=""
+if [ -f "$HOME/WheelerCommandCenter/config/repos.yml" ]; then
+  APP_INFO=$(WHEELER_APP="$APP" python3 -c "
+import os, yaml
+app_name = os.environ.get('WHEELER_APP', '')
+with open(os.environ['HOME'] + '/WheelerCommandCenter/config/repos.yml') as f:
+    data = yaml.safe_load(f)
+for r in data.get('repos', []):
+    if r['name'] == app_name:
+        print(f\"{r.get('path','?')}|{r.get('server','?')}|{r.get('deploy_command','?')}|{r.get('rollback_command','?')}|{r.get('smoke_command','?')}\")
+        break
+" 2>/dev/null || echo "")
+fi
+
+if [ -z "$APP_INFO" ]; then
+  echo "  [WARN] App '$APP' not found in config/repos.yml"
+  echo "  Add it to config/repos.yml with path, server, and deploy_command."
+  exit 1
+fi
+
+IFS='|' read -r REPO_PATH TARGET_SERVER DEPLOY_CMD ROLLBACK_CMD SMOKE_CMD <<< "$APP_INFO"
+
+echo "  App:       $APP"
+echo "  Server:    $TARGET_SERVER"
+echo "  Path:      $REPO_PATH"
+
+# Git checks if repo exists
+if [ -d "$REPO_PATH/.git" ]; then
+  BRANCH=$(cd "$REPO_PATH" && git branch --show-current 2>/dev/null || echo "?")
+  DIRTY=$(cd "$REPO_PATH" && git status --porcelain 2>/dev/null | wc -l)
+  echo "  Branch:    $BRANCH"
+  if [ "$DIRTY" -eq 0 ]; then
+    echo "  Git:       [OK] clean"
+  else
+    echo "  Git:       [WARN] $DIRTY uncommitted files"
+  fi
+else
+  echo "  Git:       [WARN] not a git repo or path missing (TODO)"
+fi
+
+echo ""
+echo "  Deploy cmd:    ${DEPLOY_CMD:-TODO}"
+echo "  Smoke cmd:     ${SMOKE_CMD:-TODO}"
+echo "  Rollback cmd:  ${ROLLBACK_CMD:-TODO}"
+echo ""
+
+if [ "$DRY_RUN" = true ]; then
+  echo "  DRY RUN COMPLETE — no changes made."
+  echo "  Run with --execute to deploy."
+else
+  echo "  [WARN] Real deployment not yet implemented."
+  echo "  Fill in deploy_command for '$APP' in config/repos.yml first."
+fi

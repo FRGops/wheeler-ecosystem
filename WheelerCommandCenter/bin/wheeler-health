@@ -1,0 +1,206 @@
+#!/usr/bin/env bash
+# ============================================
+# wheeler-health — Ecosystem Health Dashboard
+# ============================================
+set -euo pipefail
+
+WHEELER_HOME="${WHEELER_HOME:-$HOME/WheelerCommandCenter}"
+MODE="${1:-full}"
+
+ok()  { echo "  [OK]    $1"; }
+warn(){ echo "  [WARN]  $1"; }
+fail(){ echo "  [FAIL]  $1"; }
+info(){ echo "  [INFO]  $1"; }
+
+section() {
+  echo ""
+  echo " ── $1 ──"
+}
+
+# ─── Mac / Local System ───
+system_checks() {
+  section "SYSTEM — $(hostname)"
+  info "Kernel: $(uname -r)"
+  info "Uptime: $(uptime -p 2>/dev/null || uptime)"
+
+  # Disk
+  local disk_use
+  disk_use=$(df -h / 2>/dev/null | awk 'NR==2 {print $5}' | tr -d '%' || echo "100")
+  if [ "${disk_use:-100}" -lt 80 ]; then
+    ok "Disk: ${disk_use}% used"
+  elif [ "${disk_use:-100}" -lt 95 ]; then
+    warn "Disk: ${disk_use}% used"
+  else
+    fail "Disk: ${disk_use}% used — CRITICAL"
+  fi
+
+  # Memory
+  local mem_info
+  mem_info=$(free -m 2>/dev/null | awk 'NR==2 {printf "%.0f%% used (%dM / %dM)", $3*100/$2, $3, $2}' || echo "N/A")
+  info "Memory: $mem_info"
+
+  # Load
+  local load
+  load=$(cat /proc/loadavg 2>/dev/null | awk '{print $1, $2, $3}' || echo "N/A")
+  info "Load: $load"
+}
+
+# ─── Command Dependencies ───
+dependency_checks() {
+  section "DEPENDENCIES"
+  for cmd in git ssh docker tailscale gh claude node npm python3 curl openssl; do
+    if command -v "$cmd" &>/dev/null; then
+      ok "$cmd"
+    else
+      warn "$cmd — not found"
+    fi
+  done
+}
+
+# ─── SSH Aliases ───
+ssh_checks() {
+  section "SSH ALIASES"
+  for alias in hostinger hetzner coredb; do
+    if ssh -G "$alias" &>/dev/null 2>&1; then
+      local hostname
+      hostname=$(ssh -G "$alias" | { grep '^hostname ' || true; } | awk '{print $2}')
+      ok "ssh $alias -> $hostname"
+    else
+      warn "ssh $alias — not configured (add to ~/.ssh/config)"
+    fi
+  done
+}
+
+# ─── Tailscale ───
+tailscale_checks() {
+  section "TAILSCALE MESH"
+  if command -v tailscale &>/dev/null; then
+    local status
+    if status=$(tailscale status 2>/dev/null); then
+      ok "Tailscale running"
+      echo "$status" | head -20
+    else
+      warn "Tailscale installed but status failed"
+    fi
+  else
+    warn "Tailscale not installed"
+  fi
+}
+
+# ─── Docker ───
+docker_checks() {
+  section "DOCKER (local)"
+  if command -v docker &>/dev/null; then
+    if docker info &>/dev/null 2>&1; then
+      local count
+      count=$(docker ps -q 2>/dev/null | wc -l)
+      local unhealthy
+      unhealthy=$(docker ps --filter "health=unhealthy" -q 2>/dev/null | wc -l || echo 0)
+      ok "Docker running — $count containers"
+      if [ "$unhealthy" -gt 0 ]; then
+        fail "$unhealthy unhealthy containers"
+        docker ps --filter "health=unhealthy" --format "    {{.Names}} {{.Status}}" 2>/dev/null
+      fi
+      docker system df 2>/dev/null | head -5
+    else
+      fail "Docker daemon not accessible"
+    fi
+  else
+    warn "Docker not installed"
+  fi
+}
+
+# ─── Repos ───
+repo_checks() {
+  section "REPOSITORIES"
+  if [ -f "$WHEELER_HOME/config/repos.yml" ]; then
+    IFS=$'\n'
+    for repo_path in $(python3 -c "
+import yaml
+with open('$WHEELER_HOME/config/repos.yml') as f:
+    data = yaml.safe_load(f)
+for r in data.get('repos', []):
+    print(r['path'])
+" 2>/dev/null || echo ""); do
+      if [ -d "$repo_path/.git" ]; then
+        local branch status
+        branch=$(cd "$repo_path" && git branch --show-current 2>/dev/null || echo "?")
+        status=$(cd "$repo_path" && git status --porcelain 2>/dev/null | wc -l)
+        if [ "$status" -eq 0 ]; then
+          ok "$(basename "$repo_path") — $branch (clean)"
+        else
+          warn "$(basename "$repo_path") — $branch ($status dirty files)"
+        fi
+      elif [ "$repo_path" != "TODO"* ]; then
+        warn "$repo_path — not a git repo or missing"
+      fi
+    done
+  fi
+}
+
+# ─── Panic Mode ───
+panic_mode() {
+  echo " 🔴 PANIC MODE — Emergency System Status 🔴"
+  system_checks
+  ssh_checks
+  tailscale_checks
+  docker_checks
+  section "QUICK ACTIONS"
+  echo "  Emergency SSH:  ssh hetzner"
+  echo "  Check domains:  wheeler domains"
+  echo "  Check backups:  wheeler backups"
+  echo "  Recent logs:    wheeler logs aiops"
+  echo "  Full scorecard: wheeler scorecard"
+  echo ""
+  echo "  Stay calm. Isolate. Diagnose. Fix. Verify."
+}
+
+# ─── CEO Mode ───
+ceo_mode() {
+  echo " Ecosystem Status: $(date '+%Y-%m-%d %H:%M')"
+  system_checks
+  docker_checks
+  ssh_checks
+  section "TODAY'S TOP ACTIONS"
+  echo "  1. wheeler health       — full health check"
+  echo "  2. wheeler domains       — verify public sites"
+  echo "  3. wheeler smoke all     — smoke test everything"
+  echo "  4. wheeler backups       — verify backups"
+  echo "  5. wheeler scorecard     — readiness score"
+  echo ""
+  echo "  Emergency: wheeler panic"
+}
+
+# ─── Main ───
+case "$MODE" in
+  --panic)   panic_mode ;;
+  --ceo)     ceo_mode ;;
+  --mesh-only)
+    tailscale_checks
+    ;;
+  --repos-only)
+    repo_checks
+    ;;
+  --doctor)
+    system_checks
+    dependency_checks
+    ssh_checks
+    tailscale_checks
+    docker_checks
+    repo_checks
+    echo ""
+    ok "Doctor check complete"
+    ;;
+  *)
+    echo ""
+    echo " ╔══════════════════════════════════════════════╗"
+    echo " ║     WHEELER ECOSYSTEM HEALTH                ║"
+    echo " ╚══════════════════════════════════════════════╝"
+    system_checks
+    dependency_checks
+    ssh_checks
+    tailscale_checks
+    docker_checks
+    echo ""
+    ;;
+esac

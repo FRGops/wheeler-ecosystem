@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+# ============================================
+# wheeler-agents — Agent workflow launcher
+# ============================================
+set -euo pipefail
+
+WHEELER_HOME="${WHEELER_HOME:-$HOME/WheelerCommandCenter}"
+ACTION="${1:-list}"
+
+list_agents() {
+  echo ""
+  echo " ═══ WHEELER AGENT REGISTRY ═══"
+  echo ""
+  if [ -f "$WHEELER_HOME/config/agents.yml" ]; then
+    python3 -c "
+import yaml
+with open('$WHEELER_HOME/config/agents.yml') as f:
+    data = yaml.safe_load(f)
+for a in data.get('agents', []):
+    print(f\"  {a['name']:35s} [{a.get('safety','?')}]\"  )
+    print(f\"    {a.get('description','?')}\")
+    print(f\"    schedule: {a.get('schedule','on-demand')}\")
+    print()
+" 2>/dev/null || cat "$WHEELER_HOME/config/agents.yml"
+  else
+    echo "  [WARN] agents.yml not found"
+  fi
+  echo ""
+  echo "  Agent safety protocol: detect → classify → propose → backup → patch → test → verify → rollback → document"
+  echo ""
+  echo "  Run an agent: wheeler agents run <agent-name>"
+}
+
+run_agent() {
+  local agent="$1"
+  echo ""
+  echo "  Agent: $agent"
+  echo ""
+  # Look up agent in config
+  local agent_info
+  agent_info=$(python3 -c "
+import yaml
+with open('$WHEELER_HOME/config/agents.yml') as f:
+    data = yaml.safe_load(f)
+for a in data.get('agents', []):
+    if a['name'] == '$agent':
+        print(f\"{a.get('safety','?')}|{a.get('description','?')}\")
+        break
+" 2>/dev/null || echo "")
+
+  if [ -z "$agent_info" ]; then
+    echo "  [WARN] Agent '$agent' not found in registry."
+    echo "  Available agents: wheeler agents list"
+    exit 1
+  fi
+
+  IFS='|' read -r SAFETY DESC <<< "$agent_info"
+  echo "  Description: $DESC"
+  echo "  Safety:      $SAFETY"
+  echo ""
+  echo "  [INFO] Agent execution placeholder."
+  echo "  This will eventually launch the agent with safety guardrails."
+  echo "  For now, agents run via Claude Code's Agent() tool."
+}
+
+case "$ACTION" in
+  list|"")
+    list_agents
+    ;;
+  run)
+    if [ -z "${2:-}" ]; then
+      echo "Usage: wheeler agents run <agent-name>"
+      exit 1
+    fi
+    run_agent "${2:-}"
+    ;;
+  status)
+    echo "  Agent registry: $WHEELER_HOME/config/agents.yml"
+    echo "  Agent count: $(python3 -c "import yaml; d=yaml.safe_load(open('$WHEELER_HOME/config/agents.yml')); print(len(d.get('agents',[])))" 2>/dev/null || echo "?")"
+    echo "  Status: registry loaded, agents available for dispatch"
+    ;;
+  *)
+    echo "Usage: wheeler agents [list|run <name>|status]"
+    exit 1
+    ;;
+esac

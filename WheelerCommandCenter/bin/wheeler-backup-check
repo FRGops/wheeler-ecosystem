@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# ============================================
+# wheeler-backup-check — Backup verification
+# ============================================
+set -euo pipefail
+
+WHEELER_HOME="${WHEELER_HOME:-$HOME/WheelerCommandCenter}"
+ok()  { echo "  [OK]    $1"; }
+warn(){ echo "  [WARN]  $1"; }
+fail(){ echo "  [FAIL]  $1"; }
+
+echo ""
+echo " ═══ BACKUP VERIFICATION ═══"
+echo ""
+
+# Local backups
+echo ""
+echo " ── LOCAL BACKUPS ──"
+LOCAL_BACKUP_DIR="$WHEELER_HOME/backups"
+if [ -d "$LOCAL_BACKUP_DIR" ]; then
+  count=$(find "$LOCAL_BACKUP_DIR" -type f 2>/dev/null | wc -l)
+  if [ "$count" -gt 0 ]; then
+    ok "Local backup dir: $LOCAL_BACKUP_DIR ($count files)"
+    find "$LOCAL_BACKUP_DIR" -type f -printf "    %T+ %p\n" 2>/dev/null | sort -r | head -5 || ls -lt "$LOCAL_BACKUP_DIR" | head -6
+  else
+    warn "Local backup dir exists but is empty"
+  fi
+else
+  warn "Local backup dir missing: $LOCAL_BACKUP_DIR"
+fi
+
+# Also check /root/backups
+if [ -d "/root/backups" ]; then
+  bcount=$(find /root/backups -type f 2>/dev/null | wc -l)
+  if [ "$bcount" -gt 0 ]; then
+    ok "Legacy backup dir: /root/backups ($bcount files)"
+  fi
+fi
+
+# Remote backup checks via SSH
+echo ""
+echo " ── REMOTE BACKUP CHECKS ──"
+for server in hostinger hetzner coredb; do
+  echo -n "  $server: "
+  if ssh -G "$server" &>/dev/null 2>&1; then
+    result=$(ssh -o BatchMode=yes -o ConnectTimeout=5 "$server" "ls /root/backups/ 2>/dev/null | head -3" 2>/dev/null || true)
+    if [ -n "$result" ]; then
+      echo "$result"
+    else
+      echo "    [WARN] Cannot check (SSH or backup dir issue)"
+    fi
+  else
+    echo "    [WARN] SSH alias not configured"
+  fi
+done
+
+echo ""
+echo "  [INFO] For full backup verification, configure backup paths in config/services.yml"
