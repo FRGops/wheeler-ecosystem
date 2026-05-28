@@ -1,0 +1,632 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  db:
+    image: postgres:16.13-bookworm
+    container_name: prediction-radar-app-db
+    user: "999:999"
+    mem_limit: 2g
+    cpus: 1.0
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - SETGID
+      - SETUID
+    restart: unless-stopped
+    logging: *default-logging
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  db-backup:
+    image: prodrigestivill/postgres-backup-local:16-alpine
+    restart: unless-stopped
+    logging: *default-logging
+    volumes:
+      - ./backups:/backups
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      SCHEDULE: "@daily"
+      BACKUP_KEEP_DAYS: 7
+      BACKUP_KEEP_WEEKS: 4
+      BACKUP_KEEP_MONTHS: 6
+    mem_limit: 256m
+    cpus: 0.3
+    cap_drop:
+      - ALL
+    depends_on:
+      db:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    container_name: prediction-radar-app-redis
+    user: "999:999"
+    mem_limit: 512m
+    cpus: 0.5
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+    logging: *default-logging
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --save
+      - "60"
+      - "1000"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  api:
+    # === TRAEFIK_API_OVERRIDE_START ===
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.prediction-radar-api.rule=Host(`localhost`) && (PathPrefix(`/api`) || Path(`/openapi.json`) || PathPrefix(`/docs`) || PathPrefix(`/redoc`))"
+      - "traefik.http.routers.prediction-radar-api.entrypoints=websecure"
+      - "traefik.http.routers.prediction-radar-api.tls=true"
+      - "traefik.http.routers.prediction-radar-api.priority=100"
+      - "traefik.http.services.prediction-radar-api.loadbalancer.server.port=8000"
+    # === TRAEFIK_API_OVERRIDE_END ===
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    image: prediction-radar-api:v20260528
+    container_name: prediction-radar-app-api
+    restart: unless-stopped
+    stop_grace_period: 30s
+    logging: *default-logging
+    env_file:
+      - .env
+    environment:
+      HF_HOME: /tmp/huggingface
+      NUMBA_CACHE_DIR: /tmp/numba_cache
+      APP_NAME: ${APP_NAME}
+      APP_ENV: ${APP_ENV}
+      DATABASE_URL: ${DATABASE_URL}
+      SESSION_SECRET: ${SESSION_SECRET}
+      OPERATOR_EMAIL: ${OPERATOR_EMAIL}
+      OPERATOR_PASSWORD: ${OPERATOR_PASSWORD}
+      ENABLE_LIVE_EXECUTION: ${ENABLE_LIVE_EXECUTION}
+      REQUIRE_HUMAN_APPROVAL: ${REQUIRE_HUMAN_APPROVAL}
+      PAPER_MODE: ${PAPER_MODE}
+      KRONOS_REPO_PATH: /opt/repos-catalog/data/Kronos
+      KRONOS_MODEL_SIZE: ${KRONOS_MODEL_SIZE:-base}
+      ENERGY_VERTICAL_ENABLED: ${ENERGY_VERTICAL_ENABLED:-false}
+      EIA_API_KEY: ${EIA_API_KEY:-}
+      ENERGY_PAPER_MODE: ${ENERGY_PAPER_MODE:-true}
+      ENERGY_ENABLE_RECAPS: ${ENERGY_ENABLE_RECAPS:-false}
+      MAX_ENERGY_EXPOSURE_USD: ${MAX_ENERGY_EXPOSURE_USD:-250}
+      ENERGY_MIN_ORDER_USD: ${ENERGY_MIN_ORDER_USD:-2.0}
+      ENERGY_MAX_ORDER_USD: ${ENERGY_MAX_ORDER_USD:-25.0}
+      ENERGY_MAX_BANKROLL_USD: ${ENERGY_MAX_BANKROLL_USD:-500.0}
+      ENERGY_MIN_EDGE: ${ENERGY_MIN_EDGE:-0.06}
+      ENERGY_COOLDOWN_AFTER_MISS_HOURS: ${ENERGY_COOLDOWN_AFTER_MISS_HOURS:-24}
+      # Internal service-to-service auth
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
+      # Claude Managed Agents
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      MANAGED_AGENTS_ENABLED: ${MANAGED_AGENTS_ENABLED:-false}
+      MANAGED_AGENTS_ENV_ID: ${MANAGED_AGENTS_ENV_ID:-}
+      MANAGED_AGENT_SIGNAL_ADJUDICATOR_ID: ${MANAGED_AGENT_SIGNAL_ADJUDICATOR_ID:-}
+      MANAGED_AGENT_STRATEGY_ANALYST_ID: ${MANAGED_AGENT_STRATEGY_ANALYST_ID:-}
+      MANAGED_AGENT_BRIEFING_NARRATOR_ID: ${MANAGED_AGENT_BRIEFING_NARRATOR_ID:-}
+      MANAGED_AGENT_MARKET_SCOUT_ID: ${MANAGED_AGENT_MARKET_SCOUT_ID:-}
+      MANAGED_AGENT_ANOMALY_INVESTIGATOR_ID: ${MANAGED_AGENT_ANOMALY_INVESTIGATOR_ID:-}
+      MANAGED_AGENT_ENERGY_CATALYST_ID: ${MANAGED_AGENT_ENERGY_CATALYST_ID:-}
+      # Stocks vertical
+      STOCKS_VERTICAL_ENABLED: ${STOCKS_VERTICAL_ENABLED:-false}
+      ALPACA_API_KEY: ${ALPACA_API_KEY:-}
+      ALPACA_SECRET_KEY: ${ALPACA_SECRET_KEY:-}
+      ALPACA_BASE_URL: ${ALPACA_BASE_URL:-https://paper-api.alpaca.markets}
+      STOCKS_CONFIDENCE_FLOOR: ${STOCKS_CONFIDENCE_FLOOR:-0.55}
+      MAX_STOCKS_EXPOSURE_USD: ${MAX_STOCKS_EXPOSURE_USD:-500}
+      STOCKS_COOLDOWN_AFTER_LOSS_HOURS: ${STOCKS_COOLDOWN_AFTER_LOSS_HOURS:-24}
+      # IPO Intelligence vertical
+      IPO_VERTICAL_ENABLED: ${IPO_VERTICAL_ENABLED:-false}
+      IPO_CONFIDENCE_FLOOR: ${IPO_CONFIDENCE_FLOOR:-0.57}
+      MAX_IPO_EXPOSURE_USD: ${MAX_IPO_EXPOSURE_USD:-300}
+      EDGAR_POLL_INTERVAL_S: ${EDGAR_POLL_INTERVAL_S:-3600}
+      EDGAR_MAX_AGE_HOURS: ${EDGAR_MAX_AGE_HOURS:-25}
+      IPO_COOLDOWN_AFTER_LOSS_HOURS: ${IPO_COOLDOWN_AFTER_LOSS_HOURS:-48}
+      # Crypto / Altcoin / Memecoin vertical
+      CRYPTO_VERTICAL_ENABLED: ${CRYPTO_VERTICAL_ENABLED:-false}
+      CRYPTO_CONFIDENCE_FLOOR: ${CRYPTO_CONFIDENCE_FLOOR:-0.58}
+      MAX_CRYPTO_EXPOSURE_USD: ${MAX_CRYPTO_EXPOSURE_USD:-200}
+      CRYPTO_MIN_RUGCHECK_SCORE: ${CRYPTO_MIN_RUGCHECK_SCORE:-40}
+      CRYPTO_MIN_LIQUIDITY_USD: ${CRYPTO_MIN_LIQUIDITY_USD:-5000}
+      CRYPTO_MIN_TOKEN_AGE_HOURS: ${CRYPTO_MIN_TOKEN_AGE_HOURS:-1}
+      CRYPTO_TRACKED_CHAINS: ${CRYPTO_TRACKED_CHAINS:-ethereum,solana,base}
+      CCXT_DEFAULT_EXCHANGE: ${CCXT_DEFAULT_EXCHANGE:-binance}
+      CRYPTO_COOLDOWN_AFTER_LOSS_HOURS: ${CRYPTO_COOLDOWN_AFTER_LOSS_HOURS:-72}
+      # SeaweedFS S3 cold-storage (COREDB via Tailscale mesh)
+      SEAWEEDFS_S3_ENDPOINT_URL: "http://100.118.166.117:8333"
+      SEAWEEDFS_MASTER_URL: "http://100.118.166.117:9333"
+      SEAWEEDFS_BUCKET: "prediction-radar"
+      # ── Infisical Secrets (activate by uncommenting + switching image tag) ──
+      # To activate: change image tag to prediction-radar-api:v20260528-infisical
+      # INFISICAL_TOKEN: <your-infisical-service-token>
+      # INFISICAL_API_URL: http://100.118.166.117:8443
+      # INFISICAL_PROJECT_ID: ccc9ae51-d562-485f-8e2b-7f77e0c55a90
+      # AI Gateway — use Docker bridge gateway so containers can reach host port 4050
+      AI_GATEWAY_URL: "http://100.98.163.17:4050"
+      # Ollama — local LLM on host, reachable via Docker bridge gateway
+      OLLAMA_BASE_URL: "http://100.98.163.17:11434"
+      # Sportsbook Intelligence Engine
+      SPORTSBOOK_ENGINE_ENABLED: ${SPORTSBOOK_ENGINE_ENABLED:-true}
+      SPORTSBOOK_READ_ONLY: ${SPORTSBOOK_READ_ONLY:-true}
+      SPORTSBOOK_KILL_SWITCH: ${SPORTSBOOK_KILL_SWITCH:-false}
+      SPORTSBOOK_ENABLE_EXECUTION: ${SPORTSBOOK_ENABLE_EXECUTION:-false}
+      SPORTSBOOK_ALLOWED_PROVIDERS: ${SPORTSBOOK_ALLOWED_PROVIDERS:-mock,manual,the_odds_api}
+      SPORTSBOOK_MAX_STALENESS_SECONDS: ${SPORTSBOOK_MAX_STALENESS_SECONDS:-300}
+      THE_ODDS_API_KEY: ${THE_ODDS_API_KEY:-}
+    volumes:
+      - ./api/kalshi_private_key.pem:/app/kalshi_private_key.pem:ro
+      - ./api/services:/app/services:ro
+      - market_analysis_output:/app/analysis-output:ro
+      - /docker/openclaw-xg3v/data/.openclaw/openclaw.json:/data/openclaw-config/openclaw.json:ro
+      - /docker/openclaw-xg3v/data/.openclaw/routing-state.json:/data/openclaw-config/routing-state.json:rw
+      - /docker/openclaw-xg3v/data/.openclaw/routing-health.json:/data/openclaw-config/routing-health.json:ro
+      - /opt/repos-catalog/data/Kronos:/opt/repos-catalog/data/Kronos:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import socket; s=socket.create_connection(('127.0.0.1',8000),2); s.close()\""]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 180s
+    mem_limit: 2g
+    cpus: "1.0"
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/tmp
+      - /root/.cache
+
+  web:
+    # === TRAEFIK_API_OVERRIDE_START ===
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.prediction-radar-web-auth.rule=Host(`localhost`) && (PathPrefix(`/signin.html`) || PathPrefix(`/forgot-password.html`) || PathPrefix(`/verify-email.html`) || PathPrefix(`/shared/`) || PathPrefix(`/auth/`))"
+      - "traefik.http.routers.prediction-radar-web-auth.entrypoints=websecure"
+      - "traefik.http.routers.prediction-radar-web-auth.tls=true"
+      - "traefik.http.routers.prediction-radar-web-auth.priority=20"
+      - "traefik.http.routers.prediction-radar-web.rule=Host(`localhost`) && PathPrefix(`/`)"
+      - "traefik.http.routers.prediction-radar-web.entrypoints=websecure"
+      - "traefik.http.routers.prediction-radar-web.tls=true"
+      - "traefik.http.routers.prediction-radar-web.priority=10"
+      - "traefik.http.services.prediction-radar-web.loadbalancer.server.port=80"
+    # === TRAEFIK_API_OVERRIDE_END ===
+    build: ./web
+    image: prediction-radar-web:v20260528
+    container_name: prediction-radar-app-web
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.5
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    logging: *default-logging
+    ports:
+      - "127.0.0.1:8098:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    depends_on:
+      api:
+        condition: service_started
+      dashboard-v2:
+        condition: service_started
+
+  dashboard-v2:
+    build:
+      context: ./dashboard-v2
+      dockerfile: Dockerfile
+    image: prediction-radar-dashboard-v2:v20260528
+    container_name: prediction-radar-dashboard-v2
+    user: "1000:1000"
+    restart: unless-stopped
+    mem_limit: 512m
+    cpus: 0.5
+    cap_drop:
+      - ALL
+    logging: *default-logging
+    environment:
+      NODE_ENV: production
+      INTERNAL_API_BASE: "http://api:8000"
+      NEXT_PUBLIC_GRAFANA_URL: "http://localhost:3002/grafana"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.prediction-radar-v2.rule=Host(`localhost`) && PathPrefix(`/`)"
+      - "traefik.http.routers.prediction-radar-v2.entrypoints=websecure"
+      - "traefik.http.routers.prediction-radar-v2.tls=true"
+      - "traefik.http.routers.prediction-radar-v2.priority=15"
+      - "traefik.http.services.prediction-radar-v2.loadbalancer.server.port=3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/healthz > /dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+  worker:
+    build: ./worker
+    image: prediction-radar-worker:v20260528
+    container_name: prediction-radar-app-worker
+    user: "1000:1000"
+    mem_limit: 1g
+    cpus: 1.0
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import sys; sys.exit(0 if b'run.py' in open('/proc/1/cmdline','rb').read() else 1)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    env_file:
+      - .env
+    environment:
+      INTERNAL_API_BASE: "http://api:8000"
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+      WORKER_MARKET_LIMIT: ${WORKER_MARKET_LIMIT:-50}
+      WORKER_INTERVAL_SECONDS: ${WORKER_INTERVAL_SECONDS:-30}
+      WORKER_DISCORD_ALERTS: ${WORKER_DISCORD_ALERTS:-true}
+      WORKER_RUN_STRATEGIES: ${WORKER_RUN_STRATEGIES:-true}
+      WORKER_STRATEGY_KEY: ${WORKER_STRATEGY_KEY:-btc_market_maker,btc_up_down_v1,leaderboard_copy_v1}
+      WORKER_STRATEGY_LIMIT: ${WORKER_STRATEGY_LIMIT:-100}
+      WORKER_STRATEGY_LIMIT_PER_CYCLE: ${WORKER_STRATEGY_LIMIT_PER_CYCLE:-5}
+      WORKER_MIN_SIZE_A_GRADE_USD: ${WORKER_MIN_SIZE_A_GRADE_USD:-2}
+      KELLY_MAX_FRACTION: ${KELLY_MAX_FRACTION:-0.25}
+      BTC_MIN_ORDER_USD: ${BTC_MIN_ORDER_USD:-2}
+      BTC_MAX_ORDER_USD: ${BTC_MAX_ORDER_USD:-50}
+      KELLY_BANKROLL_USD: ${KELLY_BANKROLL_USD:-100}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+  scheduler:
+    build: ./scheduler
+    image: prediction-radar-scheduler:v20260528
+    container_name: prediction-radar-app-scheduler
+    user: "1000:1000"
+    mem_limit: 512m
+    cpus: 0.5
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import sys; sys.exit(0 if b'run.py' in open('/proc/1/cmdline','rb').read() else 1)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      INTERNAL_API_BASE: "http://api:8000"
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+      SCHEDULER_INTERVAL_SECONDS: ${SCHEDULER_INTERVAL_SECONDS}
+      ENABLE_LIVE_EXECUTION: ${ENABLE_LIVE_EXECUTION}
+      REQUIRE_HUMAN_APPROVAL: ${REQUIRE_HUMAN_APPROVAL}
+      PAPER_MODE: ${PAPER_MODE}
+      LEADERBOARD_INTERVAL_TICKS: ${LEADERBOARD_INTERVAL_TICKS:-80}
+      LEADERBOARD_ENABLED: ${LEADERBOARD_ENABLED:-true}
+      WITHDRAWAL_SCHEDULE: ${WITHDRAWAL_SCHEDULE:-disabled}
+      WITHDRAWAL_TARGET_WALLET: ${WITHDRAWAL_TARGET_WALLET:-}
+      WITHDRAWAL_RESERVE_USD: ${WITHDRAWAL_RESERVE_USD:-100}
+      WITHDRAWAL_AUTO_ENABLED: ${WITHDRAWAL_AUTO_ENABLED:-false}
+      ENERGY_VERTICAL_ENABLED: ${ENERGY_VERTICAL_ENABLED:-false}
+      EIA_API_KEY: ${EIA_API_KEY:-}
+      ENERGY_PAPER_MODE: ${ENERGY_PAPER_MODE:-true}
+      ENERGY_ENABLE_RECAPS: ${ENERGY_ENABLE_RECAPS:-false}
+      MAX_ENERGY_EXPOSURE_USD: ${MAX_ENERGY_EXPOSURE_USD:-250}
+      ENERGY_COOLDOWN_AFTER_MISS_HOURS: ${ENERGY_COOLDOWN_AFTER_MISS_HOURS:-24}
+      # Claude Managed Agents
+      MANAGED_AGENTS_ENABLED: ${MANAGED_AGENTS_ENABLED:-false}
+      MANAGED_AGENTS_ENV_ID: ${MANAGED_AGENTS_ENV_ID:-}
+      MANAGED_AGENT_STRATEGY_ANALYST_ID: ${MANAGED_AGENT_STRATEGY_ANALYST_ID:-}
+      MANAGED_AGENT_ENERGY_CATALYST_ID: ${MANAGED_AGENT_ENERGY_CATALYST_ID:-}
+      # Stocks vertical
+      STOCKS_VERTICAL_ENABLED: ${STOCKS_VERTICAL_ENABLED:-false}
+      ALPACA_API_KEY: ${ALPACA_API_KEY:-}
+      ALPACA_SECRET_KEY: ${ALPACA_SECRET_KEY:-}
+      ALPACA_BASE_URL: ${ALPACA_BASE_URL:-https://paper-api.alpaca.markets}
+      STOCKS_CONFIDENCE_FLOOR: ${STOCKS_CONFIDENCE_FLOOR:-0.55}
+      MAX_STOCKS_EXPOSURE_USD: ${MAX_STOCKS_EXPOSURE_USD:-500}
+      # IPO Intelligence vertical
+      IPO_VERTICAL_ENABLED: ${IPO_VERTICAL_ENABLED:-false}
+      IPO_CONFIDENCE_FLOOR: ${IPO_CONFIDENCE_FLOOR:-0.57}
+      MAX_IPO_EXPOSURE_USD: ${MAX_IPO_EXPOSURE_USD:-300}
+      EDGAR_MAX_AGE_HOURS: ${EDGAR_MAX_AGE_HOURS:-25}
+      # Crypto / Altcoin / Memecoin vertical
+      CRYPTO_VERTICAL_ENABLED: ${CRYPTO_VERTICAL_ENABLED:-false}
+      CRYPTO_CONFIDENCE_FLOOR: ${CRYPTO_CONFIDENCE_FLOOR:-0.58}
+      MAX_CRYPTO_EXPOSURE_USD: ${MAX_CRYPTO_EXPOSURE_USD:-200}
+      CRYPTO_MIN_RUGCHECK_SCORE: ${CRYPTO_MIN_RUGCHECK_SCORE:-40}
+      CRYPTO_MIN_LIQUIDITY_USD: ${CRYPTO_MIN_LIQUIDITY_USD:-5000}
+      CRYPTO_MIN_TOKEN_AGE_HOURS: ${CRYPTO_MIN_TOKEN_AGE_HOURS:-1}
+      CCXT_DEFAULT_EXCHANGE: ${CCXT_DEFAULT_EXCHANGE:-binance}
+    depends_on:
+      db:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: prediction-radar-prometheus
+    user: "65534:65534"
+    mem_limit: 1g
+    cpus: 0.5
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+    logging: *default-logging
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/alert_rules.yml:/etc/prometheus/alert_rules.yml
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=30d"
+      - "--web.enable-lifecycle"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9090/-/healthy || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      api:
+        condition: service_healthy
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: prediction-radar-alertmanager
+    user: "65534:65534"
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.3
+    cap_drop:
+      - ALL
+    logging: *default-logging
+    volumes:
+      - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+      - ./alertmanager/rules.yml:/etc/alertmanager/rules.yml
+      - alertmanager_data:/alertmanager
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9093/-/healthy || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: prediction-radar-grafana
+    user: "472:472"
+    mem_limit: 512m
+    cpus: 0.5
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-prediction-radar-grafana}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  uptime-kuma:
+    image: louislam/uptime-kuma:1.23.17
+    container_name: prediction-radar-uptime-kuma
+    restart: unless-stopped
+    mem_limit: 512m
+    cpus: 0.5
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETGID
+      - SETUID
+    logging: *default-logging
+    volumes:
+      - uptime_kuma_data:/app/data
+    depends_on:
+      api:
+        condition: service_healthy
+
+  # ── Prediction Market Analysis (research/analytics sidecar) ──────────
+  # Run-to-completion job: indexes market data, runs analyses, exports results.
+  # Trigger manually: docker compose run --rm market-analysis
+  # Or specific phase: docker compose run --rm market-analysis bash scripts/pipeline.sh index-only
+  market-analysis:
+    profiles:
+      - manual
+    build: /opt/apps/prediction-market-analysis
+    image: prediction-radar-market-analysis:v20260528
+    container_name: prediction-radar-market-analysis
+    restart: "no"
+    logging: *default-logging
+    env_file:
+      - .env
+    environment:
+      MPLBACKEND: "Agg"
+      POLYGON_RPC: ${POLYGON_RPC:-}
+      POLYMARKET_START_BLOCK: ${POLYMARKET_START_BLOCK:-33605403}
+    volumes:
+      - market_analysis_data:/app/data
+      - market_analysis_output:/app/output
+    # Default: run full pipeline (index → analyze → export)
+    command: ["bash", "scripts/pipeline.sh", "full"]
+
+  # ── Fail2Ban: brute-force and DDoS protection ────────────────────────────
+  fail2ban:
+    image: crazymax/fail2ban@sha256:7cd8a427a44675397398a8dace2a3d755e62c72527f8730e4fd37697731a9321
+    container_name: prediction-radar-fail2ban
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.3
+    logging: *default-logging
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - /var/log:/var/log:ro
+      - fail2ban_data:/data
+    environment:
+      TZ: UTC
+      F2B_LOG_TARGET: STDOUT
+      F2B_LOG_LEVEL: INFO
+      F2B_DB_PURGEAGE: "86400"
+
+  # ── QuestDB: high-performance time-series database for market data ─────
+  questdb:
+    image: questdb/questdb:9.4.0
+    container_name: prediction-radar-questdb
+    restart: unless-stopped
+    mem_limit: 2g
+    cpus: 1.0
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    logging: *default-logging
+    ports:
+      - "127.0.0.1:8812:8812"
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9009:9009"
+    volumes:
+      - questdb_data:/var/lib/questdb
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf 'http://127.0.0.1:9000/exec?query=SELECT+1' > /dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 15s
+
+  # ── CrowdSec: community threat intelligence + behavior-based blocking ────
+  crowdsec:
+    image: crowdsecurity/crowdsec@sha256:2f527c9bb8b367120eb08b82890aa912ce96bfa1ada93dda0721700e4b4e0dde
+    container_name: prediction-radar-crowdsec
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.3
+    logging: *default-logging
+    environment:
+      COLLECTIONS: "crowdsecurity/nginx crowdsecurity/base-http-scenarios crowdsecurity/iptables"
+      TZ: UTC
+    volumes:
+      - ./crowdsec/acquis.yaml:/etc/crowdsec/acquis.yaml:ro
+      - crowdsec_db:/var/lib/crowdsec/data
+      - /var/log/nginx:/var/log/nginx:ro
+    healthcheck:
+      test: ["CMD-SHELL", "cscli lapi status >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - default
+
+  fincept-terminal:
+    build:
+      context: ./fincept-terminal
+      dockerfile: Dockerfile
+    image: prediction-radar-fincept-terminal:v20260528
+    container_name: prediction-radar-fincept
+    restart: unless-stopped
+    mem_limit: 512m
+    cpus: 0.5
+    cap_drop:
+      - ALL
+    logging: *default-logging
+    environment:
+      VNC_PASSWORD: ${FINCEPT_VNC_PASSWORD:-radarfincept}
+    shm_size: '256mb'
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:6080/ >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.fincept.rule=Host(`localhost`) && PathPrefix(`/fincept`)"
+      - "traefik.http.routers.fincept.entrypoints=websecure"
+      - "traefik.http.routers.fincept.tls=true"
+      - "traefik.http.routers.fincept.priority=50"
+      - "traefik.http.routers.fincept.middlewares=fincept-strip"
+      - "traefik.http.middlewares.fincept-strip.stripprefix.prefixes=/fincept"
+      - "traefik.http.services.fincept.loadbalancer.server.port=6080"
+
+volumes:
+  postgres_data:
+  fail2ban_data:
+  crowdsec_db:
+  prometheus_data:
+  alertmanager_data:
+  grafana_data:
+  uptime_kuma_data:
+  market_analysis_data:
+  market_analysis_output:
+  questdb_data:
