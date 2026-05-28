@@ -787,7 +787,7 @@ register_peers_with_daemon() {
         # Check if already registered
         local existing
         existing="$(curl -s "$REPOWIRE_API/peers" --connect-timeout 3 --max-time 5 2>/dev/null \
-            | python3 -c "import json,sys; data=json.load(sys.stdin); print(any(p.get('name')=='${peer_name}' for p in data))" 2>/dev/null || echo "false")"
+            | python3 -c 'import json,sys; data=json.load(sys.stdin); print(any(p.get("name")==sys.argv[1] for p in data))' "${peer_name}" 2>/dev/null || echo "false")"
 
         if [[ "$existing" == "True" ]]; then
             log_info "$peer_name already registered in mesh — updating metadata"

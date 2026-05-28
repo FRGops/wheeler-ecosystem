@@ -149,10 +149,10 @@ except Exception:
 repowire_hook_broadcast() {
     local text="$1"
     local payload
-    payload="$(python3 -c "
-import json
-print(json.dumps({'from_peer': '${PEER_NAME}', 'text': '${text}'}))
-" 2>/dev/null)"
+    payload="$(python3 -c '
+import json, sys
+print(json.dumps({"from_peer": sys.argv[1], "text": sys.argv[2]}))
+' "${PEER_NAME}" "${text}" 2>/dev/null)"
 
     if _rh_api "POST" "/broadcast" "${payload}"; then
         _rh_ok "Broadcast: ${text}"

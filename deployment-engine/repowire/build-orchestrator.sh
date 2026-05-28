@@ -293,25 +293,32 @@ _bo_state_update() {
     local tmp
     tmp="$(mktemp)" 2>/dev/null || tmp="/tmp/bo-state-$$.tmp"
 
-    # Use a safe python3 one-liner for JSON manipulation
-    python3 -c "
-import json, sys
+    # Use a safe python3 one-liner for JSON manipulation (args passed via sys.argv)
+    python3 -c '
+import json, sys, os
+state_path = sys.argv[1]
+key = sys.argv[2]
+value = sys.argv[3]
 try:
-    with open('${state_path}') as f:
+    with open(state_path) as f:
         data = json.load(f)
-    data['${key}'] = json.loads('${value}') if ('${value}' == 'true' or '${value}' == 'false' or '${value}' == 'null' or (isinstance(${value}, (int, float)) if False else True)) else '${value}'
+    data[key] = json.loads(value) if value in ("true", "false", "null") else value
 except:
     data = {}
-    data['${key}'] = '${value}'
-with open('${state_path}', 'w') as f:
+    data[key] = value
+with open(state_path, "w") as f:
     json.dump(data, f, indent=2)
-" 2>/dev/null || python3 -c "
+' "${state_path}" "${key}" "${value}" 2>/dev/null || python3 -c '
 import json, sys
-with open('${state_path}') as f:
+state_path = sys.argv[1]
+key = sys.argv[2]
+value = sys.argv[3]
+with open(state_path) as f:
     data = json.load(f)
-data['${key}'] = '${value}'
-with open('${state_path}', 'w') as f:
+data[key] = value
+with open(state_path, "w") as f:
     json.dump(data, f, indent=2)
+' "${state_path}" "${key}" "${value}"
 " 2>/dev/null || true
 
     rm -f "${tmp}" 2>/dev/null || true
